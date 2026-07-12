@@ -4,10 +4,10 @@ import { moduleSummaries } from "@/lib/data";
 export default function WarehousesPage() {
   return (
     <ModulePage
-      title="Warehouses"
-      description="Multiple warehouse control for main warehouse, cold storage, dry storage, chemical storage, and packaging storage."
+      title="Gudang"
+      description="Kontrol beberapa gudang untuk gudang utama, gudang dingin, gudang kering, gudang kimia, dan gudang kemasan."
       records={moduleSummaries.warehouses}
-      actions={["Create warehouse", "Assign staff", "Map zones", "Set storage rules", "Review capacity"]}
+      actions={["Buat gudang", "Tugaskan staf", "Petakan zona", "Atur aturan simpan", "Review kapasitas"]}
     />
   );
 }

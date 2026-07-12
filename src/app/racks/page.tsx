@@ -4,10 +4,10 @@ import { moduleSummaries } from "@/lib/data";
 export default function RacksPage() {
   return (
     <ModulePage
-      title="Rack Management"
-      description="Rack code management with structured location labels such as A-01-01 for fast storage, picking, and stock opname."
+      title="Manajemen Rak"
+      description="Pengelolaan kode rak dengan label lokasi seperti A-01-01 untuk penyimpanan, picking, dan stok opname."
       records={moduleSummaries.racks}
-      actions={["Generate rack code", "Assign warehouse", "Print label", "Scan QR", "Track capacity"]}
+      actions={["Buat kode rak", "Tentukan gudang", "Cetak label", "Scan QR", "Pantau kapasitas"]}
     />
   );
 }

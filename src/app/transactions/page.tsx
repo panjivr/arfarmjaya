@@ -1,13 +1,17 @@
-import { ModulePage } from "@/components/module-page";
+import { AppShell } from "@/components/shell/app-shell";
+import { StockOutForm } from "@/components/inventory/stock-out-form";
 
 export default function TransactionsPage() {
   return (
-    <ModulePage
-      title="Inventory Transactions"
-      description="Incoming, outgoing, adjustment, transfer, mutation, FIFO, FEFO, and batch tracking with immutable stock ledger."
-      stages={["Transaction Draft", "Stock Rule Check", "FIFO/FEFO Allocation", "Approval", "Ledger Posted"]}
-      records={["IN-260712-044 / 320 bags", "OUT-260712-067 / branch request", "ADJ-260711-012 / stock opname variance"]}
-      actions={["Incoming", "Outgoing", "Adjustment", "Transfer", "Mutation"]}
-    />
+    <AppShell>
+      <div className="mb-6">
+        <p className="text-sm font-semibold text-primary">Operasional Gudang</p>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight">Barang Keluar</h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
+          Karyawan gudang dapat mencatat barang keluar, misalnya Barang A keluar 50 pcs. Admin Utama tetap dapat melihat dan mengelola seluruh akses.
+        </p>
+      </div>
+      <StockOutForm />
+    </AppShell>
   );
 }

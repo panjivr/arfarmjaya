@@ -8,8 +8,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "AR FARM JAYA WMS",
-  description: "Enterprise Warehouse Management System for AR FARM JAYA.",
+  title: "AR FARM JAYA - Sistem Manajemen Gudang",
+  description: "Sistem manajemen gudang, inventori, pembelian, distribusi, dan barang keluar AR FARM JAYA.",
 };
 
 export default function RootLayout({
@@ -18,7 +18,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={inter.variable} suppressHydrationWarning>
+    <html lang="id" className={inter.variable} suppressHydrationWarning>
       <body>{children}</body>
     </html>
   );

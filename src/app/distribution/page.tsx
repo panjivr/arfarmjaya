@@ -3,11 +3,11 @@ import { ModulePage } from "@/components/module-page";
 export default function DistributionPage() {
   return (
     <ModulePage
-      title="Distribution"
-      description="Warehouse distribution workflow covering picking, packing, loading, shipping, delivered, and completed status."
-      stages={["Warehouse", "Picking", "Packing", "Loading", "Shipping", "Delivered", "Completed"]}
-      records={["DO-260712-018 / Branch Cibubur", "DO-260712-019 / Kitchen Central", "DO-260711-088 / Retail store"]}
-      actions={["Create delivery", "Assign driver", "Print manifest", "Track status", "Confirm delivery"]}
+      title="Distribusi"
+      description="Alur distribusi gudang dari picking, packing, loading, pengiriman, terkirim, sampai selesai."
+      stages={["Gudang", "Picking", "Packing", "Loading", "Pengiriman", "Terkirim", "Selesai"]}
+      records={["DO-260712-018 / Cabang Cibubur", "DO-260712-019 / Dapur Pusat", "DO-260711-088 / Toko retail"]}
+      actions={["Buat pengiriman", "Tugaskan driver", "Cetak manifest", "Pantau status", "Konfirmasi terkirim"]}
     />
   );
 }

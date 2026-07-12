@@ -4,10 +4,10 @@ const prisma = new PrismaClient();
 
 async function main() {
   const role = await prisma.role.upsert({
-    where: { name: "Owner" },
+    where: { name: "Admin Utama" },
     update: {},
     create: {
-      name: "Owner",
+      name: "Admin Utama",
       permissions: {
         create: [
           { action: "manage", subject: "all" },
@@ -22,9 +22,33 @@ async function main() {
     where: { email: "owner@arfarmjaya.com" },
     update: {},
     create: {
-      name: "AR FARM JAYA Owner",
+      name: "Admin Utama",
       email: "owner@arfarmjaya.com",
       roleId: role.id,
+    },
+  });
+
+  const staffRole = await prisma.role.upsert({
+    where: { name: "Karyawan Gudang" },
+    update: {},
+    create: {
+      name: "Karyawan Gudang",
+      permissions: {
+        create: [
+          { action: "create", subject: "stock-out" },
+          { action: "read", subject: "stock-out" },
+        ],
+      },
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: "karyawan@arfarmjaya.com" },
+    update: {},
+    create: {
+      name: "Karyawan Gudang",
+      email: "karyawan@arfarmjaya.com",
+      roleId: staffRole.id,
     },
   });
 

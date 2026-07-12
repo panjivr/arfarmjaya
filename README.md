@@ -1,16 +1,21 @@
 # AR FARM JAYA WMS
 
-Enterprise Warehouse Management System for AR FARM JAYA.
+Sistem Manajemen Gudang untuk ARFARM BHINNEKA NUSA JAYA.
 
-## Features
+## Fitur
 
-- Executive dashboard with inventory, purchase, distribution, retail, revenue, and expense metrics
-- Inventory master data with SKU, barcode, QR code-ready fields, rack, warehouse, supplier, batch, and expiration tracking
-- Purchasing, receiving goods, inventory transactions, distribution, request goods, stock opname, and retail POS modules
-- Reports, analytics, users and roles, notifications, audit log, and system settings
-- Responsive dashboard shell with sidebar navigation, global search command palette, charts, and advanced tables
-- PostgreSQL and Prisma schema for normalized production data
-- Zod validated server actions and RBAC-ready architecture
+- Login dengan role `Admin Utama` dan `Karyawan Gudang`.
+- Admin Utama memiliki akses penuh ke seluruh menu.
+- Karyawan Gudang hanya dapat mencatat Barang Keluar.
+- Dasbor inventori, pembelian, distribusi, penjualan, pendapatan, dan biaya.
+- Data barang dengan SKU, barcode, rak, gudang, pemasok, batch, dan tanggal kedaluwarsa.
+- Modul kategori, pemasok, gudang, rak, pembelian, penerimaan barang, distribusi, permintaan barang, stok opname, POS retail, laporan, pengguna, notifikasi, log audit, analitik, dan pengaturan.
+- Prisma schema PostgreSQL ternormalisasi dan seed data role awal.
+
+## Akun Demo
+
+- Admin Utama: `admin` / `admin123`
+- Karyawan Gudang: `karyawan` / `gudang123`
 
 ## Stack
 
@@ -18,16 +23,16 @@ Enterprise Warehouse Management System for AR FARM JAYA.
 - React 19
 - TypeScript
 - TailwindCSS
-- Prisma and PostgreSQL
-- Better Auth-ready authentication boundary
+- Prisma dan PostgreSQL
+- Better Auth-ready
 - Zustand
 - TanStack Table
 - Recharts
-- React Hook Form and Zod
+- React Hook Form dan Zod
 - Lucide Icons
 - Framer Motion
 
-## Getting Started
+## Menjalankan Lokal
 
 ```bash
 npm install
@@ -36,17 +41,17 @@ npm run prisma:generate
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+Buka `http://localhost:3000`.
 
 ## Database
 
-Set `DATABASE_URL` in `.env`, then run:
+Isi `DATABASE_URL` di `.env`, lalu jalankan:
 
 ```bash
 npm run prisma:migrate
 npm run prisma:seed
 ```
 
-## Architecture
+## Arsitektur
 
-See `docs/ARCHITECTURE.md` for the module map, security model, API architecture, and ERD.
+Lihat `docs/ARCHITECTURE.md` untuk struktur modul, model keamanan, API, dan ERD.

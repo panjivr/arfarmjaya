@@ -4,10 +4,10 @@ import { moduleSummaries } from "@/lib/data";
 export default function CategoriesPage() {
   return (
     <ModulePage
-      title="Categories"
-      description="CRUD category management for feed, veterinary, retail, packaging, chemical, and future product groupings."
+      title="Kategori"
+      description="Pengelolaan kategori untuk pakan, veteriner, retail, kemasan, kimia, dan kelompok produk lain."
       records={moduleSummaries.categories}
-      actions={["Create category", "Edit hierarchy", "Merge duplicate", "Archive category", "Audit changes"]}
+      actions={["Buat kategori", "Edit hierarki", "Gabungkan duplikat", "Arsip kategori", "Audit perubahan"]}
     />
   );
 }

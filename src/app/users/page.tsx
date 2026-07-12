@@ -4,10 +4,10 @@ import { moduleSummaries } from "@/lib/data";
 export default function UsersPage() {
   return (
     <ModulePage
-      title="Users & Roles"
-      description="Better Auth-ready user management with role based access control for owner, administrator, warehouse, purchasing, cashier, driver, and viewer users."
+      title="Pengguna & Role"
+      description="Manajemen pengguna siap Better Auth dengan hak akses berbasis role untuk admin utama, gudang, pembelian, kasir, driver, dan viewer."
       records={moduleSummaries.roles}
-      actions={["Invite user", "Assign role", "Set permission", "Disable account", "Review access log"]}
+      actions={["Undang pengguna", "Tetapkan role", "Atur izin", "Nonaktifkan akun", "Review akses"]}
     />
   );
 }

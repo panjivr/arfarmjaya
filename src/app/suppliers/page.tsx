@@ -4,10 +4,10 @@ import { moduleSummaries } from "@/lib/data";
 export default function SuppliersPage() {
   return (
     <ModulePage
-      title="Suppliers"
-      description="Supplier profiles with company, contact, phone, email, address, tax number, payment terms, ranking, and purchase performance."
+      title="Pemasok"
+      description="Profil pemasok berisi perusahaan, kontak, telepon, email, alamat, nomor pajak, termin pembayaran, peringkat, dan performa pembelian."
       records={moduleSummaries.suppliers}
-      actions={["Add supplier", "Validate tax number", "Set payment terms", "Rank supplier", "Export supplier report"]}
+      actions={["Tambah pemasok", "Validasi pajak", "Atur termin", "Beri peringkat", "Ekspor laporan"]}
     />
   );
 }

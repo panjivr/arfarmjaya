@@ -19,15 +19,15 @@ export function InventoryValueChart() {
       <AreaChart data={inventoryTrend}>
         <defs>
           <linearGradient id="inventoryValue" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="5%" stopColor="#22C55E" stopOpacity={0.35} />
-            <stop offset="95%" stopColor="#22C55E" stopOpacity={0} />
+            <stop offset="5%" stopColor="#76B852" stopOpacity={0.35} />
+            <stop offset="95%" stopColor="#76B852" stopOpacity={0} />
           </linearGradient>
         </defs>
         <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
         <XAxis dataKey="month" tickLine={false} axisLine={false} />
         <YAxis tickLine={false} axisLine={false} />
-        <Tooltip formatter={(value) => [`${value}B`, "Inventory Value"]} />
-        <Area type="monotone" dataKey="value" stroke="#166534" strokeWidth={3} fill="url(#inventoryValue)" />
+        <Tooltip formatter={(value) => [`${value}B`, "Nilai Inventori"]} />
+        <Area type="monotone" dataKey="value" stroke="#007A4B" strokeWidth={3} fill="url(#inventoryValue)" />
       </AreaChart>
     </ResponsiveContainer>
   );
@@ -41,8 +41,8 @@ export function RevenuePurchaseChart() {
         <XAxis dataKey="month" tickLine={false} axisLine={false} />
         <YAxis tickLine={false} axisLine={false} />
         <Tooltip />
-        <Bar dataKey="purchase" name="Purchases" fill="#166534" radius={[6, 6, 0, 0]} />
-        <Bar dataKey="revenue" name="Revenue" fill="#F59E0B" radius={[6, 6, 0, 0]} />
+        <Bar dataKey="purchase" name="Pembelian" fill="#007A4B" radius={[6, 6, 0, 0]} />
+        <Bar dataKey="revenue" name="Pendapatan" fill="#F6B333" radius={[6, 6, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -56,7 +56,7 @@ export function DistributionChart() {
         <XAxis type="number" tickLine={false} axisLine={false} />
         <YAxis type="category" dataKey="status" width={82} tickLine={false} axisLine={false} />
         <Tooltip />
-        <Bar dataKey="orders" fill="#22C55E" radius={[0, 6, 6, 0]} />
+        <Bar dataKey="orders" fill="#76B852" radius={[0, 6, 6, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );

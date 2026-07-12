@@ -20,18 +20,18 @@ export function ProductTable() {
     () => [
       { accessorKey: "sku", header: "SKU" },
       { accessorKey: "barcode", header: "Barcode" },
-      { accessorKey: "name", header: "Product Name" },
-      { accessorKey: "category", header: "Category" },
-      { accessorKey: "warehouse", header: "Warehouse" },
+      { accessorKey: "name", header: "Nama Barang" },
+      { accessorKey: "category", header: "Kategori" },
+      { accessorKey: "warehouse", header: "Gudang" },
       { accessorKey: "rack", header: "Rack" },
       {
         accessorKey: "currentStock",
-        header: "Stock",
+        header: "Stok",
         cell: ({ row }) => `${row.original.currentStock} ${row.original.unit}`,
       },
       {
         accessorKey: "retailPrice",
-        header: "Retail Price",
+        header: "Harga Jual",
         cell: ({ row }) => currency.format(row.original.retailPrice),
       },
       {
@@ -41,10 +41,10 @@ export function ProductTable() {
           <span
             className={cn(
               "rounded-full px-2.5 py-1 text-xs font-semibold",
-              row.original.status === "Available" && "bg-green-50 text-primary",
-              row.original.status === "Low Stock" && "bg-amber-50 text-amber-700",
-              row.original.status === "Expiring" && "bg-orange-50 text-orange-700",
-              row.original.status === "Quarantine" && "bg-red-50 text-danger",
+              row.original.status === "Tersedia" && "bg-leaf/10 text-primary",
+              row.original.status === "Stok Rendah" && "bg-amber-50 text-amber-700",
+              row.original.status === "Hampir Kedaluwarsa" && "bg-orange-50 text-orange-700",
+              row.original.status === "Karantina" && "bg-red-50 text-danger",
             )}
           >
             {row.original.status}
@@ -72,13 +72,13 @@ export function ProductTable() {
           value={globalFilter}
           onChange={(event) => setGlobalFilter(event.target.value)}
           className="h-10 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-          placeholder="Search product, SKU, barcode, rack, supplier..."
+          placeholder="Cari barang, SKU, barcode, rak, atau pemasok..."
         />
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary"><Filter className="h-4 w-4" /> Filter</Button>
-          <Button variant="secondary"><Upload className="h-4 w-4" /> Import</Button>
-          <Button variant="secondary"><Download className="h-4 w-4" /> Export</Button>
-          <Button><Plus className="h-4 w-4" /> Product</Button>
+          <Button variant="secondary"><Upload className="h-4 w-4" /> Impor</Button>
+          <Button variant="secondary"><Download className="h-4 w-4" /> Ekspor</Button>
+          <Button><Plus className="h-4 w-4" /> Barang</Button>
         </div>
       </div>
       <div className="overflow-x-auto">

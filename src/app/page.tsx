@@ -12,9 +12,9 @@ export default function DashboardPage() {
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-sm font-semibold text-primary">AR FARM JAYA</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight">Warehouse Management System</h1>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight">Sistem Manajemen Gudang</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-            Executive control center for inventory, purchasing, receiving, distribution, retail POS, analytics, and audit-ready operations.
+            Pusat kendali untuk inventori, pembelian, penerimaan, distribusi, POS retail, analitik, dan operasional siap audit.
           </p>
         </div>
         <div className="grid grid-cols-3 gap-2 rounded-lg border border-border bg-card p-2 text-center text-xs">
@@ -28,7 +28,7 @@ export default function DashboardPage() {
           </div>
           <div className="rounded-md bg-slate-100 px-3 py-2 text-slate-700">
             <Truck className="mx-auto mb-1 h-4 w-4" />
-            Live
+            Aktif
           </div>
         </div>
       </div>
@@ -41,7 +41,7 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-sm text-muted">{metric.label}</p>
                   <p className="mt-2 text-2xl font-bold">
-                    {metric.label.includes("Value") || metric.label.includes("Sales")
+                    {metric.label.includes("Nilai") || metric.label.includes("Penjualan")
                       ? currency.format(metric.value)
                       : compactNumber.format(metric.value)}
                   </p>
@@ -59,8 +59,8 @@ export default function DashboardPage() {
       <section className="mt-4 grid gap-4 xl:grid-cols-2">
         <Card>
           <CardHeader>
-            <h2 className="font-semibold">Inventory Value</h2>
-            <p className="text-sm text-muted">Monthly valuation trend in billion IDR.</p>
+            <h2 className="font-semibold">Nilai Inventori</h2>
+            <p className="text-sm text-muted">Tren valuasi bulanan dalam miliar rupiah.</p>
           </CardHeader>
           <CardContent>
             <InventoryValueChart />
@@ -68,8 +68,8 @@ export default function DashboardPage() {
         </Card>
         <Card>
           <CardHeader>
-            <h2 className="font-semibold">Purchases vs Revenue</h2>
-            <p className="text-sm text-muted">Purchasing, retail sales, and operating cash flow view.</p>
+            <h2 className="font-semibold">Pembelian vs Pendapatan</h2>
+            <p className="text-sm text-muted">Ringkasan pembelian, penjualan retail, dan arus kas operasional.</p>
           </CardHeader>
           <CardContent>
             <RevenuePurchaseChart />
@@ -80,8 +80,8 @@ export default function DashboardPage() {
       <section className="mt-4 grid gap-4 xl:grid-cols-[1fr_420px]">
         <Card>
           <CardHeader>
-            <h2 className="font-semibold">Inventory Control</h2>
-            <p className="text-sm text-muted">Search, filter, sort, import, export, batch, rack, and expiration tracking.</p>
+            <h2 className="font-semibold">Kontrol Inventori</h2>
+            <p className="text-sm text-muted">Cari, filter, sortir, impor, ekspor, batch, rak, dan pelacakan kedaluwarsa.</p>
           </CardHeader>
           <CardContent className="p-0">
             <ProductTable />
@@ -89,8 +89,8 @@ export default function DashboardPage() {
         </Card>
         <Card>
           <CardHeader>
-            <h2 className="font-semibold">Distribution Today</h2>
-            <p className="text-sm text-muted">Picking through completed delivery status.</p>
+            <h2 className="font-semibold">Distribusi Hari Ini</h2>
+            <p className="text-sm text-muted">Status dari picking sampai pengiriman selesai.</p>
           </CardHeader>
           <CardContent>
             <DistributionChart />

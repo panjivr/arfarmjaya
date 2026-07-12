@@ -3,10 +3,10 @@ import { ModulePage } from "@/components/module-page";
 export default function AuditLogPage() {
   return (
     <ModulePage
-      title="Audit Log"
-      description="Immutable audit trail that records who changed what, when it happened, old value, new value, and IP address."
-      records={["Admin updated minimum stock", "Warehouse Manager approved adjustment", "Cashier voided POS transaction"]}
-      actions={["Filter actor", "Compare values", "Export evidence", "Review IP", "Lock retention"]}
+      title="Log Audit"
+      description="Jejak audit permanen yang mencatat siapa mengubah apa, kapan terjadi, nilai lama, nilai baru, dan alamat IP."
+      records={["Admin mengubah stok minimum", "Manajer gudang menyetujui adjustment", "Kasir membatalkan transaksi POS"]}
+      actions={["Filter aktor", "Bandingkan nilai", "Ekspor bukti", "Review IP", "Kunci retensi"]}
     />
   );
 }

@@ -3,10 +3,10 @@ import { ModulePage } from "@/components/module-page";
 export default function ReportsPage() {
   return (
     <ModulePage
-      title="Reports"
-      description="Inventory, purchase, supplier, stock movement, distribution, retail sales, expired, slow moving, fast moving, and valuation reports."
-      records={["Inventory Valuation / July 2026", "Fast Moving Products / Week 28", "Expired Report / 30-day horizon"]}
-      actions={["Export PDF", "Export Excel", "Export CSV", "Schedule report", "Email report"]}
+      title="Laporan"
+      description="Laporan inventori, pembelian, pemasok, pergerakan stok, distribusi, penjualan retail, kedaluwarsa, slow moving, fast moving, dan valuasi."
+      records={["Valuasi Inventori / Juli 2026", "Produk Fast Moving / Minggu 28", "Laporan Kedaluwarsa / 30 hari"]}
+      actions={["Ekspor PDF", "Ekspor Excel", "Ekspor CSV", "Jadwalkan laporan", "Kirim email"]}
     />
   );
 }
