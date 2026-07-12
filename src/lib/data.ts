@@ -19,6 +19,7 @@ import {
   Users,
   Warehouse,
 } from "lucide-react";
+import { realStockProducts } from "@/lib/stock-products";
 
 export type Product = {
   sku: string;
@@ -32,12 +33,16 @@ export type Product = {
   minStock: number;
   maxStock: number;
   currentStock: number;
+  initialStock?: number;
+  stockIn?: number;
+  stockOut?: number;
   rack: string;
   warehouse: string;
   supplier: string;
   batch: string;
   expirationDate: string;
-  status: "Tersedia" | "Stok Rendah" | "Hampir Kedaluwarsa" | "Karantina";
+  status: "Tersedia" | "Stok Rendah" | "Hampir Kedaluwarsa" | "Karantina" | "Habis";
+  lastUpdate?: string;
 };
 
 export const navigation = [
@@ -62,113 +67,24 @@ export const navigation = [
   { label: "Pengaturan", href: "/settings", icon: Settings2, adminOnly: true },
 ];
 
-export const products: Product[] = [
-  {
-    sku: "AFJ-FEED-001",
-    barcode: "8997001200011",
-    name: "Pakan Layer Premium 50kg",
-    category: "Pakan",
-    brand: "AR Select",
-    unit: "Karung",
-    purchasePrice: 315000,
-    retailPrice: 345000,
-    minStock: 80,
-    maxStock: 420,
-    currentStock: 312,
-    rack: "A-01-01",
-    warehouse: "Gudang Kering",
-    supplier: "PT Agro Nutrisi Prima",
-    batch: "B2407-LF",
-    expirationDate: "2026-11-20",
-    status: "Tersedia",
-  },
-  {
-    sku: "AFJ-MED-014",
-    barcode: "8997001200141",
-    name: "Konsentrat Vitamin Unggas",
-    category: "Veteriner",
-    brand: "VitaFarm",
-    unit: "Botol",
-    purchasePrice: 47000,
-    retailPrice: 65000,
-    minStock: 120,
-    maxStock: 800,
-    currentStock: 64,
-    rack: "C-03-08",
-    warehouse: "Gudang Kimia",
-    supplier: "CV Sehat Ternak",
-    batch: "VT2603",
-    expirationDate: "2026-08-12",
-    status: "Stok Rendah",
-  },
-  {
-    sku: "AFJ-EGG-030",
-    barcode: "8997001200301",
-    name: "Telur Grade A per Tray",
-    category: "Retail",
-    brand: "AR Farm Jaya",
-    unit: "Tray",
-    purchasePrice: 44000,
-    retailPrice: 52000,
-    minStock: 50,
-    maxStock: 280,
-    currentStock: 138,
-    rack: "CS-02-04",
-    warehouse: "Gudang Dingin",
-    supplier: "Peternakan Internal",
-    batch: "EGG-120726",
-    expirationDate: "2026-07-24",
-    status: "Hampir Kedaluwarsa",
-  },
-  {
-    sku: "AFJ-PKG-006",
-    barcode: "8997001200066",
-    name: "Karton Telur Cetak 12pcs",
-    category: "Kemasan",
-    brand: "PackPro",
-    unit: "Bundel",
-    purchasePrice: 85000,
-    retailPrice: 112000,
-    minStock: 40,
-    maxStock: 260,
-    currentStock: 211,
-    rack: "P-04-02",
-    warehouse: "Gudang Kemasan",
-    supplier: "PT Kemasan Nusantara",
-    batch: "PKG-2627",
-    expirationDate: "2028-01-01",
-    status: "Tersedia",
-  },
-  {
-    sku: "AFJ-BIO-021",
-    barcode: "8997001200219",
-    name: "Disinfektan Biosecurity",
-    category: "Kimia",
-    brand: "CleanCoop",
-    unit: "Jeriken",
-    purchasePrice: 128000,
-    retailPrice: 159000,
-    minStock: 60,
-    maxStock: 340,
-    currentStock: 18,
-    rack: "Q-01-06",
-    warehouse: "Gudang Kimia",
-    supplier: "PT Sanitasi Farmasi",
-    batch: "BIO-Q2607",
-    expirationDate: "2027-02-16",
-    status: "Karantina",
-  },
-];
+export const products: Product[] = realStockProducts;
+
+const inventoryValue = products.reduce((total, product) => total + product.currentStock * product.purchasePrice, 0);
+const lowStockCount = products.filter((product) => product.status === "Stok Rendah").length;
+const emptyStockCount = products.filter((product) => product.status === "Habis").length;
+const incomingTotal = products.reduce((total, product) => total + (product.stockIn ?? 0), 0);
+const outgoingTotal = products.reduce((total, product) => total + (product.stockOut ?? 0), 0);
+const missingPriceCount = products.filter((product) => product.purchasePrice === 0).length;
 
 export const metrics = [
-  { label: "Nilai Inventori", value: 2845000000, change: "+12.4%" },
-  { label: "Total Produk", value: 1284, change: "+36 SKU" },
-  { label: "Stok Rendah", value: 27, change: "-8 hari ini" },
-  { label: "Hampir Kedaluwarsa", value: 14, change: "7 hari" },
-  { label: "Pesanan Pembelian", value: 18, change: "5 menunggu" },
-  { label: "Barang Masuk Hari Ini", value: 42, change: "penerimaan" },
-  { label: "Barang Keluar Hari Ini", value: 67, change: "pengeluaran" },
-  { label: "Penjualan Retail", value: 38600000, change: "+9.1%" },
+  { label: "Nilai Inventori", value: inventoryValue, change: "berdasarkan HPP" },
+  { label: "Total Produk", value: products.length, change: "data real Excel" },
+  { label: "Stok Rendah", value: lowStockCount, change: "stok <= 5" },
+  { label: "Stok Habis", value: emptyStockCount, change: "perlu restok" },
+  { label: "Barang Masuk", value: incomingTotal, change: "dari kolom Masuk" },
+  { label: "Barang Keluar", value: outgoingTotal, change: "dari kolom Keluar" },
+  { label: "HPP Kosong", value: missingPriceCount, change: "perlu dilengkapi" },
+  { label: "Gudang", value: 1, change: "Gudang Bahan Baku" },
 ];
 
 export const inventoryTrend = [
@@ -190,9 +106,9 @@ export const distributionTrend = [
 ];
 
 export const moduleSummaries = {
-  categories: ["Pakan", "Veteriner", "Retail", "Kemasan", "Kimia"],
-  suppliers: ["PT Agro Nutrisi Prima", "CV Sehat Ternak", "PT Kemasan Nusantara", "PT Sanitasi Farmasi"],
-  warehouses: ["Gudang Utama", "Gudang Dingin", "Gudang Kering", "Gudang Kimia", "Gudang Kemasan"],
-  racks: ["A-01-01", "A-01-02", "CS-02-04", "C-03-08", "P-04-02", "Q-01-06"],
+  categories: ["Bahan Baku", "Kemasan", "Operasional"],
+  suppliers: ["Data Stock Gudang ARFARM"],
+  warehouses: ["Gudang Bahan Baku"],
+  racks: ["BB-01-01"],
   roles: ["Admin Utama", "Administrator", "Manajer Gudang", "Staf Gudang", "Pembelian", "Kasir", "Driver", "Viewer"],
 };

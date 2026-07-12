@@ -19,20 +19,38 @@ export function ProductTable() {
   const columns = useMemo<ColumnDef<Product>[]>(
     () => [
       { accessorKey: "sku", header: "SKU" },
-      { accessorKey: "barcode", header: "Barcode" },
       { accessorKey: "name", header: "Nama Barang" },
       { accessorKey: "category", header: "Kategori" },
-      { accessorKey: "warehouse", header: "Gudang" },
-      { accessorKey: "rack", header: "Rack" },
+      { accessorKey: "unit", header: "Satuan" },
+      {
+        accessorKey: "initialStock",
+        header: "Stok Awal",
+        cell: ({ row }) => `${row.original.initialStock ?? 0} ${row.original.unit}`,
+      },
+      {
+        accessorKey: "stockIn",
+        header: "Masuk",
+        cell: ({ row }) => `${row.original.stockIn ?? 0} ${row.original.unit}`,
+      },
+      {
+        accessorKey: "stockOut",
+        header: "Keluar",
+        cell: ({ row }) => `${row.original.stockOut ?? 0} ${row.original.unit}`,
+      },
       {
         accessorKey: "currentStock",
-        header: "Stok",
+        header: "Stok Akhir",
         cell: ({ row }) => `${row.original.currentStock} ${row.original.unit}`,
       },
       {
-        accessorKey: "retailPrice",
-        header: "Harga Jual",
-        cell: ({ row }) => currency.format(row.original.retailPrice),
+        accessorKey: "purchasePrice",
+        header: "HPP",
+        cell: ({ row }) => currency.format(row.original.purchasePrice),
+      },
+      {
+        accessorKey: "lastUpdate",
+        header: "Last Update",
+        cell: ({ row }) => row.original.lastUpdate ? new Date(row.original.lastUpdate).toLocaleDateString("id-ID") : "-",
       },
       {
         accessorKey: "status",
@@ -43,6 +61,7 @@ export function ProductTable() {
               "rounded-full px-2.5 py-1 text-xs font-semibold",
               row.original.status === "Tersedia" && "bg-leaf/10 text-primary",
               row.original.status === "Stok Rendah" && "bg-amber-50 text-amber-700",
+              row.original.status === "Habis" && "bg-red-50 text-danger",
               row.original.status === "Hampir Kedaluwarsa" && "bg-orange-50 text-orange-700",
               row.original.status === "Karantina" && "bg-red-50 text-danger",
             )}
@@ -72,7 +91,7 @@ export function ProductTable() {
           value={globalFilter}
           onChange={(event) => setGlobalFilter(event.target.value)}
           className="h-10 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-          placeholder="Cari barang, SKU, barcode, rak, atau pemasok..."
+          placeholder="Cari nama barang, SKU, satuan, kategori, atau status..."
         />
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary"><Filter className="h-4 w-4" /> Filter</Button>

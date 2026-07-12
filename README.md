@@ -9,6 +9,7 @@ Sistem Manajemen Gudang untuk ARFARM BHINNEKA NUSA JAYA.
 - Karyawan Gudang hanya dapat mencatat Barang Keluar.
 - Dasbor inventori, pembelian, distribusi, penjualan, pendapatan, dan biaya.
 - Data barang dengan SKU, barcode, rak, gudang, pemasok, batch, dan tanggal kedaluwarsa.
+- Stok bahan baku real dari `STOCK BAHAN BAKU GUDANG ARFARM.xlsx`.
 - Modul kategori, pemasok, gudang, rak, pembelian, penerimaan barang, distribusi, permintaan barang, stok opname, POS retail, laporan, pengguna, notifikasi, log audit, analitik, dan pengaturan.
 - Prisma schema PostgreSQL ternormalisasi dan seed data role awal.
 

@@ -10,6 +10,7 @@ datasource db {
 enum ProductStatus {
   AVAILABLE
   LOW_STOCK
+  OUT_OF_STOCK
   EXPIRING
   QUARANTINE
   INACTIVE

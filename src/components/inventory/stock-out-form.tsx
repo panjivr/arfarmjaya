@@ -9,16 +9,34 @@ import { Button } from "@/components/ui/button";
 
 export function StockOutForm() {
   const [sku, setSku] = useState(products[0]?.sku ?? "");
-  const [quantity, setQuantity] = useState(50);
+  const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("Pengambilan operasional");
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState("");
   const recordStockOut = useUiStore((state) => state.recordStockOut);
   const movements = useUiStore((state) => state.stockMovements);
   const selectedProduct = useMemo(() => products.find((product) => product.sku === sku) ?? products[0], [sku]);
+  const sessionStockOut = movements
+    .filter((movement) => movement.sku === selectedProduct?.sku)
+    .reduce((total, movement) => total + movement.quantity, 0);
+  const availableStock = Math.max((selectedProduct?.currentStock ?? 0) - sessionStockOut, 0);
 
   function submitMovement(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedProduct || quantity <= 0) {
+    setError("");
+
+    if (!selectedProduct) {
+      setError("Barang tidak ditemukan.");
+      return;
+    }
+
+    if (quantity <= 0) {
+      setError("Jumlah keluar harus lebih dari 0.");
+      return;
+    }
+
+    if (quantity > availableStock) {
+      setError(`Stok tidak cukup. Sisa stok tersedia ${availableStock} ${selectedProduct.unit}.`);
       return;
     }
 
@@ -70,7 +88,7 @@ export function StockOutForm() {
                 <input
                   type="number"
                   min={1}
-                  max={selectedProduct?.currentStock}
+                  max={availableStock}
                   value={quantity}
                   onChange={(event) => setQuantity(Number(event.target.value))}
                   className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
@@ -79,8 +97,9 @@ export function StockOutForm() {
               <div className="rounded-lg border border-border bg-background p-3">
                 <p className="text-xs text-muted">Sisa estimasi</p>
                 <p className="mt-1 text-xl font-bold">
-                  {Math.max((selectedProduct?.currentStock ?? 0) - quantity, 0)} {selectedProduct?.unit}
+                  {Math.max(availableStock - quantity, 0)} {selectedProduct?.unit}
                 </p>
+                <p className="mt-1 text-xs text-muted">Tersedia: {availableStock} {selectedProduct?.unit}</p>
               </div>
             </div>
 
@@ -98,6 +117,12 @@ export function StockOutForm() {
               <div className="flex items-center gap-2 rounded-lg border border-leaf/30 bg-leaf/10 px-3 py-2 text-sm font-medium text-primary">
                 <CheckCircle2 className="h-4 w-4" />
                 Barang keluar berhasil dicatat.
+              </div>
+            )}
+
+            {error && (
+              <div className="rounded-lg border border-danger/20 bg-red-50 px-3 py-2 text-sm font-medium text-danger">
+                {error}
               </div>
             )}
 
