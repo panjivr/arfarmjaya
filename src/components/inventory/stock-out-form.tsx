@@ -66,7 +66,7 @@ export function StockOutForm() {
           </div>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4" onSubmit={submitMovement}>
+          <form className="space-y-4" onSubmit={submitMovement} noValidate>
             <label className="block">
               <span className="mb-2 block text-sm font-semibold">Barang</span>
               <select
