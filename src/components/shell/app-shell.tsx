@@ -206,7 +206,7 @@ function Sidebar({
         })}
       </nav>
       <div className="border-t border-border p-4 text-xs text-muted">
-        PostgreSQL, Prisma, Better Auth, RBAC, dan log audit siap produksi.
+        Role admin, role karyawan, data stok real, dan alur audit gudang sudah disiapkan.
       </div>
     </div>
   );

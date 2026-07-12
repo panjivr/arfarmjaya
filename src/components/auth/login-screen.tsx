@@ -80,7 +80,7 @@ export function LoginScreen() {
                 </div>
                 <h2 className="text-2xl font-bold tracking-tight">Masuk ke Sistem</h2>
                 <p className="mt-2 text-sm leading-6 text-muted">
-                  Pilih mode akses untuk masuk. Integrasi database dan Better Auth sudah disiapkan di struktur proyek.
+                  Pilih mode akses untuk masuk. Hak akses admin dan karyawan sudah dipisahkan untuk alur operasional gudang.
                 </p>
               </div>
 
@@ -159,7 +159,7 @@ export function LoginScreen() {
                 )}
 
                 <div className="rounded-lg bg-slate-50 p-4 text-sm text-muted dark:bg-slate-900">
-                  Demo login: `admin/admin123` untuk Admin Utama, `karyawan/gudang123` untuk Karyawan Gudang.
+                  Gunakan akun yang sudah diberikan untuk Admin Utama atau Karyawan Gudang.
                 </div>
 
                 <Button className="w-full" type="submit">
