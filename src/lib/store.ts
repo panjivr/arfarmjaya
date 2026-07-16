@@ -9,6 +9,8 @@ import type {
   AuditEntry,
   Category,
   Distribution,
+  Invoice,
+  InvoiceLine,
   ItemRequest,
   ManagedUser,
   OpnameSession,
@@ -22,6 +24,7 @@ import type {
   Role,
   SessionUser,
   StockMovement,
+  Store,
   Supplier,
   Warehouse,
 } from "@/lib/types";
@@ -65,6 +68,22 @@ const seedUsers: ManagedUser[] = [
   { id: uid(), name: "Karyawan Gudang", username: "karyawan", role: "karyawan", active: true, createdAt: now() },
 ];
 
+const seedStores: Store[] = [
+  {
+    id: uid(),
+    name: "AR FARM JAYA",
+    address: "Gudang Bahan Baku, Ponorogo",
+    phone: "-",
+    email: "",
+    bankInfo: "BNI 0000000000 a.n. AR FARM JAYA",
+    invoicePrefix: "INV",
+    signatureName: "AR FARM JAYA",
+    note: "Barang yang sudah dibeli tidak bisa ditukar atau dikembalikan.",
+    accent: "#007a4b",
+    createdAt: now(),
+  },
+];
+
 const defaultSettings: AppSettings = {
   companyName: "ARFARM BHINNEKA NUSA JAYA",
   address: "Gudang Bahan Baku",
@@ -103,8 +122,11 @@ type State = {
   requests: ItemRequest[];
   opnameSessions: OpnameSession[];
   posSales: PosSale[];
+  stores: Store[];
+  invoices: Invoice[];
   auditLog: AuditEntry[];
   readNotifications: string[];
+  loginNoticeSeen: boolean;
   settings: AppSettings;
 };
 
@@ -161,8 +183,25 @@ type Actions = {
   postOpname: (id: string) => void;
   createSale: (data: { lines: OrderLine[]; discount: number; payment: PaymentMethod; paid: number }) => { ok: boolean; message?: string };
 
+  // retail: stores & invoices
+  addStore: (data: Omit<Store, "id" | "createdAt">) => void;
+  updateStore: (id: string, patch: Partial<Store>) => void;
+  removeStore: (id: string) => void;
+  createInvoice: (data: {
+    storeId: string;
+    buyer: string;
+    buyerPhone?: string;
+    date: string;
+    number?: string;
+    lines: InvoiceLine[];
+    shipping: number;
+    note?: string;
+  }) => { ok: boolean; message?: string; invoice?: Invoice };
+  deleteInvoice: (id: string) => void;
+
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: (ids: string[]) => void;
+  setLoginNoticeSeen: (value: boolean) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
   resetData: () => void;
 };
@@ -199,8 +238,11 @@ function buildInitial(): State {
     requests: [],
     opnameSessions: [],
     posSales: [],
+    stores: seedStores,
+    invoices: [],
     auditLog: [],
     readNotifications: [],
+    loginNoticeSeen: false,
     settings: defaultSettings,
   };
 }
@@ -215,7 +257,7 @@ export const useUiStore = create<State & Actions>()(
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
       setSidebar: (open) => set({ sidebarOpen: open }),
       setCommandOpen: (open) => set({ commandOpen: open }),
-      login: (user) => set({ user }),
+      login: (user) => set({ user, loginNoticeSeen: false }),
       logout: () => set({ user: null, sidebarOpen: false, commandOpen: false }),
 
       audit: (action, entity, detail) => {
@@ -444,7 +486,54 @@ export const useUiStore = create<State & Actions>()(
         return { ok: true };
       },
 
+      addStore: (data) => {
+        set((s) => ({ stores: [...s.stores, { ...data, id: uid(), createdAt: now() }] }));
+        get().audit("Tambah", "Toko", data.name);
+      },
+      updateStore: (id, patch) => {
+        set((s) => ({ stores: s.stores.map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
+        get().audit("Ubah", "Toko", get().stores.find((x) => x.id === id)?.name ?? id);
+      },
+      removeStore: (id) => {
+        const name = get().stores.find((x) => x.id === id)?.name ?? id;
+        set((s) => ({ stores: s.stores.filter((x) => x.id !== id) }));
+        get().audit("Hapus", "Toko", name);
+      },
+      createInvoice: ({ storeId, buyer, buyerPhone, date, number, lines, shipping, note }) => {
+        const store = get().stores.find((x) => x.id === storeId);
+        if (!store) return { ok: false, message: "Toko tidak ditemukan." };
+        if (!buyer.trim()) return { ok: false, message: "Nama pembeli wajib diisi." };
+        if (lines.length === 0) return { ok: false, message: "Tambahkan minimal satu barang." };
+        const subtotal = lines.reduce((t, l) => t + l.price * l.quantity, 0);
+        const total = subtotal + (shipping || 0);
+        const invNumber = number?.trim() || `${store.invoicePrefix}${seq(get().invoices.length)}`;
+        const invoice: Invoice = {
+          id: uid(),
+          number: invNumber,
+          storeId,
+          storeName: store.name,
+          buyer: buyer.trim(),
+          buyerPhone,
+          date,
+          lines,
+          subtotal,
+          shipping: shipping || 0,
+          total,
+          note: note ?? store.note,
+          createdAt: now(),
+        };
+        set((s) => ({ invoices: [invoice, ...s.invoices] }));
+        get().audit("Buat", "Invoice", `${invNumber} · ${buyer}`);
+        return { ok: true, invoice };
+      },
+      deleteInvoice: (id) => {
+        const inv = get().invoices.find((x) => x.id === id);
+        set((s) => ({ invoices: s.invoices.filter((x) => x.id !== id) }));
+        get().audit("Hapus", "Invoice", inv?.number ?? id);
+      },
+
       markNotificationRead: (id) => set((s) => ({ readNotifications: Array.from(new Set([...s.readNotifications, id])) })),
+      setLoginNoticeSeen: (value) => set({ loginNoticeSeen: value }),
       markAllNotificationsRead: (ids) => set((s) => ({ readNotifications: Array.from(new Set([...s.readNotifications, ...ids])) })),
       updateSettings: (patch) => {
         set((s) => ({ settings: { ...s.settings, ...patch } }));
@@ -474,8 +563,11 @@ export const useUiStore = create<State & Actions>()(
         requests: s.requests,
         opnameSessions: s.opnameSessions,
         posSales: s.posSales,
+        stores: s.stores,
+        invoices: s.invoices,
         auditLog: s.auditLog,
         readNotifications: s.readNotifications,
+        loginNoticeSeen: s.loginNoticeSeen,
         settings: s.settings,
       }),
       onRehydrateStorage: () => (state) => state?.setHasHydrated(true),

@@ -72,3 +72,33 @@ textarea {
   border-radius: 999px;
   background-clip: padding-box;
 }
+
+#print-area {
+  display: none;
+}
+
+@media print {
+  body {
+    background: #fff;
+  }
+  body * {
+    visibility: hidden;
+  }
+  #print-area,
+  #print-area * {
+    visibility: visible;
+  }
+  #print-area {
+    display: block;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .invoice-doc {
+    box-shadow: none !important;
+  }
+}

@@ -24,6 +24,7 @@ import { useUiStore } from "@/lib/store";
 import { buildNotifications } from "@/lib/selectors";
 import { Button } from "@/components/ui/button";
 import { LoginScreen } from "@/components/auth/login-screen";
+import { LoginNotice } from "@/components/shell/login-notice";
 import { Card, CardContent } from "@/components/ui/card";
 import { Toaster } from "@/components/ui/toast";
 
@@ -144,6 +145,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} navigationItems={visibleNavigation} />
+      <LoginNotice />
       <Toaster />
     </div>
   );

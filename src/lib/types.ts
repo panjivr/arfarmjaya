@@ -184,3 +184,41 @@ export type AppSettings = {
   expiryWarningDays: number;
   currency: string;
 };
+
+export type Store = {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  email?: string;
+  logo?: string; // data URL
+  bankInfo?: string; // e.g. "BNI 2024501132 a.n. ALIF LOLITA"
+  invoicePrefix: string; // e.g. "INVAL"
+  signatureName?: string; // name shown above seller signature line
+  note?: string; // default catatan / perhatian
+  accent?: string; // hex accent color for the invoice header
+  createdAt: string;
+};
+
+export type InvoiceLine = {
+  name: string;
+  unit: string;
+  quantity: number;
+  price: number;
+};
+
+export type Invoice = {
+  id: string;
+  number: string;
+  storeId: string;
+  storeName: string;
+  buyer: string;
+  buyerPhone?: string;
+  date: string; // yyyy-mm-dd
+  lines: InvoiceLine[];
+  subtotal: number;
+  shipping: number;
+  total: number;
+  note?: string;
+  createdAt: string;
+};
