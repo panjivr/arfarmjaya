@@ -7,10 +7,13 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Role, useUiStore } from "@/lib/store";
+import { useUiStore } from "@/lib/store";
+import { roleLabel } from "@/lib/store";
+import type { Role } from "@/lib/types";
 
 export function LoginScreen() {
   const login = useUiStore((state) => state.login);
+  const audit = useUiStore((state) => state.audit);
   const router = useRouter();
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("admin123");
@@ -27,7 +30,14 @@ export function LoginScreen() {
       return;
     }
 
-    login(role);
+    login({
+      id: role,
+      name: role === "admin" ? "Admin Utama" : "Karyawan Gudang",
+      username,
+      role,
+      label: roleLabel[role],
+    });
+    audit("Login", "Autentikasi", `${username} masuk sebagai ${role}`);
     router.push(role === "admin" ? "/" : "/transactions");
   }
 

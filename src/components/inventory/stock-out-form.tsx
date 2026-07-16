@@ -1,54 +1,41 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, MinusCircle, PackageMinus, Save } from "lucide-react";
-import { products } from "@/lib/data";
+import { MinusCircle, PackageMinus, Save } from "lucide-react";
 import { useUiStore } from "@/lib/store";
+import { toast } from "@/components/ui/toast";
+import { formatDateTime } from "@/lib/utils";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Field, Input, Select, Textarea } from "@/components/ui/field";
+import { Badge } from "@/components/ui/badge";
 
 export function StockOutForm() {
+  const products = useUiStore((s) => s.products);
+  const movements = useUiStore((s) => s.movements);
+  const recordMovement = useUiStore((s) => s.recordMovement);
+
   const [sku, setSku] = useState(products[0]?.sku ?? "");
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("Pengambilan operasional");
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState("");
-  const recordStockOut = useUiStore((state) => state.recordStockOut);
-  const movements = useUiStore((state) => state.stockMovements);
-  const selectedProduct = useMemo(() => products.find((product) => product.sku === sku) ?? products[0], [sku]);
-  const sessionStockOut = movements
-    .filter((movement) => movement.sku === selectedProduct?.sku)
-    .reduce((total, movement) => total + movement.quantity, 0);
-  const availableStock = Math.max((selectedProduct?.currentStock ?? 0) - sessionStockOut, 0);
 
-  function submitMovement(event: React.FormEvent<HTMLFormElement>) {
+  const selectedProduct = useMemo(() => products.find((p) => p.sku === sku) ?? products[0], [products, sku]);
+  const available = selectedProduct?.currentStock ?? 0;
+  const outMovements = movements.filter((m) => m.type === "out");
+
+  function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError("");
-
     if (!selectedProduct) {
-      setError("Barang tidak ditemukan.");
+      toast.error("Barang tidak ditemukan.");
       return;
     }
-
-    if (quantity <= 0) {
-      setError("Jumlah keluar harus lebih dari 0.");
+    const result = recordMovement({ type: "out", sku: selectedProduct.sku, quantity, note });
+    if (!result.ok) {
+      toast.error(result.message ?? "Gagal mencatat.");
       return;
     }
-
-    if (quantity > availableStock) {
-      setError(`Stok tidak cukup. Sisa stok tersedia ${availableStock} ${selectedProduct.unit}.`);
-      return;
-    }
-
-    recordStockOut({
-      sku: selectedProduct.sku,
-      productName: selectedProduct.name,
-      quantity,
-      unit: selectedProduct.unit,
-      note,
-    });
-    setSuccess(true);
-    setTimeout(() => setSuccess(false), 2400);
+    toast.success(`${quantity} ${selectedProduct.unit} ${selectedProduct.name} keluar.`);
+    setQuantity(1);
   }
 
   return (
@@ -61,74 +48,46 @@ export function StockOutForm() {
             </div>
             <div>
               <h2 className="font-semibold">Input Barang Keluar</h2>
-              <p className="text-sm text-muted">Pilih barang, isi jumlah, lalu simpan transaksi keluar.</p>
+              <p className="text-sm text-muted">Pilih barang, isi jumlah, lalu simpan. Stok langsung berkurang.</p>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4" onSubmit={submitMovement} noValidate>
-            <label className="block">
-              <span className="mb-2 block text-sm font-semibold">Barang</span>
-              <select
-                value={sku}
-                onChange={(event) => setSku(event.target.value)}
-                className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-              >
-                {products.map((product) => (
-                  <option key={product.sku} value={product.sku}>
-                    {product.name} - stok {product.currentStock} {product.unit}
+          <form className="space-y-4" onSubmit={submit} noValidate>
+            <Field label="Barang">
+              <Select value={sku} onChange={(e) => setSku(e.target.value)}>
+                {products.map((p) => (
+                  <option key={p.sku} value={p.sku}>
+                    {p.name} — stok {p.currentStock} {p.unit}
                   </option>
                 ))}
-              </select>
-            </label>
+              </Select>
+            </Field>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold">Jumlah Keluar</span>
-                <input
+              <Field label="Jumlah Keluar">
+                <Input
                   type="number"
                   min={1}
-                  max={availableStock}
+                  max={available}
                   value={quantity}
-                  onChange={(event) => setQuantity(Number(event.target.value))}
-                  className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                  onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
                 />
-              </label>
+              </Field>
               <div className="rounded-lg border border-border bg-background p-3">
-                <p className="text-xs text-muted">Sisa estimasi</p>
-                <p className="mt-1 text-xl font-bold">
-                  {Math.max(availableStock - quantity, 0)} {selectedProduct?.unit}
-                </p>
-                <p className="mt-1 text-xs text-muted">Tersedia: {availableStock} {selectedProduct?.unit}</p>
+                <p className="text-xs text-muted">Sisa setelah keluar</p>
+                <p className="mt-1 text-xl font-bold">{Math.max(available - quantity, 0)} {selectedProduct?.unit}</p>
+                <p className="mt-1 text-xs text-muted">Tersedia: {available} {selectedProduct?.unit}</p>
               </div>
             </div>
 
-            <label className="block">
-              <span className="mb-2 block text-sm font-semibold">Catatan</span>
-              <textarea
-                value={note}
-                onChange={(event) => setNote(event.target.value)}
-                className="min-h-24 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-                placeholder="Contoh: Barang keluar untuk cabang A"
-              />
-            </label>
+            <Field label="Catatan">
+              <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Contoh: Barang keluar untuk cabang A" />
+            </Field>
 
-            {success && (
-              <div className="flex items-center gap-2 rounded-lg border border-leaf/30 bg-leaf/10 px-3 py-2 text-sm font-medium text-primary">
-                <CheckCircle2 className="h-4 w-4" />
-                Barang keluar berhasil dicatat.
-              </div>
-            )}
-
-            {error && (
-              <div className="rounded-lg border border-danger/20 bg-red-50 px-3 py-2 text-sm font-medium text-danger">
-                {error}
-              </div>
-            )}
-
-            <Button className="w-full" type="submit">
+            <Button className="w-full" type="submit" disabled={available <= 0}>
               <Save className="h-4 w-4" />
-              Simpan Barang Keluar
+              {available <= 0 ? "Stok Habis" : "Simpan Barang Keluar"}
             </Button>
           </form>
         </CardContent>
@@ -137,31 +96,27 @@ export function StockOutForm() {
       <Card>
         <CardHeader>
           <h2 className="font-semibold">Riwayat Barang Keluar</h2>
-          <p className="text-sm text-muted">Riwayat ini tersimpan di sesi browser dan siap disambungkan ke database.</p>
+          <p className="text-sm text-muted">Riwayat tersimpan lokal dan memperbarui stok inventori.</p>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {movements.length === 0 ? (
+            {outMovements.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border p-8 text-center">
                 <MinusCircle className="mx-auto h-8 w-8 text-muted" />
                 <p className="mt-3 font-semibold">Belum ada barang keluar</p>
-                <p className="mt-1 text-sm text-muted">Transaksi yang dicatat karyawan akan tampil di sini.</p>
+                <p className="mt-1 text-sm text-muted">Transaksi yang dicatat akan tampil di sini.</p>
               </div>
             ) : (
-              movements.map((movement) => (
-                <div key={movement.id} className="rounded-lg border border-border bg-background p-4">
+              outMovements.slice(0, 12).map((m) => (
+                <div key={m.id} className="rounded-lg border border-border bg-background p-4">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <p className="font-semibold">{movement.productName}</p>
-                      <p className="text-sm text-muted">{movement.sku} / {movement.note}</p>
+                      <p className="font-semibold">{m.productName}</p>
+                      <p className="text-sm text-muted">{m.sku} / {m.note}</p>
                     </div>
-                    <span className="rounded-full bg-harvest/15 px-3 py-1 text-sm font-bold text-amber-800">
-                      -{movement.quantity} {movement.unit}
-                    </span>
+                    <Badge className="bg-harvest/15 text-amber-800">-{m.quantity} {m.unit}</Badge>
                   </div>
-                  <p className="mt-3 text-xs text-muted">
-                    Dicatat oleh {movement.actor} pada {new Date(movement.createdAt).toLocaleString("id-ID")}
-                  </p>
+                  <p className="mt-3 text-xs text-muted">Dicatat oleh {m.actor} pada {formatDateTime(m.createdAt)}</p>
                 </div>
               ))
             )}

@@ -2,76 +2,485 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { Product } from "@/lib/data";
+import { realStockProducts } from "@/lib/stock-products";
+import type {
+  AppSettings,
+  AuditEntry,
+  Category,
+  Distribution,
+  ItemRequest,
+  ManagedUser,
+  OpnameSession,
+  OrderLine,
+  OrderStatus,
+  PaymentMethod,
+  PosSale,
+  PurchaseOrder,
+  Rack,
+  Receipt,
+  Role,
+  SessionUser,
+  StockMovement,
+  Supplier,
+  Warehouse,
+} from "@/lib/types";
 
-export type Role = "admin" | "karyawan";
+export type { Role, SessionUser } from "@/lib/types";
 
-export type SessionUser = {
-  name: string;
-  role: Role;
-  label: string;
+const now = () => new Date().toISOString();
+const uid = () =>
+  typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+const stamp = () => {
+  const d = new Date();
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+};
+const seq = (n: number) => String(n + 1).padStart(4, "0");
+
+function unique(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b, "id"));
+}
+
+function seedCategories(products: Product[]): Category[] {
+  return unique(products.map((p) => p.category)).map((name) => ({ id: uid(), name, createdAt: now() }));
+}
+function seedSuppliers(products: Product[]): Supplier[] {
+  return unique(products.map((p) => p.supplier)).map((name) => ({ id: uid(), name, createdAt: now() }));
+}
+function seedWarehouses(products: Product[]): Warehouse[] {
+  return unique(products.map((p) => p.warehouse)).map((name) => ({ id: uid(), name, createdAt: now() }));
+}
+function seedRacks(products: Product[]): Rack[] {
+  const map = new Map<string, string>();
+  products.forEach((p) => {
+    if (p.rack && !map.has(p.rack)) map.set(p.rack, p.warehouse);
+  });
+  return Array.from(map.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([code, warehouse]) => ({ id: uid(), code, name: code, warehouse, createdAt: now() }));
+}
+
+const seedUsers: ManagedUser[] = [
+  { id: uid(), name: "Admin Utama", username: "admin", role: "admin", active: true, createdAt: now() },
+  { id: uid(), name: "Karyawan Gudang", username: "karyawan", role: "karyawan", active: true, createdAt: now() },
+];
+
+const defaultSettings: AppSettings = {
+  companyName: "ARFARM BHINNEKA NUSA JAYA",
+  address: "Gudang Bahan Baku",
+  phone: "-",
+  taxNumber: "-",
+  lowStockThreshold: 5,
+  expiryWarningDays: 30,
+  currency: "IDR",
 };
 
-type StockMovement = {
-  id: string;
-  sku: string;
-  productName: string;
-  quantity: number;
-  unit: string;
-  note: string;
-  actor: string;
-  createdAt: string;
-};
+function statusFor(product: Product, threshold: number): Product["status"] {
+  if (product.currentStock <= 0) return "Habis";
+  if (product.currentStock <= Math.max(product.minStock, threshold)) return "Stok Rendah";
+  const days = (new Date(product.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+  if (product.expirationDate && days <= 30 && days >= 0) return "Hampir Kedaluwarsa";
+  return "Tersedia";
+}
 
-type UiState = {
+type State = {
+  hasHydrated: boolean;
+  theme: "light" | "dark";
   sidebarOpen: boolean;
   commandOpen: boolean;
   user: SessionUser | null;
-  stockMovements: StockMovement[];
-  toggleSidebar: () => void;
-  setCommandOpen: (open: boolean) => void;
-  login: (role: Role) => void;
-  logout: () => void;
-  recordStockOut: (movement: Omit<StockMovement, "id" | "actor" | "createdAt">) => void;
+
+  products: Product[];
+  movements: StockMovement[];
+  categories: Category[];
+  suppliers: Supplier[];
+  warehouses: Warehouse[];
+  racks: Rack[];
+  users: ManagedUser[];
+  purchaseOrders: PurchaseOrder[];
+  receipts: Receipt[];
+  distributions: Distribution[];
+  requests: ItemRequest[];
+  opnameSessions: OpnameSession[];
+  posSales: PosSale[];
+  auditLog: AuditEntry[];
+  readNotifications: string[];
+  settings: AppSettings;
 };
 
-export const useUiStore = create<UiState>()(
+type Actions = {
+  setHasHydrated: (value: boolean) => void;
+  toggleTheme: () => void;
+  toggleSidebar: () => void;
+  setSidebar: (open: boolean) => void;
+  setCommandOpen: (open: boolean) => void;
+  login: (user: SessionUser) => void;
+  logout: () => void;
+
+  audit: (action: string, entity: string, detail: string) => void;
+
+  // inventory
+  addProduct: (product: Product) => void;
+  updateProduct: (sku: string, patch: Partial<Product>) => void;
+  deleteProduct: (sku: string) => void;
+  recordMovement: (m: {
+    type: StockMovement["type"];
+    sku: string;
+    quantity: number;
+    note?: string;
+    reference?: string;
+  }) => { ok: boolean; message?: string };
+
+  // master data
+  addCategory: (name: string, note?: string) => void;
+  updateCategory: (id: string, patch: Partial<Category>) => void;
+  removeCategory: (id: string) => void;
+  addSupplier: (data: Omit<Supplier, "id" | "createdAt">) => void;
+  updateSupplier: (id: string, patch: Partial<Supplier>) => void;
+  removeSupplier: (id: string) => void;
+  addWarehouse: (data: Omit<Warehouse, "id" | "createdAt">) => void;
+  updateWarehouse: (id: string, patch: Partial<Warehouse>) => void;
+  removeWarehouse: (id: string) => void;
+  addRack: (data: Omit<Rack, "id" | "createdAt" | "name">) => void;
+  updateRack: (id: string, patch: Partial<Rack>) => void;
+  removeRack: (id: string) => void;
+  addUser: (data: Omit<ManagedUser, "id" | "createdAt" | "active">) => void;
+  updateUser: (id: string, patch: Partial<ManagedUser>) => void;
+  toggleUserActive: (id: string) => void;
+  removeUser: (id: string) => void;
+
+  // workflows
+  createPurchaseOrder: (data: { supplier: string; lines: OrderLine[]; note?: string }) => void;
+  setPurchaseStatus: (id: string, status: OrderStatus) => void;
+  createReceipt: (data: Omit<Receipt, "id" | "number" | "actor" | "createdAt">) => void;
+  createDistribution: (data: { destination: string; driver?: string; lines: OrderLine[] }) => { ok: boolean; message?: string };
+  setDistributionStatus: (id: string, status: OrderStatus) => void;
+  createRequest: (data: { requester: string; lines: OrderLine[]; note?: string }) => void;
+  setRequestStatus: (id: string, status: OrderStatus) => void;
+  createOpname: (data: { warehouse: string; lines: OpnameSession["lines"]; reason?: string }) => void;
+  postOpname: (id: string) => void;
+  createSale: (data: { lines: OrderLine[]; discount: number; payment: PaymentMethod; paid: number }) => { ok: boolean; message?: string };
+
+  markNotificationRead: (id: string) => void;
+  markAllNotificationsRead: (ids: string[]) => void;
+  updateSettings: (patch: Partial<AppSettings>) => void;
+  resetData: () => void;
+};
+
+const roleLabel: Record<Role, string> = {
+  admin: "Akses penuh",
+  manajer: "Manajer gudang",
+  gudang: "Staf gudang",
+  pembelian: "Pembelian",
+  kasir: "Kasir POS",
+  driver: "Distribusi",
+  viewer: "Hanya lihat",
+  karyawan: "Barang keluar",
+};
+
+function buildInitial(): State {
+  const products = realStockProducts.map((p) => ({ ...p }));
+  return {
+    hasHydrated: false,
+    theme: "light",
+    sidebarOpen: false,
+    commandOpen: false,
+    user: null,
+    products,
+    movements: [],
+    categories: seedCategories(products),
+    suppliers: seedSuppliers(products),
+    warehouses: seedWarehouses(products),
+    racks: seedRacks(products),
+    users: seedUsers,
+    purchaseOrders: [],
+    receipts: [],
+    distributions: [],
+    requests: [],
+    opnameSessions: [],
+    posSales: [],
+    auditLog: [],
+    readNotifications: [],
+    settings: defaultSettings,
+  };
+}
+
+export const useUiStore = create<State & Actions>()(
   persist(
     (set, get) => ({
-      sidebarOpen: false,
-      commandOpen: false,
-      user: null,
-      stockMovements: [],
-      toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+      ...buildInitial(),
+
+      setHasHydrated: (value) => set({ hasHydrated: value }),
+      toggleTheme: () => set((s) => ({ theme: s.theme === "light" ? "dark" : "light" })),
+      toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
+      setSidebar: (open) => set({ sidebarOpen: open }),
       setCommandOpen: (open) => set({ commandOpen: open }),
-      login: (role) =>
-        set({
-          user:
-            role === "admin"
-              ? { name: "Admin Utama", role: "admin", label: "Akses penuh" }
-              : { name: "Karyawan Gudang", role: "karyawan", label: "Barang keluar" },
-        }),
+      login: (user) => set({ user }),
       logout: () => set({ user: null, sidebarOpen: false, commandOpen: false }),
-      recordStockOut: (movement) => {
-        const actor = get().user?.name ?? "Pengguna";
-        set((state) => ({
-          stockMovements: [
+
+      audit: (action, entity, detail) => {
+        const actor = get().user?.name ?? "Sistem";
+        set((s) => ({
+          auditLog: [{ id: uid(), actor, action, entity, detail, createdAt: now() }, ...s.auditLog].slice(0, 500),
+        }));
+      },
+
+      addProduct: (product) => {
+        const threshold = get().settings.lowStockThreshold;
+        const withStatus = { ...product, status: statusFor(product, threshold), lastUpdate: now() };
+        set((s) => ({ products: [withStatus, ...s.products] }));
+        get().audit("Tambah", "Produk", `${product.name} (${product.sku})`);
+      },
+      updateProduct: (sku, patch) => {
+        const threshold = get().settings.lowStockThreshold;
+        set((s) => ({
+          products: s.products.map((p) => {
+            if (p.sku !== sku) return p;
+            const merged = { ...p, ...patch, lastUpdate: now() };
+            return { ...merged, status: statusFor(merged, threshold) };
+          }),
+        }));
+        get().audit("Ubah", "Produk", `${sku}`);
+      },
+      deleteProduct: (sku) => {
+        set((s) => ({ products: s.products.filter((p) => p.sku !== sku) }));
+        get().audit("Hapus", "Produk", sku);
+      },
+
+      recordMovement: ({ type, sku, quantity, note = "", reference }) => {
+        const state = get();
+        const product = state.products.find((p) => p.sku === sku);
+        if (!product) return { ok: false, message: "Barang tidak ditemukan." };
+        if (quantity <= 0) return { ok: false, message: "Jumlah harus lebih dari 0." };
+        const isOut = type === "out" || type === "sale" || type === "transfer";
+        if (isOut && quantity > product.currentStock) {
+          return { ok: false, message: `Stok tidak cukup. Sisa ${product.currentStock} ${product.unit}.` };
+        }
+
+        const threshold = state.settings.lowStockThreshold;
+        set((s) => ({
+          products: s.products.map((p) => {
+            if (p.sku !== sku) return p;
+            let currentStock = p.currentStock;
+            if (type === "adjust") currentStock = quantity;
+            else if (isOut) currentStock -= quantity;
+            else currentStock += quantity;
+            const stockIn = (p.stockIn ?? 0) + (type === "in" ? quantity : 0);
+            const stockOut = (p.stockOut ?? 0) + (isOut ? quantity : 0);
+            const merged = { ...p, currentStock, stockIn, stockOut, lastUpdate: now() };
+            return { ...merged, status: statusFor(merged, threshold) };
+          }),
+          movements: [
             {
-              ...movement,
-              id: crypto.randomUUID(),
-              actor,
-              createdAt: new Date().toISOString(),
+              id: uid(),
+              type,
+              sku,
+              productName: product.name,
+              quantity,
+              unit: product.unit,
+              note,
+              reference,
+              actor: s.user?.name ?? "Pengguna",
+              createdAt: now(),
             },
-            ...state.stockMovements,
+            ...s.movements,
+          ].slice(0, 1000),
+        }));
+        const labelMap = { in: "Barang Masuk", out: "Barang Keluar", adjust: "Penyesuaian", sale: "Penjualan", transfer: "Transfer" };
+        get().audit(labelMap[type], "Stok", `${product.name} ${isOut ? "-" : type === "adjust" ? "=" : "+"}${quantity} ${product.unit}`);
+        return { ok: true };
+      },
+
+      addCategory: (name, note) => {
+        set((s) => ({ categories: [{ id: uid(), name, note, createdAt: now() }, ...s.categories] }));
+        get().audit("Tambah", "Kategori", name);
+      },
+      updateCategory: (id, patch) => set((s) => ({ categories: s.categories.map((c) => (c.id === id ? { ...c, ...patch } : c)) })),
+      removeCategory: (id) => set((s) => ({ categories: s.categories.filter((c) => c.id !== id) })),
+
+      addSupplier: (data) => {
+        set((s) => ({ suppliers: [{ ...data, id: uid(), createdAt: now() }, ...s.suppliers] }));
+        get().audit("Tambah", "Pemasok", data.name);
+      },
+      updateSupplier: (id, patch) => set((s) => ({ suppliers: s.suppliers.map((x) => (x.id === id ? { ...x, ...patch } : x)) })),
+      removeSupplier: (id) => set((s) => ({ suppliers: s.suppliers.filter((x) => x.id !== id) })),
+
+      addWarehouse: (data) => {
+        set((s) => ({ warehouses: [{ ...data, id: uid(), createdAt: now() }, ...s.warehouses] }));
+        get().audit("Tambah", "Gudang", data.name);
+      },
+      updateWarehouse: (id, patch) => set((s) => ({ warehouses: s.warehouses.map((x) => (x.id === id ? { ...x, ...patch } : x)) })),
+      removeWarehouse: (id) => set((s) => ({ warehouses: s.warehouses.filter((x) => x.id !== id) })),
+
+      addRack: (data) => {
+        set((s) => ({ racks: [{ ...data, name: data.code, id: uid(), createdAt: now() }, ...s.racks] }));
+        get().audit("Tambah", "Rak", data.code);
+      },
+      updateRack: (id, patch) => set((s) => ({ racks: s.racks.map((x) => (x.id === id ? { ...x, ...patch } : x)) })),
+      removeRack: (id) => set((s) => ({ racks: s.racks.filter((x) => x.id !== id) })),
+
+      addUser: (data) => {
+        set((s) => ({ users: [{ ...data, id: uid(), active: true, createdAt: now() }, ...s.users] }));
+        get().audit("Tambah", "Pengguna", data.name);
+      },
+      updateUser: (id, patch) => set((s) => ({ users: s.users.map((x) => (x.id === id ? { ...x, ...patch } : x)) })),
+      toggleUserActive: (id) => set((s) => ({ users: s.users.map((x) => (x.id === id ? { ...x, active: !x.active } : x)) })),
+      removeUser: (id) => set((s) => ({ users: s.users.filter((x) => x.id !== id) })),
+
+      createPurchaseOrder: ({ supplier, lines, note }) => {
+        const total = lines.reduce((t, l) => t + l.price * l.quantity, 0);
+        const number = `PO-${stamp()}-${seq(get().purchaseOrders.length)}`;
+        set((s) => ({
+          purchaseOrders: [
+            { id: uid(), number, supplier, status: "Menunggu Persetujuan", lines, total, note, actor: s.user?.name ?? "Pengguna", createdAt: now() },
+            ...s.purchaseOrders,
           ],
         }));
+        get().audit("Buat", "Pembelian", number);
+      },
+      setPurchaseStatus: (id, status) => {
+        set((s) => ({ purchaseOrders: s.purchaseOrders.map((p) => (p.id === id ? { ...p, status } : p)) }));
+        const po = get().purchaseOrders.find((p) => p.id === id);
+        get().audit("Status", "Pembelian", `${po?.number ?? id} → ${status}`);
+      },
+
+      createReceipt: (data) => {
+        const number = `GRN-${stamp()}-${seq(get().receipts.length)}`;
+        set((s) => ({
+          receipts: [{ ...data, id: uid(), number, actor: s.user?.name ?? "Pengguna", createdAt: now() }, ...s.receipts],
+        }));
+        get().recordMovement({ type: "in", sku: data.sku, quantity: data.quantity, note: `Penerimaan ${number}`, reference: number });
+      },
+
+      createDistribution: ({ destination, driver, lines }) => {
+        const state = get();
+        for (const line of lines) {
+          const product = state.products.find((p) => p.sku === line.sku);
+          if (!product || line.quantity > product.currentStock) {
+            return { ok: false, message: `Stok ${line.name} tidak cukup.` };
+          }
+        }
+        const number = `DO-${stamp()}-${seq(state.distributions.length)}`;
+        set((s) => ({
+          distributions: [
+            { id: uid(), number, destination, driver, status: "Diproses", lines, actor: s.user?.name ?? "Pengguna", createdAt: now() },
+            ...s.distributions,
+          ],
+        }));
+        lines.forEach((line) =>
+          get().recordMovement({ type: "out", sku: line.sku, quantity: line.quantity, note: `Distribusi ${number} → ${destination}`, reference: number }),
+        );
+        return { ok: true };
+      },
+      setDistributionStatus: (id, status) => {
+        set((s) => ({ distributions: s.distributions.map((d) => (d.id === id ? { ...d, status } : d)) }));
+        const d = get().distributions.find((x) => x.id === id);
+        get().audit("Status", "Distribusi", `${d?.number ?? id} → ${status}`);
+      },
+
+      createRequest: ({ requester, lines, note }) => {
+        const number = `REQ-${stamp()}-${seq(get().requests.length)}`;
+        set((s) => ({
+          requests: [
+            { id: uid(), number, requester, status: "Menunggu Persetujuan", lines, note, actor: s.user?.name ?? "Pengguna", createdAt: now() },
+            ...s.requests,
+          ],
+        }));
+        get().audit("Buat", "Permintaan", number);
+      },
+      setRequestStatus: (id, status) => {
+        const req = get().requests.find((r) => r.id === id);
+        set((s) => ({ requests: s.requests.map((r) => (r.id === id ? { ...r, status } : r)) }));
+        if (status === "Selesai" && req) {
+          req.lines.forEach((line) =>
+            get().recordMovement({ type: "out", sku: line.sku, quantity: line.quantity, note: `Permintaan ${req.number}`, reference: req.number }),
+          );
+        }
+        get().audit("Status", "Permintaan", `${req?.number ?? id} → ${status}`);
+      },
+
+      createOpname: ({ warehouse, lines, reason }) => {
+        const number = `OPN-${stamp()}-${seq(get().opnameSessions.length)}`;
+        set((s) => ({
+          opnameSessions: [
+            { id: uid(), number, warehouse, status: "Draft", lines, reason, actor: s.user?.name ?? "Pengguna", createdAt: now() },
+            ...s.opnameSessions,
+          ],
+        }));
+        get().audit("Buat", "Stok Opname", number);
+      },
+      postOpname: (id) => {
+        const session = get().opnameSessions.find((o) => o.id === id);
+        if (!session || session.status === "Diposting") return;
+        session.lines.forEach((line) => {
+          if (line.actualStock !== line.systemStock) {
+            get().recordMovement({ type: "adjust", sku: line.sku, quantity: line.actualStock, note: `Opname ${session.number}`, reference: session.number });
+          }
+        });
+        set((s) => ({ opnameSessions: s.opnameSessions.map((o) => (o.id === id ? { ...o, status: "Diposting" } : o)) }));
+        get().audit("Posting", "Stok Opname", session.number);
+      },
+
+      createSale: ({ lines, discount, payment, paid }) => {
+        const state = get();
+        for (const line of lines) {
+          const product = state.products.find((p) => p.sku === line.sku);
+          if (!product || line.quantity > product.currentStock) {
+            return { ok: false, message: `Stok ${line.name} tidak cukup.` };
+          }
+        }
+        const subtotal = lines.reduce((t, l) => t + l.price * l.quantity, 0);
+        const total = Math.max(subtotal - discount, 0);
+        const number = `POS-${stamp()}-${seq(state.posSales.length)}`;
+        set((s) => ({
+          posSales: [
+            { id: uid(), number, lines, subtotal, discount, total, payment, paid, change: Math.max(paid - total, 0), actor: s.user?.name ?? "Kasir", createdAt: now() },
+            ...s.posSales,
+          ],
+        }));
+        lines.forEach((line) =>
+          get().recordMovement({ type: "sale", sku: line.sku, quantity: line.quantity, note: `POS ${number}`, reference: number }),
+        );
+        return { ok: true };
+      },
+
+      markNotificationRead: (id) => set((s) => ({ readNotifications: Array.from(new Set([...s.readNotifications, id])) })),
+      markAllNotificationsRead: (ids) => set((s) => ({ readNotifications: Array.from(new Set([...s.readNotifications, ...ids])) })),
+      updateSettings: (patch) => {
+        set((s) => ({ settings: { ...s.settings, ...patch } }));
+        get().audit("Ubah", "Pengaturan", "Konfigurasi sistem diperbarui");
+      },
+      resetData: () => {
+        const fresh = buildInitial();
+        set({ ...fresh, hasHydrated: true, user: get().user, theme: get().theme });
       },
     }),
     {
-      name: "arfarmjaya-session",
-      partialize: (state) => ({
-        user: state.user,
-        stockMovements: state.stockMovements,
+      name: "arfarmjaya-wms",
+      version: 2,
+      partialize: (s) => ({
+        theme: s.theme,
+        user: s.user,
+        products: s.products,
+        movements: s.movements,
+        categories: s.categories,
+        suppliers: s.suppliers,
+        warehouses: s.warehouses,
+        racks: s.racks,
+        users: s.users,
+        purchaseOrders: s.purchaseOrders,
+        receipts: s.receipts,
+        distributions: s.distributions,
+        requests: s.requests,
+        opnameSessions: s.opnameSessions,
+        posSales: s.posSales,
+        auditLog: s.auditLog,
+        readNotifications: s.readNotifications,
+        settings: s.settings,
       }),
+      onRehydrateStorage: () => (state) => state?.setHasHydrated(true),
     },
   ),
 );
+
+export { roleLabel };

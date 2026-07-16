@@ -2,36 +2,76 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import {
   Bell,
   Command,
+  CornerDownLeft,
   LogOut,
   Menu,
   Moon,
+  Package,
   Search,
   ShieldCheck,
   Sun,
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { navigation } from "@/lib/data";
+import { navigation, type NavItem } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/lib/store";
+import { buildNotifications } from "@/lib/selectors";
 import { Button } from "@/components/ui/button";
 import { LoginScreen } from "@/components/auth/login-screen";
 import { Card, CardContent } from "@/components/ui/card";
+import { Toaster } from "@/components/ui/toast";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { sidebarOpen, toggleSidebar, commandOpen, setCommandOpen, user, logout } = useUiStore();
-  const visibleNavigation = navigation.filter((item) => user?.role === "admin" || !item.adminOnly);
+  const theme = useUiStore((s) => s.theme);
+  const user = useUiStore((s) => s.user);
+  const toggleSidebar = useUiStore((s) => s.toggleSidebar);
+  const setSidebar = useUiStore((s) => s.setSidebar);
+  const sidebarOpen = useUiStore((s) => s.sidebarOpen);
+  const commandOpen = useUiStore((s) => s.commandOpen);
+  const setCommandOpen = useUiStore((s) => s.setCommandOpen);
+  const toggleTheme = useUiStore((s) => s.toggleTheme);
+  const logout = useUiStore((s) => s.logout);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle("dark", theme === "dark");
+    root.style.colorScheme = theme;
+  }, [theme]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCommandOpen(!useUiStore.getState().commandOpen);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [setCommandOpen]);
+
+  useEffect(() => {
+    setSidebar(false);
+    setCommandOpen(false);
+  }, [pathname, setSidebar, setCommandOpen]);
 
   if (!user) {
-    return <LoginScreen />;
+    return (
+      <>
+        <LoginScreen />
+        <Toaster />
+      </>
+    );
   }
 
-  const isRestricted = user.role === "karyawan" && pathname !== "/transactions";
+  const visibleNavigation = navigation.filter((item) => user.role === "admin" || !item.adminOnly);
+  const isRestricted = user.role !== "admin" && navigation.some((n) => n.href === pathname && n.adminOnly);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -46,12 +86,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            onClick={toggleSidebar}
           >
             <motion.aside
               className="h-full w-72 border-r border-border bg-card"
               initial={{ x: -288 }}
               animate={{ x: 0 }}
               exit={{ x: -288 }}
+              onClick={(e) => e.stopPropagation()}
             >
               <div className="flex justify-end p-3">
                 <Button variant="ghost" className="h-9 w-9 px-0" onClick={toggleSidebar} aria-label="Tutup sidebar">
@@ -75,18 +117,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               onClick={() => setCommandOpen(true)}
             >
               <Search className="h-4 w-4 shrink-0" />
-              <span className="truncate">Cari SKU, barang, pemasok, rak, atau transaksi...</span>
+              <span className="truncate">Cari SKU, barang, atau menu...</span>
               <span className="ml-auto hidden items-center gap-1 rounded-md border border-border px-2 py-0.5 text-xs sm:flex">
                 <Command className="h-3 w-3" /> K
               </span>
             </button>
-            <Button variant="secondary" className="h-10 w-10 px-0" aria-label="Ganti tema">
-              <Sun className="h-4 w-4 dark:hidden" />
-              <Moon className="hidden h-4 w-4 dark:block" />
+            <Button variant="secondary" className="h-10 w-10 px-0" onClick={toggleTheme} aria-label="Ganti tema">
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
-            <Button variant="secondary" className="h-10 w-10 px-0" aria-label="Notifikasi">
-              <Bell className="h-4 w-4" />
-            </Button>
+            <NotificationBell isAdmin={user.role === "admin"} />
             <div className="hidden items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 md:flex">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white">
                 <ShieldCheck className="h-4 w-4" />
@@ -101,49 +140,138 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Button>
           </div>
         </header>
-        <main className="px-4 py-6 sm:px-6 lg:px-8">
-          {isRestricted ? <RestrictedAccess /> : children}
-        </main>
+        <main className="px-4 py-6 sm:px-6 lg:px-8">{isRestricted ? <RestrictedAccess /> : children}</main>
       </div>
 
-      <AnimatePresence>
-        {commandOpen && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/40 px-4 pt-24"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setCommandOpen(false)}
-          >
-            <motion.div
-              className="w-full max-w-2xl rounded-lg border border-border bg-card shadow-xl"
-              initial={{ y: -20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -20, opacity: 0 }}
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-                <Search className="h-5 w-5 text-muted" />
-                <input className="w-full bg-transparent text-sm outline-none" placeholder="Cari menu atau data operasional..." autoFocus />
-              </div>
-              <div className="grid gap-1 p-2">
-                {visibleNavigation.slice(0, 8).map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-900"
-                    onClick={() => setCommandOpen(false)}
-                  >
-                    <item.icon className="h-4 w-4 text-primary" />
-                    {item.label}
-                  </Link>
-                ))}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} navigationItems={visibleNavigation} />
+      <Toaster />
     </div>
+  );
+}
+
+function NotificationBell({ isAdmin }: { isAdmin: boolean }) {
+  const products = useUiStore((s) => s.products);
+  const settings = useUiStore((s) => s.settings);
+  const read = useUiStore((s) => s.readNotifications);
+  const hasHydrated = useUiStore((s) => s.hasHydrated);
+  const count = useMemo(() => buildNotifications(products, settings).filter((n) => !read.includes(n.id)).length, [products, settings, read]);
+  if (!isAdmin) {
+    return (
+      <Button variant="secondary" className="h-10 w-10 px-0" aria-label="Notifikasi" disabled>
+        <Bell className="h-4 w-4" />
+      </Button>
+    );
+  }
+  return (
+    <Link
+      href="/notifications"
+      className="relative inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-card hover:bg-slate-50 dark:hover:bg-slate-900"
+      aria-label="Notifikasi"
+    >
+      <Bell className="h-4 w-4" />
+      {hasHydrated && count > 0 && (
+        <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">
+          {count > 99 ? "99+" : count}
+        </span>
+      )}
+    </Link>
+  );
+}
+
+function CommandPalette({
+  open,
+  onClose,
+  navigationItems,
+}: {
+  open: boolean;
+  onClose: () => void;
+  navigationItems: NavItem[];
+}) {
+  const products = useUiStore((s) => s.products);
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    if (open) setQuery("");
+  }, [open]);
+
+  const q = query.trim().toLowerCase();
+  const menuMatches = navigationItems.filter((i) => i.label.toLowerCase().includes(q)).slice(0, 6);
+  const productMatches = q
+    ? products
+        .filter((p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || p.barcode.toLowerCase().includes(q))
+        .slice(0, 6)
+    : [];
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/40 px-4 pt-24"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+        >
+          <motion.div
+            className="w-full max-w-2xl rounded-lg border border-border bg-card shadow-xl"
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -20, opacity: 0 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+              <Search className="h-5 w-5 text-muted" />
+              <input
+                className="w-full bg-transparent text-sm outline-none"
+                placeholder="Cari menu, SKU, barang, atau barcode..."
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+              <span className="hidden items-center gap-1 rounded-md border border-border px-2 py-0.5 text-xs text-muted sm:flex">
+                Esc
+              </span>
+            </div>
+            <div className="max-h-96 overflow-y-auto p-2">
+              {menuMatches.length > 0 && <p className="px-3 py-1.5 text-xs font-semibold uppercase text-muted">Menu</p>}
+              {menuMatches.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-900"
+                  onClick={onClose}
+                >
+                  <item.icon className="h-4 w-4 text-primary" />
+                  {item.label}
+                </Link>
+              ))}
+              {productMatches.length > 0 && <p className="px-3 py-1.5 text-xs font-semibold uppercase text-muted">Barang</p>}
+              {productMatches.map((p) => (
+                <button
+                  key={p.sku}
+                  onClick={() => {
+                    router.push("/inventory");
+                    onClose();
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-900"
+                >
+                  <Package className="h-4 w-4 text-primary" />
+                  <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                  <span className="text-xs text-muted">{p.sku}</span>
+                  <span className="text-xs font-semibold">{p.currentStock} {p.unit}</span>
+                </button>
+              ))}
+              {q && menuMatches.length === 0 && productMatches.length === 0 && (
+                <div className="flex items-center gap-2 px-3 py-6 text-sm text-muted">
+                  <CornerDownLeft className="h-4 w-4" /> Tidak ada hasil untuk &quot;{query}&quot;.
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -154,7 +282,7 @@ function RestrictedAccess() {
         <ShieldCheck className="h-12 w-12 text-primary" />
         <h1 className="mt-5 text-2xl font-bold">Akses dibatasi</h1>
         <p className="mt-2 max-w-md text-sm leading-6 text-muted">
-          Akun Karyawan Gudang hanya dapat membuka fitur Barang Keluar. Semua menu lain hanya untuk Admin Utama.
+          Akun ini hanya dapat membuka fitur Barang Keluar. Menu lain khusus untuk Admin Utama.
         </p>
         <Link
           href="/transactions"
@@ -167,13 +295,17 @@ function RestrictedAccess() {
   );
 }
 
-function Sidebar({
-  pathname,
-  navigationItems,
-}: {
-  pathname: string;
-  navigationItems: typeof navigation;
-}) {
+function Sidebar({ pathname, navigationItems }: { pathname: string; navigationItems: NavItem[] }) {
+  const groups = useMemo(() => {
+    const map = new Map<string, NavItem[]>();
+    navigationItems.forEach((item) => {
+      const list = map.get(item.group) ?? [];
+      list.push(item);
+      map.set(item.group, list);
+    });
+    return Array.from(map.entries());
+  }, [navigationItems]);
+
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-border p-5">
@@ -188,25 +320,30 @@ function Sidebar({
         </div>
       </div>
       <nav className="flex-1 overflow-y-auto p-3">
-        {navigationItems.map((item) => {
-          const active = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted transition hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-900",
-                active && "bg-leaf/10 text-primary dark:bg-green-950/40",
-              )}
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              <span className="truncate">{item.label}</span>
-            </Link>
-          );
-        })}
+        {groups.map(([group, items]) => (
+          <div key={group} className="mb-3">
+            <p className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">{group}</p>
+            {items.map((item) => {
+              const active = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted transition hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-900",
+                    active && "bg-leaf/10 text-primary dark:bg-green-950/40",
+                  )}
+                >
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
       <div className="border-t border-border p-4 text-xs text-muted">
-        Role admin, role karyawan, data stok real, dan alur audit gudang sudah disiapkan.
+        Data tersimpan lokal di browser. Semua modul terhubung ke inventori dan log audit.
       </div>
     </div>
   );

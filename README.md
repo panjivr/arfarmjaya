@@ -1,58 +1,53 @@
 # AR FARM JAYA WMS
 
-Sistem Manajemen Gudang untuk ARFARM BHINNEKA NUSA JAYA.
+Sistem Manajemen Gudang untuk ARFARM BHINNEKA NUSA JAYA — aplikasi web yang berjalan penuh di sisi klien (static export) dengan data tersimpan di browser (localStorage). Semua modul saling terhubung ke satu sumber data inventori.
 
 ## Fitur
 
-- Login dengan role `Admin Utama` dan `Karyawan Gudang`.
-- Admin Utama memiliki akses penuh ke seluruh menu.
-- Karyawan Gudang hanya dapat mencatat Barang Keluar.
-- Dasbor inventori, pembelian, distribusi, penjualan, pendapatan, dan biaya.
-- Data barang dengan SKU, barcode, rak, gudang, pemasok, batch, dan tanggal kedaluwarsa.
-- Stok bahan baku real dari `STOCK BAHAN BAKU GUDANG ARFARM.xlsx`.
-- Modul kategori, pemasok, gudang, rak, pembelian, penerimaan barang, distribusi, permintaan barang, stok opname, POS retail, laporan, pengguna, notifikasi, log audit, analitik, dan pengaturan.
-- Prisma schema PostgreSQL ternormalisasi dan seed data role awal.
+- **Autentikasi & RBAC** — role `Admin Utama` (akses penuh) dan `Karyawan Gudang` (hanya Barang Keluar).
+- **Dasbor** — metrik live (nilai inventori, stok rendah/habis, hampir kedaluwarsa) dan grafik yang dihitung langsung dari data stok.
+- **Inventori** — cari, filter status/kategori, ekspor CSV, tambah & hapus barang.
+- **Data Master** — Kategori, Pemasok, Gudang, dan Rak dengan CRUD penuh dan statistik turunan.
+- **Operasional** — Pembelian (PO + persetujuan), Penerimaan Barang (menambah stok), Barang Keluar, Distribusi, Permintaan Barang, Stok Opname (adjustment), dan POS Retail (mengurangi stok).
+- **Analitik & Laporan** — laporan valuasi, stok rendah, kedaluwarsa, pergerakan stok, dan ekspor CSV.
+- **Sistem** — Notifikasi otomatis (stok rendah/kedaluwarsa), Log Audit setiap aksi, Pengguna & Role, dan Pengaturan.
+- **UX** — mode terang/gelap, command palette (Ctrl/Cmd+K), pencarian global, dan notifikasi toast.
+
+Semua transaksi (masuk, keluar, penerimaan, distribusi, opname, POS) memperbarui stok inventori yang sama dan menulis entri log audit.
 
 ## Akun Demo
 
 - Admin Utama: `admin` / `admin123`
 - Karyawan Gudang: `karyawan` / `gudang123`
 
+## Data
+
+Stok awal berasal dari `STOCK BAHAN BAKU GUDANG ARFARM.xlsx` (`src/lib/stock-products.ts`). Saat aplikasi dijalankan, data di-seed ke store dan perubahan disimpan di browser. Gunakan menu **Pengaturan → Reset Data** untuk mengembalikan ke data awal.
+
 ## Stack
 
-- Next.js 15
-- React 19
-- TypeScript
-- TailwindCSS
-- Prisma dan PostgreSQL
-- Better Auth-ready
-- Zustand
-- TanStack Table
-- Recharts
-- React Hook Form dan Zod
-- Lucide Icons
-- Framer Motion
+- Next.js 15 (App Router, static export) + React 19 + TypeScript
+- TailwindCSS v4
+- Zustand (state + persistensi localStorage)
+- Recharts, Lucide Icons, Framer Motion
 
 ## Menjalankan Lokal
 
 ```bash
 npm install
-cp .env.example .env
-npm run prisma:generate
 npm run dev
 ```
 
 Buka `http://localhost:3000`.
 
-## Database
-
-Isi `DATABASE_URL` di `.env`, lalu jalankan:
+## Build Statis
 
 ```bash
-npm run prisma:migrate
-npm run prisma:seed
+npm run build
 ```
+
+Output diekspor ke `out/` dan dapat dihosting sebagai situs statis (mis. GitHub Pages).
 
 ## Arsitektur
 
-Lihat `docs/ARCHITECTURE.md` untuk struktur modul, model keamanan, API, dan ERD.
+Lihat `docs/ARCHITECTURE.md` untuk struktur modul dan model data.
