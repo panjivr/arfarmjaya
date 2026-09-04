@@ -56,7 +56,7 @@ export type NavItem = {
 };
 
 export const navigation: NavItem[] = [
-  { label: "Dasbor", href: "/", icon: LayoutDashboard, adminOnly: true, group: "Ringkasan" },
+  { label: "Dasbor", href: "/dashboard", icon: LayoutDashboard, adminOnly: true, group: "Ringkasan" },
   { label: "Inventori", href: "/inventory", icon: Boxes, adminOnly: true, group: "Data Master" },
   { label: "Kategori", href: "/categories", icon: Archive, adminOnly: true, group: "Data Master" },
   { label: "Pemasok", href: "/suppliers", icon: Building2, adminOnly: true, group: "Data Master" },

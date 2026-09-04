@@ -1,8 +1,9 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LockKeyhole, ShieldCheck, UserRoundCheck } from "lucide-react";
+import { ArrowLeft, LockKeyhole, ShieldCheck, UserRoundCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -38,7 +39,7 @@ export function LoginScreen() {
       label: roleLabel[role],
     });
     audit("Login", "Autentikasi", `${username} masuk sebagai ${role}`);
-    router.push(role === "admin" ? "/" : "/transactions");
+    router.push(role === "admin" ? "/dashboard" : "/transactions");
   }
 
   return (
@@ -75,6 +76,9 @@ export function LoginScreen() {
 
       <main className="flex items-center justify-center px-5 py-10">
         <div className="w-full max-w-md">
+          <Link href="/" className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-muted transition hover:text-primary">
+            <ArrowLeft className="h-4 w-4" /> Kembali ke beranda
+          </Link>
           <div className="mb-8 flex items-center gap-4 lg:hidden">
             <Image src="/logo.png" alt="Logo AR FARM JAYA" width={68} height={68} className="object-contain" priority />
             <div>
