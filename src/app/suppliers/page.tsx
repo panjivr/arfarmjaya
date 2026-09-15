@@ -111,7 +111,7 @@ export default function SuppliersPage() {
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Data Master"
+        eyebrow="Inventori & Master"
         title="Pemasok"
         description="Kelola profil pemasok beserta kontak, telepon, email, dan alamat untuk pembelian dan penerimaan barang."
         action={
@@ -139,7 +139,7 @@ export default function SuppliersPage() {
         }
       />
 
-      <section className="mb-4 grid gap-4 sm:grid-cols-3">
+      <section className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
         <StatCard label="Total Pemasok" value={suppliers.length} icon={Building2} />
         <StatCard label="Pemasok Terpakai" value={usedCount} icon={Building2} tone="primary" />
         <StatCard label="Belum Terpakai" value={suppliers.length - usedCount} icon={Building2} tone="slate" />

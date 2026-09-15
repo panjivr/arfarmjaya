@@ -64,7 +64,7 @@ export default function RequestsPage() {
         action={<Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> Permintaan Baru</Button>}
       />
 
-      <section className="mb-4 grid gap-4 sm:grid-cols-3">
+      <section className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
         <StatCard label="Total Permintaan" value={requests.length} icon={ClipboardList} />
         <StatCard label="Menunggu Persetujuan" value={waiting} icon={ClipboardList} tone="amber" />
         <StatCard label="Selesai" value={done} icon={ClipboardList} tone="primary" />

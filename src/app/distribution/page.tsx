@@ -65,7 +65,7 @@ export default function DistributionPage() {
         action={<Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> Distribusi Baru</Button>}
       />
 
-      <section className="mb-4 grid gap-4 sm:grid-cols-3">
+      <section className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
         <StatCard label="Total DO" value={distributions.length} icon={Truck} />
         <StatCard label="Sedang Diproses" value={processing} icon={Truck} tone="amber" />
         <StatCard label="Selesai" value={done} icon={Truck} tone="primary" />

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/field";
 import { toast } from "@/components/ui/toast";
+import { ScaledPreview } from "@/components/ui/scaled-preview";
 import { InvoiceDocument, type InvoiceData } from "@/components/invoice/invoice-document";
 import { useUiStore } from "@/lib/store";
 import { currency, formatDate } from "@/lib/utils";
@@ -67,7 +68,7 @@ export default function InvoicesPage() {
   if (stores.length === 0) {
     return (
       <AppShell>
-        <PageHeader eyebrow="Retail & Invoice" title="Invoice" description="Buat dan cetak invoice untuk toko Anda." />
+        <PageHeader eyebrow="Penjualan" title="Invoice" description="Buat dan cetak invoice untuk toko Anda." />
         <EmptyState icon={FileText} title="Belum ada toko" description="Tambahkan toko dulu di menu Toko sebelum membuat invoice." />
       </AppShell>
     );
@@ -76,20 +77,20 @@ export default function InvoicesPage() {
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Retail & Invoice"
+        eyebrow="Penjualan"
         title="Invoice"
         description="Pilih toko, isi pembeli dan daftar barang, lalu simpan atau cetak invoice siap kirim."
       />
 
-      <section className="mb-4 grid gap-4 sm:grid-cols-3">
+      <section className="no-print mb-4 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3">
         <StatCard label="Total Invoice" value={invoices.length} icon={FileText} />
         <StatCard label="Nilai Invoice" value={currency.format(invoices.reduce((t, i) => t + i.total, 0))} icon={FileText} tone="primary" />
         <StatCard label="Toko Aktif" value={stores.length} icon={FileText} tone="amber" />
       </section>
 
-      <div className="grid gap-4 xl:grid-cols-[420px_1fr]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
         {/* Editor */}
-        <div className="no-print space-y-4">
+        <div className="no-print min-w-0 space-y-4">
           <Card>
             <CardHeader><h2 className="font-semibold">Data Invoice</h2></CardHeader>
             <CardContent className="space-y-3">
@@ -144,9 +145,12 @@ export default function InvoicesPage() {
         </div>
 
         {/* Live preview */}
-        <div className="no-print">
-          <Card className="overflow-x-auto bg-slate-100 p-4 dark:bg-slate-900">
-            <div className="shadow-lg"><InvoiceDocument store={store} invoice={previewData} /></div>
+        <div className="no-print min-w-0">
+          <Card className="bg-slate-100 p-3 sm:p-4 lg:sticky lg:top-20 dark:bg-slate-900">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted sm:mb-3">Pratinjau invoice</p>
+            <ScaledPreview baseWidth={800}>
+              <div className="shadow-lg"><InvoiceDocument store={store} invoice={previewData} /></div>
+            </ScaledPreview>
           </Card>
         </div>
       </div>

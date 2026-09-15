@@ -119,7 +119,7 @@ export default function UsersPage() {
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Data Master"
+        eyebrow="Inventori & Master"
         title="Pengguna & Role"
         description="Kelola akun pengguna beserta hak akses berbasis role untuk operasional gudang."
         action={
@@ -145,7 +145,7 @@ export default function UsersPage() {
         }
       />
 
-      <section className="mb-4 grid gap-4 sm:grid-cols-3">
+      <section className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
         <StatCard label="Total Pengguna" value={users.length} icon={Users} />
         <StatCard label="Pengguna Aktif" value={activeCount} icon={Users} tone="primary" />
         <StatCard label="Jumlah Role" value={uniqueRoles} icon={Users} tone="slate" />

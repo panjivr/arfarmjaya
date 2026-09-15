@@ -12,11 +12,11 @@ export function PageHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <p className="text-sm font-semibold text-primary">{eyebrow}</p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight">{title}</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">{description}</p>
+        <h1 className="mt-1.5 text-2xl font-bold tracking-tight sm:mt-2 sm:text-3xl">{title}</h1>
+        <p className="mt-1.5 max-w-3xl text-sm leading-6 text-muted sm:mt-2">{description}</p>
       </div>
       {action && <div className="flex flex-wrap gap-2">{action}</div>}
     </div>
@@ -43,11 +43,11 @@ export function StatCard({
     slate: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
   };
   return (
-    <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
+    <div className="min-w-0 rounded-lg border border-border bg-card p-4 shadow-sm sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm text-muted">{label}</p>
-          <p className="mt-2 truncate text-2xl font-bold">{value}</p>
+          <p className="truncate text-xs text-muted sm:text-sm">{label}</p>
+          <p className="mt-1.5 truncate text-xl font-bold sm:mt-2 sm:text-2xl">{value}</p>
         </div>
         {Icon && (
           <div className={cn("rounded-lg p-2", tones[tone])}>
@@ -55,7 +55,7 @@ export function StatCard({
           </div>
         )}
       </div>
-      {hint && <p className="mt-3 text-xs font-medium text-primary">{hint}</p>}
+      {hint && <p className="mt-2 truncate text-xs font-medium text-primary sm:mt-3">{hint}</p>}
     </div>
   );
 }

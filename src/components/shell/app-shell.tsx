@@ -3,9 +3,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bell,
+  ChevronDown,
   Command,
   CornerDownLeft,
   LogOut,
@@ -13,6 +14,7 @@ import {
   Moon,
   Package,
   Search,
+  Settings2,
   ShieldCheck,
   Sun,
   X,
@@ -62,6 +64,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setCommandOpen(false);
   }, [pathname, setSidebar, setCommandOpen]);
 
+  // Kunci gulir latar selama laci menu terbuka di layar kecil.
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [sidebarOpen]);
+
   if (!user) {
     return (
       <>
@@ -72,36 +84,41 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   const visibleNavigation = navigation.filter((item) => user.role === "admin" || !item.adminOnly);
+  const homeHref = user.role === "admin" ? "/dashboard" : "/transactions";
   const isRestricted = user.role !== "admin" && navigation.some((n) => n.href === pathname && n.adminOnly);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-border bg-card lg:block">
-        <Sidebar pathname={pathname} navigationItems={visibleNavigation} />
+        <Sidebar pathname={pathname} navigationItems={visibleNavigation} homeHref={homeHref} />
       </aside>
 
       <AnimatePresence>
         {sidebarOpen && (
           <motion.div
-            className="fixed inset-0 z-40 bg-slate-950/40 lg:hidden"
+            className="fixed inset-0 z-40 bg-slate-950/50 lg:hidden"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={toggleSidebar}
           >
             <motion.aside
-              className="h-full w-72 border-r border-border bg-card"
-              initial={{ x: -288 }}
+              className="relative h-full w-[17rem] max-w-[86vw] border-r border-border bg-card shadow-xl"
+              initial={{ x: "-100%" }}
               animate={{ x: 0 }}
-              exit={{ x: -288 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "tween", duration: 0.2 }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex justify-end p-3">
-                <Button variant="ghost" className="h-9 w-9 px-0" onClick={toggleSidebar} aria-label="Tutup sidebar">
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
-              <Sidebar pathname={pathname} navigationItems={visibleNavigation} />
+              <Button
+                variant="ghost"
+                className="absolute right-2 top-2 z-10 h-9 w-9 px-0"
+                onClick={toggleSidebar}
+                aria-label="Tutup menu"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+              <Sidebar pathname={pathname} navigationItems={visibleNavigation} homeHref={homeHref} collapsible />
             </motion.aside>
           </motion.div>
         )}
@@ -109,44 +126,150 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="lg:pl-72">
         <header className="sticky top-0 z-20 border-b border-border bg-background/90 backdrop-blur">
-          <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
-            <Button variant="ghost" className="h-10 w-10 px-0 lg:hidden" onClick={toggleSidebar} aria-label="Buka sidebar">
+          <div className="flex h-14 items-center gap-2 px-3 sm:h-16 sm:gap-3 sm:px-6">
+            <Button variant="ghost" className="h-10 w-10 shrink-0 px-0 lg:hidden" onClick={toggleSidebar} aria-label="Buka menu">
               <Menu className="h-5 w-5" />
             </Button>
+
+            {/* Merek ringkas menggantikan sidebar saat layar kecil */}
+            <Link href={homeHref} className="flex min-w-0 flex-1 items-center gap-2 lg:hidden">
+              <Image src="/logo.png" alt="" width={28} height={28} className="h-7 w-7 shrink-0 object-contain" />
+              <span className="truncate text-sm font-bold tracking-tight">AR FARM JAYA</span>
+            </Link>
+
+            {/* Pencarian: kolom penuh di layar lebar, tombol ikon di layar kecil */}
             <button
-              className="flex h-10 min-w-0 flex-1 items-center gap-3 rounded-lg border border-border bg-card px-3 text-left text-sm text-muted"
+              className="hidden h-10 min-w-0 flex-1 items-center gap-3 rounded-lg border border-border bg-card px-3 text-left text-sm text-muted lg:flex"
               onClick={() => setCommandOpen(true)}
             >
               <Search className="h-4 w-4 shrink-0" />
               <span className="truncate">Cari SKU, barang, atau menu...</span>
-              <span className="ml-auto hidden items-center gap-1 rounded-md border border-border px-2 py-0.5 text-xs sm:flex">
+              <span className="ml-auto flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-xs">
                 <Command className="h-3 w-3" /> K
               </span>
             </button>
-            <Button variant="secondary" className="h-10 w-10 px-0" onClick={toggleTheme} aria-label="Ganti tema">
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            <Button variant="ghost" className="h-10 w-10 shrink-0 px-0 lg:hidden" onClick={() => setCommandOpen(true)} aria-label="Cari">
+              <Search className="h-5 w-5" />
             </Button>
+
             <NotificationBell isAdmin={user.role === "admin"} />
-            <div className="hidden items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 md:flex">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white">
-                <ShieldCheck className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold">{user.name}</p>
-                <p className="text-xs text-muted">{user.label}</p>
-              </div>
-            </div>
-            <Button variant="ghost" className="h-10 w-10 px-0" onClick={logout} aria-label="Keluar">
-              <LogOut className="h-4 w-4" />
-            </Button>
+            <UserMenu name={user.name} label={user.label} isAdmin={user.role === "admin"} theme={theme} onToggleTheme={toggleTheme} onLogout={logout} />
           </div>
         </header>
-        <main className="px-4 py-6 sm:px-6 lg:px-8">{isRestricted ? <RestrictedAccess /> : children}</main>
+        <main className="min-w-0 px-4 py-5 sm:px-6 sm:py-6 lg:px-8">{isRestricted ? <RestrictedAccess /> : children}</main>
       </div>
 
       <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} navigationItems={visibleNavigation} />
       <LoginNotice />
       <Toaster />
+    </div>
+  );
+}
+
+/**
+ * Satu menu untuk identitas pengguna, ganti tema, pintasan pengaturan, dan
+ * keluar — menggantikan tiga kontrol terpisah di header agar tetap ringkas di HP.
+ */
+function UserMenu({
+  name,
+  label,
+  isAdmin,
+  theme,
+  onToggleTheme,
+  onLogout,
+}: {
+  name: string;
+  label: string;
+  isAdmin: boolean;
+  theme: "light" | "dark";
+  onToggleTheme: () => void;
+  onLogout: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const initials = name
+    .split(" ")
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+
+  return (
+    <div className="relative shrink-0" ref={ref}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Menu pengguna"
+        className="flex h-10 items-center gap-2 rounded-lg border border-border bg-card pl-1.5 pr-1.5 text-left transition hover:bg-slate-50 sm:pr-2.5 dark:hover:bg-slate-900"
+      >
+        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-[11px] font-bold text-white">{initials}</span>
+        <span className="hidden min-w-0 md:block">
+          <span className="block max-w-[140px] truncate text-sm font-semibold leading-tight">{name}</span>
+          <span className="block max-w-[140px] truncate text-[11px] leading-tight text-muted">{label}</span>
+        </span>
+        <ChevronDown className={cn("hidden h-4 w-4 shrink-0 text-muted transition sm:block", open && "rotate-180")} />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            role="menu"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            className="absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-lg border border-border bg-card shadow-xl"
+          >
+            <div className="border-b border-border px-4 py-3 md:hidden">
+              <p className="truncate text-sm font-semibold">{name}</p>
+              <p className="truncate text-xs text-muted">{label}</p>
+            </div>
+            <button
+              role="menuitem"
+              onClick={() => {
+                onToggleTheme();
+                setOpen(false);
+              }}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-900"
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4 text-muted" /> : <Moon className="h-4 w-4 text-muted" />}
+              Mode {theme === "dark" ? "terang" : "gelap"}
+            </button>
+            {isAdmin && (
+              <Link
+                role="menuitem"
+                href="/settings"
+                onClick={() => setOpen(false)}
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-sm hover:bg-slate-100 dark:hover:bg-slate-900"
+              >
+                <Settings2 className="h-4 w-4 text-muted" /> Pengaturan
+              </Link>
+            )}
+            <button
+              role="menuitem"
+              onClick={onLogout}
+              className="flex w-full items-center gap-3 border-t border-border px-4 py-2.5 text-left text-sm font-medium text-danger hover:bg-red-50 dark:hover:bg-red-950/30"
+            >
+              <LogOut className="h-4 w-4" /> Keluar
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -297,56 +420,101 @@ function RestrictedAccess() {
   );
 }
 
-function Sidebar({ pathname, navigationItems }: { pathname: string; navigationItems: NavItem[] }) {
+function Sidebar({
+  pathname,
+  navigationItems,
+  homeHref,
+  collapsible = false,
+}: {
+  pathname: string;
+  navigationItems: NavItem[];
+  homeHref: string;
+  /** true di laci HP: hanya grup aktif yang terbuka agar daftar tetap pendek. */
+  collapsible?: boolean;
+}) {
+  const soloItems = navigationItems.filter((item) => !item.group);
   const groups = useMemo(() => {
     const map = new Map<string, NavItem[]>();
-    navigationItems.forEach((item) => {
-      const list = map.get(item.group) ?? [];
-      list.push(item);
-      map.set(item.group, list);
-    });
+    navigationItems
+      .filter((item) => item.group)
+      .forEach((item) => {
+        const list = map.get(item.group) ?? [];
+        list.push(item);
+        map.set(item.group, list);
+      });
     return Array.from(map.entries());
   }, [navigationItems]);
 
+  const activeGroup = navigationItems.find((item) => item.href === pathname)?.group ?? "";
+  const [closed, setClosed] = useState<Record<string, boolean>>({});
+  const isOpen = (group: string) =>
+    closed[group] === undefined ? !collapsible || group === activeGroup : !closed[group];
+
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-border p-5">
-        <div className="flex items-center gap-3">
-          <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-white p-1 shadow-sm ring-1 ring-border">
-            <Image src="/logo.png" alt="Logo AR FARM JAYA" width={48} height={48} className="object-contain" priority />
+      <div className="border-b border-border p-4 sm:p-5">
+        <Link href={homeHref} className="flex items-center gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white p-1 shadow-sm ring-1 ring-border">
+            <Image src="/logo.png" alt="Logo AR FARM JAYA" width={44} height={44} className="object-contain" priority />
           </div>
-          <div>
-            <p className="font-bold tracking-tight">AR FARM JAYA</p>
-            <p className="text-xs font-medium text-muted">Sistem Manajemen Gudang</p>
+          <div className="min-w-0">
+            <p className="truncate font-bold tracking-tight">AR FARM JAYA</p>
+            <p className="truncate text-xs font-medium text-muted">Sistem Manajemen Gudang</p>
           </div>
-        </div>
+        </Link>
       </div>
+
       <nav className="flex-1 overflow-y-auto p-3">
-        {groups.map(([group, items]) => (
-          <div key={group} className="mb-3">
-            <p className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">{group}</p>
-            {items.map((item) => {
-              const active = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted transition hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-900",
-                    active && "bg-leaf/10 text-primary dark:bg-green-950/40",
-                  )}
-                >
-                  <item.icon className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{item.label}</span>
-                </Link>
-              );
-            })}
-          </div>
+        {soloItems.map((item) => (
+          <NavLink key={item.href} item={item} active={pathname === item.href} />
         ))}
+
+        {groups.map(([group, items]) => {
+          const open = isOpen(group);
+          const hasActive = items.some((item) => item.href === pathname);
+          return (
+            <div key={group} className="mt-1.5">
+              <button
+                onClick={() => setClosed((state) => ({ ...state, [group]: open }))}
+                aria-expanded={open}
+                className={cn(
+                  "flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted transition hover:bg-slate-100 dark:hover:bg-slate-900",
+                  hasActive && !open && "text-primary",
+                )}
+              >
+                <span className="truncate">{group}</span>
+                <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 transition", open && "rotate-180")} />
+              </button>
+              {open && (
+                <div className="mt-0.5">
+                  {items.map((item) => (
+                    <NavLink key={item.href} item={item} active={pathname === item.href} />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </nav>
-      <div className="border-t border-border p-4 text-xs text-muted">
+
+      <div className="border-t border-border p-4 text-xs leading-5 text-muted">
         Data tersimpan lokal di browser. Semua modul terhubung ke inventori dan log audit.
       </div>
     </div>
+  );
+}
+
+function NavLink({ item, active }: { item: NavItem; active: boolean }) {
+  return (
+    <Link
+      href={item.href}
+      className={cn(
+        "mb-0.5 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted transition hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-900",
+        active && "bg-leaf/10 font-semibold text-primary dark:bg-green-950/40",
+      )}
+    >
+      <item.icon className="h-4 w-4 shrink-0" />
+      <span className="truncate">{item.label}</span>
+    </Link>
   );
 }

@@ -104,13 +104,13 @@ export default function StoresPage() {
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Retail & Invoice"
+        eyebrow="Penjualan"
         title="Toko"
         description="Kelola beberapa toko/penjual untuk membuat invoice. Setiap toko punya logo, alamat, kontak, dan info pembayaran sendiri."
         action={<Button onClick={openCreate}><Plus className="h-4 w-4" /> Toko Baru</Button>}
       />
 
-      <section className="mb-4 grid gap-4 sm:grid-cols-3">
+      <section className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
         <StatCard label="Total Toko" value={stores.length} icon={StoreIcon} />
         <StatCard label="Total Invoice" value={invoices.length} icon={Building2} tone="primary" />
         <StatCard label="Toko dengan Logo" value={stores.filter((s) => s.logo).length} icon={ImagePlus} tone="amber" />

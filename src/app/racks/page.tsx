@@ -101,7 +101,7 @@ export default function RacksPage() {
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Data Master"
+        eyebrow="Inventori & Master"
         title="Manajemen Rak"
         description="Kelola kode rak dan pemetaan gudang untuk penyimpanan, picking, dan stok opname."
         action={
@@ -126,7 +126,7 @@ export default function RacksPage() {
         }
       />
 
-      <section className="mb-4 grid gap-4 sm:grid-cols-3">
+      <section className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
         <StatCard label="Total Rak" value={racks.length} icon={LayoutGrid} />
         <StatCard label="Rak Terpakai" value={usedCount} icon={LayoutGrid} tone="primary" />
         <StatCard label="Jumlah Gudang" value={warehouses.length} icon={LayoutGrid} tone="slate" />

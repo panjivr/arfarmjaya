@@ -37,7 +37,7 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {metrics.map((metric) => {
           const tone = metric.label.includes("Habis") || metric.label.includes("Kedaluwarsa")
             ? "danger"

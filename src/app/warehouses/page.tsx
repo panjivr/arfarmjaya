@@ -107,7 +107,7 @@ export default function WarehousesPage() {
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Data Master"
+        eyebrow="Inventori & Master"
         title="Gudang"
         description="Kelola lokasi penyimpanan barang beserta sebaran SKU, total stok, dan nilai HPP tiap gudang."
         action={
@@ -134,7 +134,7 @@ export default function WarehousesPage() {
         }
       />
 
-      <section className="mb-4 grid gap-4 sm:grid-cols-3">
+      <section className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
         <StatCard label="Total Gudang" value={warehouses.length} icon={WarehouseIcon} />
         <StatCard label="Total SKU" value={products.length} icon={WarehouseIcon} tone="primary" />
         <StatCard label="Nilai HPP" value={currency.format(totalValue)} icon={WarehouseIcon} tone="amber" />

@@ -95,7 +95,7 @@ export default function CategoriesPage() {
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Data Master"
+        eyebrow="Inventori & Master"
         title="Kategori"
         description="Kelompokkan barang untuk pelaporan valuasi, filter inventori, dan analitik."
         action={
@@ -106,7 +106,7 @@ export default function CategoriesPage() {
         }
       />
 
-      <section className="mb-4 grid gap-4 sm:grid-cols-3">
+      <section className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
         <StatCard label="Total Kategori" value={categories.length} icon={Archive} />
         <StatCard label="Kategori Terisi" value={stats.length} icon={Archive} tone="primary" />
         <StatCard label="Nilai Terbesar" value={stats[0]?.name ?? "-"} hint={stats[0] ? currency.format(stats[0].value) : undefined} icon={Archive} tone="amber" />

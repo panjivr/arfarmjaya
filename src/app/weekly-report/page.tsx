@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { toast } from "@/components/ui/toast";
+import { ScaledPreview } from "@/components/ui/scaled-preview";
 import { WeeklyReportDocument, type WeeklyReportData } from "@/components/report/weekly-report-document";
 import { useUiStore } from "@/lib/store";
 import { A4_LANDSCAPE_PRINT, compressImage, currency, exportCsv, fitPrintZoom, formatDate, formatDateTime, printDocument } from "@/lib/utils";
@@ -276,7 +277,7 @@ export default function WeeklyReportPage() {
   if (!profile) {
     return (
       <AppShell>
-        <PageHeader eyebrow="Program Lapangan" title="Laporan Mingguan" description="Buat laporan pelaksanaan mingguan yang rapi dan siap cetak." />
+        <PageHeader eyebrow="Laporan & Analitik" title="Laporan Mingguan" description="Buat laporan pelaksanaan mingguan yang rapi dan siap cetak." />
         <EmptyState icon={Sprout} title="Belum ada profil laporan" description="Profil laporan berisi kop surat, judul, dan format cetak." />
       </AppShell>
     );
@@ -285,34 +286,34 @@ export default function WeeklyReportPage() {
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Program Lapangan"
+        eyebrow="Laporan & Analitik"
         title="Laporan Mingguan"
         description="Susun laporan pelaksanaan mingguan lengkap dengan kop lembaga, tabel kegiatan, foto, total nominal, dan blok tanda tangan — lalu simpan, cetak, atau ekspor ke PDF."
         action={
           <>
-            <Button variant="secondary" onClick={() => setProfileModalOpen(true)}>
-              <Settings2 className="h-4 w-4" /> Pengaturan Format
+            <Button variant="secondary" className="flex-1 sm:flex-none" onClick={() => setProfileModalOpen(true)}>
+              <Settings2 className="h-4 w-4" /> <span className="truncate">Pengaturan Format</span>
             </Button>
-            <Button variant="secondary" onClick={resetForm}>
+            <Button variant="secondary" className="flex-1 sm:flex-none" onClick={resetForm}>
               <FilePlus2 className="h-4 w-4" /> Laporan Baru
             </Button>
-            <Button onClick={save}>
+            <Button className="flex-1 sm:flex-none" onClick={save}>
               <Save className="h-4 w-4" /> {editingId ? "Perbarui" : "Simpan"}
             </Button>
           </>
         }
       />
 
-      <section className="no-print mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Laporan Tersimpan" value={reports.length} icon={FileDown} />
-        <StatCard label="Kegiatan di Laporan Ini" value={activities.length} icon={Sprout} tone="primary" />
+      <section className="no-print mb-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <StatCard label="Tersimpan" value={reports.length} icon={FileDown} />
+        <StatCard label="Kegiatan" value={activities.length} icon={Sprout} tone="primary" />
         <StatCard label="Total Nominal" value={currency.format(total)} icon={Wallet} tone="amber" />
         <StatCard label="Profil Format" value={profiles.length} icon={Settings2} tone="slate" />
       </section>
 
-      <div className="grid gap-4 xl:grid-cols-[430px_1fr]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,430px)_minmax(0,1fr)]">
         {/* Editor */}
-        <div className="no-print space-y-4">
+        <div className="no-print min-w-0 space-y-4">
           <Card>
             <CardHeader className="flex items-center justify-between gap-3">
               <h2 className="font-semibold">Identitas Laporan</h2>
@@ -452,12 +453,14 @@ export default function WeeklyReportPage() {
         </div>
 
         {/* Pratinjau */}
-        <div className="no-print">
-          <Card className="overflow-x-auto bg-slate-100 p-4 dark:bg-slate-900">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">Pratinjau cetak — A4 landscape</p>
-            <div className="min-w-[900px] shadow-lg">
-              <WeeklyReportDocument profile={profile} report={previewData} printedAt={printedAt} />
-            </div>
+        <div className="no-print min-w-0">
+          <Card className="bg-slate-100 p-3 sm:p-4 lg:sticky lg:top-20 dark:bg-slate-900">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted sm:mb-3">Pratinjau cetak — A4 landscape</p>
+            <ScaledPreview>
+              <div className="shadow-lg">
+                <WeeklyReportDocument profile={profile} report={previewData} printedAt={printedAt} />
+              </div>
+            </ScaledPreview>
           </Card>
         </div>
       </div>
@@ -571,6 +574,7 @@ export default function WeeklyReportPage() {
     </AppShell>
   );
 }
+
 
 /* ── Modal kegiatan ─────────────────────────────────────────────────────── */
 

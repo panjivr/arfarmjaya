@@ -25,12 +25,12 @@ export default function AnalyticsPage() {
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Analitik"
+        eyebrow="Laporan & Analitik"
         title="Analitik"
         description="Visualisasi nilai inventori, arus stok, dan status barang berdasarkan data gudang secara langsung."
       />
 
-      <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {metrics.map((m) => (
           <StatCard
             key={m.label}

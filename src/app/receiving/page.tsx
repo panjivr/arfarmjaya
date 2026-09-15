@@ -66,7 +66,7 @@ export default function ReceivingPage() {
         action={<Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> Terima Barang</Button>}
       />
 
-      <section className="mb-4 grid gap-4 sm:grid-cols-2">
+      <section className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2">
         <StatCard label="Total Penerimaan" value={receipts.length} icon={PackageCheck} />
         <StatCard label="Total Unit Diterima" value={totalUnits} icon={PackageCheck} tone="primary" />
       </section>

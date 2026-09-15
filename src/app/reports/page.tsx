@@ -69,12 +69,12 @@ export default function ReportsPage() {
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Analitik"
+        eyebrow="Laporan & Analitik"
         title="Laporan"
         description="Ringkasan valuasi inventori, stok kritis, kedaluwarsa, dan pergerakan stok. Setiap tabel dapat diekspor ke CSV."
       />
 
-      <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Nilai Inventori" value={currency.format(inventoryValue(products))} icon={Wallet} tone="primary" />
         <StatCard label="Total SKU" value={numberFmt.format(products.length)} icon={Boxes} tone="slate" />
         <StatCard label="Penjualan POS" value={currency.format(posTotal)} icon={ReceiptText} tone="amber" />

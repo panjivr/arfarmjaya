@@ -69,6 +69,7 @@ export function DataTable<T>({
           <EmptyState icon={Boxes} title={emptyTitle} description={emptyDescription} />
         </div>
       ) : (
+        <>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm" style={{ minWidth }}>
             <thead className="bg-slate-50 text-xs uppercase text-muted dark:bg-slate-900">
@@ -99,6 +100,8 @@ export function DataTable<T>({
             </tbody>
           </table>
         </div>
+        <p className="border-t border-border px-4 py-2 text-[11px] text-muted sm:hidden">Geser tabel ke samping untuk melihat kolom lain.</p>
+        </>
       )}
     </div>
   );

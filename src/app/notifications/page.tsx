@@ -43,7 +43,7 @@ export default function NotificationsPage() {
         }
       />
 
-      <section className="mb-6 grid gap-4 sm:grid-cols-3">
+      <section className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
         <StatCard label="Total Peringatan" value={items.length} icon={Bell} tone="slate" />
         <StatCard label="Belum Dibaca" value={unread.length} icon={AlertTriangle} tone="amber" />
         <StatCard label="Kritis" value={critical.length} icon={ShieldAlert} tone="danger" />

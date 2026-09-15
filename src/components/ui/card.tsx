@@ -2,7 +2,9 @@ import { HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("rounded-lg border border-border bg-card shadow-sm", className)} {...props} />;
+  // `min-w-0` menjaga kartu tetap menyusut di dalam grid/flex, sehingga tabel
+  // lebar di dalamnya bergulir sendiri alih-alih melebarkan halaman (penting di HP).
+  return <div className={cn("min-w-0 rounded-lg border border-border bg-card shadow-sm", className)} {...props} />;
 }
 
 export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {

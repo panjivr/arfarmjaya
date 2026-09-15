@@ -64,7 +64,7 @@ export default function AuditLogPage() {
         }
       />
 
-      <section className="mb-6 grid gap-4 sm:grid-cols-3">
+      <section className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
         <StatCard label="Total Entri" value={auditLog.length} icon={ShieldCheck} tone="slate" />
         <StatCard label="Aktor Unik" value={actors.length} icon={Users} tone="primary" />
         <StatCard label="Entri Hari Ini" value={todayCount} icon={CalendarClock} tone="amber" />

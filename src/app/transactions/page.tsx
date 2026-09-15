@@ -8,7 +8,7 @@ export default function TransactionsPage() {
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Operasional Gudang"
+        eyebrow="Operasional"
         title="Barang Keluar"
         description="Catat barang keluar dari gudang. Stok inventori langsung berkurang dan tercatat di log audit."
       />

@@ -156,6 +156,8 @@ export function ProductTable({ compact = false }: { compact?: boolean }) {
         </table>
       </div>
 
+      <p className="border-t border-border px-4 py-2 text-[11px] text-muted sm:hidden">Geser tabel ke samping untuk melihat kolom lain.</p>
+
       <AddProductModal open={addOpen} onClose={() => setAddOpen(false)} onSubmit={addProduct} />
     </div>
   );

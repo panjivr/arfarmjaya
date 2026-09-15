@@ -86,7 +86,7 @@ export default function PosPage() {
         description="Kasir retail: cari barang, tambahkan ke keranjang, terima pembayaran, dan stok otomatis berkurang."
       />
 
-      <section className="mb-4 grid gap-4 sm:grid-cols-2">
+      <section className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2">
         <StatCard label="Transaksi Hari Ini" value={todaySales.length} icon={ShoppingBag} />
         <StatCard label="Total Penjualan" value={currency.format(totalSales)} icon={Wallet} tone="primary" />
       </section>

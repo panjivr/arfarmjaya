@@ -70,7 +70,7 @@ export default function StockOpnamePage() {
         action={<Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> Sesi Baru</Button>}
       />
 
-      <section className="mb-4 grid gap-4 sm:grid-cols-3">
+      <section className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
         <StatCard label="Total Sesi" value={sessions.length} icon={ClipboardCheck} />
         <StatCard label="Draft" value={draft} icon={ClipboardCheck} tone="amber" />
         <StatCard label="Diposting" value={posted} icon={ClipboardCheck} tone="primary" />

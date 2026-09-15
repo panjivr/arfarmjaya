@@ -65,7 +65,7 @@ export default function PurchasePage() {
         action={<Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> Pesanan Baru</Button>}
       />
 
-      <section className="mb-4 grid gap-4 sm:grid-cols-3">
+      <section className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
         <StatCard label="Total Pesanan" value={orders.length} icon={ShoppingCart} />
         <StatCard label="Menunggu Persetujuan" value={pending} icon={ShoppingCart} tone="amber" />
         <StatCard label="Total Nilai" value={currency.format(totalValue)} icon={ShoppingCart} tone="primary" />
