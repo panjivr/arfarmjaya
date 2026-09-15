@@ -21,12 +21,15 @@ import type {
   PurchaseOrder,
   Rack,
   Receipt,
+  ReportProfile,
   Role,
   SessionUser,
   StockMovement,
   Store,
   Supplier,
   Warehouse,
+  WeeklyActivity,
+  WeeklyReport,
 } from "@/lib/types";
 
 export type { Role, SessionUser } from "@/lib/types";
@@ -84,6 +87,44 @@ const seedStores: Store[] = [
   },
 ];
 
+const seedReportProfiles: ReportProfile[] = [
+  {
+    id: uid(),
+    name: "Sinergi Titian Harapan — Penanaman Kedelai",
+    organization: "YAYASAN SINERGI TITIAN HARAPAN",
+    tagline: "Strengthening Communities",
+    program: "Program Pemberdayaan Pertanian — Penanaman Kedelai",
+    address: "",
+    phone: "",
+    email: "",
+    logo: "/report-logo-sinergi.png",
+    accent: "#c0201c",
+    reportTitle: "LAPORAN PELAKSANAAN MINGGUAN PENANAMAN KEDELAI",
+    currencyLabel: "Nominal (Rp)",
+    signaturePlace: "",
+    signatureRole: "Pelaksana / Penyuluh",
+    signatureName: "",
+    signatureId: "",
+    approverRole: "",
+    approverName: "",
+    approverId: "",
+    notes: [
+      "Umur HST = umur tanaman dihitung sejak Hari Setelah Tanam (mis. 0, 7, 14 HST).",
+      "Kolom Nominal (Rp) diisi angka saja; total terhitung otomatis oleh sistem.",
+      "Foto kegiatan diunggah pada tiap baris kegiatan dan ikut tercetak di kolom terakhir.",
+    ],
+    showHst: true,
+    showAmount: true,
+    showOutput: true,
+    showPhoto: true,
+    showSummary: true,
+    showNotes: true,
+    autoFit: true,
+    minRows: 8,
+    createdAt: now(),
+  },
+];
+
 const defaultSettings: AppSettings = {
   companyName: "ARFARM BHINNEKA NUSA JAYA",
   address: "Gudang Bahan Baku",
@@ -124,6 +165,8 @@ type State = {
   posSales: PosSale[];
   stores: Store[];
   invoices: Invoice[];
+  reportProfiles: ReportProfile[];
+  weeklyReports: WeeklyReport[];
   auditLog: AuditEntry[];
   readNotifications: string[];
   loginNoticeSeen: boolean;
@@ -199,6 +242,27 @@ type Actions = {
   }) => { ok: boolean; message?: string; invoice?: Invoice };
   deleteInvoice: (id: string) => void;
 
+  // laporan pelaksanaan mingguan
+  addReportProfile: (data: Omit<ReportProfile, "id" | "createdAt">) => ReportProfile;
+  updateReportProfile: (id: string, patch: Partial<ReportProfile>) => void;
+  removeReportProfile: (id: string) => { ok: boolean; message?: string };
+  saveWeeklyReport: (data: {
+    id?: string;
+    number?: string;
+    profileId: string;
+    executor: string;
+    group: string;
+    location: string;
+    week: string;
+    periodStart?: string;
+    periodEnd?: string;
+    signPlace: string;
+    signDate: string;
+    activities: WeeklyActivity[];
+  }) => { ok: boolean; message?: string; report?: WeeklyReport };
+  duplicateWeeklyReport: (id: string) => { ok: boolean; report?: WeeklyReport };
+  deleteWeeklyReport: (id: string) => void;
+
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: (ids: string[]) => void;
   setLoginNoticeSeen: (value: boolean) => void;
@@ -240,6 +304,8 @@ function buildInitial(): State {
     posSales: [],
     stores: seedStores,
     invoices: [],
+    reportProfiles: seedReportProfiles,
+    weeklyReports: [],
     auditLog: [],
     readNotifications: [],
     loginNoticeSeen: false,
@@ -532,6 +598,85 @@ export const useUiStore = create<State & Actions>()(
         get().audit("Hapus", "Invoice", inv?.number ?? id);
       },
 
+      addReportProfile: (data) => {
+        const profile: ReportProfile = { ...data, id: uid(), createdAt: now() };
+        set((s) => ({ reportProfiles: [...s.reportProfiles, profile] }));
+        get().audit("Tambah", "Profil Laporan", profile.name);
+        return profile;
+      },
+      updateReportProfile: (id, patch) => {
+        set((s) => ({ reportProfiles: s.reportProfiles.map((p) => (p.id === id ? { ...p, ...patch } : p)) }));
+        get().audit("Ubah", "Profil Laporan", get().reportProfiles.find((p) => p.id === id)?.name ?? id);
+      },
+      removeReportProfile: (id) => {
+        const profile = get().reportProfiles.find((p) => p.id === id);
+        if (!profile) return { ok: false, message: "Profil tidak ditemukan." };
+        if (get().reportProfiles.length <= 1) return { ok: false, message: "Minimal satu profil harus tersedia." };
+        if (get().weeklyReports.some((r) => r.profileId === id)) {
+          return { ok: false, message: "Profil masih dipakai laporan tersimpan." };
+        }
+        set((s) => ({ reportProfiles: s.reportProfiles.filter((p) => p.id !== id) }));
+        get().audit("Hapus", "Profil Laporan", profile.name);
+        return { ok: true };
+      },
+
+      saveWeeklyReport: (data) => {
+        const profile = get().reportProfiles.find((p) => p.id === data.profileId);
+        if (!profile) return { ok: false, message: "Profil laporan tidak ditemukan." };
+        if (!data.executor.trim()) return { ok: false, message: "Nama pelaksana / penyuluh wajib diisi." };
+        const activities = data.activities.filter((a) => a.activity.trim() || a.purpose.trim() || a.output.trim() || a.amount > 0);
+        if (activities.length === 0) return { ok: false, message: "Tambahkan minimal satu kegiatan." };
+
+        const total = activities.reduce((t, a) => t + (Number(a.amount) || 0), 0);
+        const existing = data.id ? get().weeklyReports.find((r) => r.id === data.id) : undefined;
+        const report: WeeklyReport = {
+          id: existing?.id ?? uid(),
+          number: data.number?.trim() || existing?.number || `LPM-${stamp()}-${seq(get().weeklyReports.length)}`,
+          profileId: profile.id,
+          profileName: profile.name,
+          executor: data.executor.trim(),
+          group: data.group.trim(),
+          location: data.location.trim(),
+          week: data.week.trim(),
+          periodStart: data.periodStart || undefined,
+          periodEnd: data.periodEnd || undefined,
+          signPlace: data.signPlace.trim(),
+          signDate: data.signDate,
+          activities,
+          total,
+          actor: existing?.actor ?? get().user?.name ?? "Pengguna",
+          createdAt: existing?.createdAt ?? now(),
+          updatedAt: now(),
+        };
+        set((s) => ({
+          weeklyReports: existing
+            ? s.weeklyReports.map((r) => (r.id === report.id ? report : r))
+            : [report, ...s.weeklyReports],
+        }));
+        get().audit(existing ? "Ubah" : "Buat", "Laporan Mingguan", `${report.number} · ${report.executor}`);
+        return { ok: true, report };
+      },
+      duplicateWeeklyReport: (id) => {
+        const source = get().weeklyReports.find((r) => r.id === id);
+        if (!source) return { ok: false };
+        const copy: WeeklyReport = {
+          ...source,
+          id: uid(),
+          number: `LPM-${stamp()}-${seq(get().weeklyReports.length)}`,
+          activities: source.activities.map((a) => ({ ...a, id: uid() })),
+          createdAt: now(),
+          updatedAt: now(),
+        };
+        set((s) => ({ weeklyReports: [copy, ...s.weeklyReports] }));
+        get().audit("Duplikat", "Laporan Mingguan", `${source.number} → ${copy.number}`);
+        return { ok: true, report: copy };
+      },
+      deleteWeeklyReport: (id) => {
+        const report = get().weeklyReports.find((r) => r.id === id);
+        set((s) => ({ weeklyReports: s.weeklyReports.filter((r) => r.id !== id) }));
+        get().audit("Hapus", "Laporan Mingguan", report?.number ?? id);
+      },
+
       markNotificationRead: (id) => set((s) => ({ readNotifications: Array.from(new Set([...s.readNotifications, id])) })),
       setLoginNoticeSeen: (value) => set({ loginNoticeSeen: value }),
       markAllNotificationsRead: (ids) => set((s) => ({ readNotifications: Array.from(new Set([...s.readNotifications, ...ids])) })),
@@ -565,6 +710,8 @@ export const useUiStore = create<State & Actions>()(
         posSales: s.posSales,
         stores: s.stores,
         invoices: s.invoices,
+        reportProfiles: s.reportProfiles,
+        weeklyReports: s.weeklyReports,
         auditLog: s.auditLog,
         readNotifications: s.readNotifications,
         loginNoticeSeen: s.loginNoticeSeen,

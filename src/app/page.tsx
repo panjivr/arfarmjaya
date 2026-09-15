@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   ShoppingCart,
   Sun,
+  Sprout,
   Truck,
   Warehouse,
 } from "lucide-react";
@@ -29,6 +30,7 @@ const features = [
   { icon: Truck, title: "Distribusi & Permintaan", desc: "Alur pengiriman ke cabang/dapur dengan status dari picking hingga selesai." },
   { icon: ReceiptText, title: "POS Retail", desc: "Kasir cepat dengan pengurangan stok otomatis dan riwayat penjualan." },
   { icon: FileText, title: "Invoice Multi-Toko", desc: "Buat & cetak invoice profesional dengan logo dan data tiap toko." },
+  { icon: Sprout, title: "Laporan Mingguan Lapangan", desc: "Laporan pelaksanaan program dengan kop lembaga, foto kegiatan, dan cetak/PDF rapi." },
   { icon: BarChart3, title: "Laporan & Analitik", desc: "Valuasi inventori, barang laris, stok kritis, dan ekspor CSV." },
   { icon: ShieldCheck, title: "RBAC & Log Audit", desc: "Hak akses per peran dan jejak audit untuk setiap perubahan." },
 ];
@@ -36,7 +38,7 @@ const features = [
 const modules = [
   "Dasbor", "Inventori", "Kategori", "Pemasok", "Gudang", "Rak",
   "Pembelian", "Penerimaan", "Barang Keluar", "Distribusi", "Permintaan",
-  "Stok Opname", "POS Retail", "Toko", "Invoice", "Laporan", "Analitik",
+  "Stok Opname", "POS Retail", "Toko", "Invoice", "Laporan Mingguan", "Laporan", "Analitik",
   "Notifikasi", "Log Audit", "Pengguna", "Pengaturan",
 ];
 

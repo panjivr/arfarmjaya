@@ -222,3 +222,74 @@ export type Invoice = {
   note?: string;
   createdAt: string;
 };
+
+/* ── Laporan Pelaksanaan Mingguan (laporan kegiatan lapangan) ───────────── */
+
+/**
+ * Kop surat + format cetak laporan. Semua bagian laporan (identitas lembaga,
+ * judul, kolom yang tampil, blok tanda tangan, dan catatan kaki) diatur lewat
+ * profil ini sehingga template bisa dipakai ulang untuk program lain.
+ */
+export type ReportProfile = {
+  id: string;
+  name: string; // nama profil di daftar pilihan
+  organization: string; // baris utama kop surat
+  tagline?: string;
+  program?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  logo?: string; // data URL atau path publik
+  accent: string; // warna aksen kop, judul, dan header tabel
+  reportTitle: string;
+  currencyLabel: string; // label kolom nominal, mis. "Nominal (Rp)"
+  signaturePlace?: string;
+  signatureRole: string;
+  signatureName?: string;
+  signatureId?: string;
+  signatureImage?: string; // data URL tanda tangan (opsional)
+  approverRole?: string; // blok "Mengetahui" (opsional)
+  approverName?: string;
+  approverId?: string;
+  notes: string[]; // keterangan pengisian di kaki laporan
+  showHst: boolean;
+  showAmount: boolean;
+  showOutput: boolean;
+  showPhoto: boolean;
+  showSummary: boolean;
+  showNotes: boolean;
+  autoFit: boolean; // perkecil otomatis agar muat satu halaman saat dicetak
+  minRows: number; // baris kosong minimum agar form tetap rapi saat dicetak
+  createdAt: string;
+};
+
+export type WeeklyActivity = {
+  id: string;
+  date: string; // yyyy-mm-dd
+  activity: string;
+  purpose: string;
+  hst: string; // umur tanaman, mis. "0 HST"
+  amount: number;
+  output: string;
+  photo?: string; // data URL
+};
+
+export type WeeklyReport = {
+  id: string;
+  number: string;
+  profileId: string;
+  profileName: string;
+  executor: string; // nama pelaksana / penyuluh
+  group: string; // kelompok tani
+  location: string; // lokasi / desa
+  week: string; // minggu ke- / periode
+  periodStart?: string;
+  periodEnd?: string;
+  signPlace: string;
+  signDate: string; // yyyy-mm-dd
+  activities: WeeklyActivity[];
+  total: number;
+  actor: string;
+  createdAt: string;
+  updatedAt: string;
+};

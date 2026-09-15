@@ -9,11 +9,21 @@ Sistem Manajemen Gudang untuk ARFARM BHINNEKA NUSA JAYA — aplikasi web yang be
 - **Inventori** — cari, filter status/kategori, ekspor CSV, tambah & hapus barang.
 - **Data Master** — Kategori, Pemasok, Gudang, dan Rak dengan CRUD penuh dan statistik turunan.
 - **Operasional** — Pembelian (PO + persetujuan), Penerimaan Barang (menambah stok), Barang Keluar, Distribusi, Permintaan Barang, Stok Opname (adjustment), dan POS Retail (mengurangi stok).
+- **Laporan Mingguan Lapangan** — generator *Laporan Pelaksanaan Mingguan* (mis. program penanaman kedelai): kop lembaga + logo, tabel kegiatan (tanggal, jenis kegiatan, tujuan, umur HST, nominal, output, foto), total otomatis, ringkasan, blok tanda tangan, dan keterangan pengisian. Hasilnya bisa disimpan, dicetak, atau diekspor ke PDF (A4 landscape, otomatis muat satu halaman) dan CSV. Semua elemen kop, judul, kolom, tanda tangan, dan catatan dapat diatur lewat **Pengaturan Format**.
 - **Analitik & Laporan** — laporan valuasi, stok rendah, kedaluwarsa, pergerakan stok, dan ekspor CSV.
 - **Sistem** — Notifikasi otomatis (stok rendah/kedaluwarsa), Log Audit setiap aksi, Pengguna & Role, dan Pengaturan.
 - **UX** — mode terang/gelap, command palette (Ctrl/Cmd+K), pencarian global, dan notifikasi toast.
 
 Semua transaksi (masuk, keluar, penerimaan, distribusi, opname, POS) memperbarui stok inventori yang sama dan menulis entri log audit.
+
+### Cetak & PDF
+
+Cetak dan "Simpan sebagai PDF" memakai dialog cetak browser, sehingga hasilnya tetap tajam (teks vektor) dan mengikuti margin serta orientasi yang sudah diatur aplikasi:
+
+- Invoice: A4 potrait.
+- Laporan Mingguan: A4 landscape, margin 10 mm, header tabel berulang tiap halaman, dan penyesuaian skala otomatis agar laporan muat satu halaman (bisa dimatikan di Pengaturan Format).
+
+Pada dialog cetak, pilih tujuan **Simpan sebagai PDF** untuk menghasilkan berkas PDF.
 
 ## Akun Demo
 

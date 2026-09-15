@@ -47,6 +47,7 @@ The database schema includes role based access control via `Role` and `Permissio
 - Stock Opname
 - Retail POS
 - Reports
+- Weekly Field Report (Laporan Pelaksanaan Mingguan)
 - Users and Roles
 - Notifications
 - Audit Log
@@ -64,6 +65,17 @@ Recommended production services:
 - `DistributionService`: picking, packing, loading, shipping, delivery confirmation.
 - `RetailService`: POS payment flow, receipt generation, automatic stock deduction.
 - `AuditService`: immutable audit log writer.
+- `FieldReportService`: weekly implementation reports, report profiles (letterhead + print format), activity photos.
+
+## Weekly Field Report Module
+
+`/weekly-report` generates the printable *Laporan Pelaksanaan Mingguan* used by field programs.
+
+- `ReportProfile` holds everything about presentation: letterhead (logo, organization, tagline, program, contact), accent color, report title, visible table columns, minimum blank rows, signature and approver blocks, and footer notes. Multiple profiles can coexist, so one system serves several programs or partner organizations.
+- `WeeklyReport` holds the data: executor, farmer group, location, week/period, sign place and date, and the `WeeklyActivity[]` rows (date, activity, purpose, HST age, amount, output, photo).
+- `src/components/report/weekly-report-document.tsx` renders both the on-screen preview and the print output from the same component, so what is previewed is what is printed.
+- Printing renders the document through a React portal into `document.body` (`#report-print-area`) and toggles `body.printing-report`, which hides the application layout with `display: none` — that keeps the PDF free of blank pages. `printDocument()` injects the `@page` rule (A4 landscape, 10 mm margins) for the duration of the print, and `fitPrintZoom()` measures the document at the real print width to pick a `zoom` factor that keeps it on one page.
+- Photos are downscaled in the browser (`compressImage`) before being stored as data URLs, keeping the persisted store within localStorage limits.
 
 ## ERD
 
