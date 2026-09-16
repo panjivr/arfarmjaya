@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeApplier } from "@/components/theme-applier";
+import { SyncProvider } from "@/components/sync-provider";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -36,6 +37,7 @@ export default function RootLayout({
     <html lang="id" className={inter.variable} suppressHydrationWarning>
       <body>
         <ThemeApplier />
+        <SyncProvider />
         {children}
       </body>
     </html>

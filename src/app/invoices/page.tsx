@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FileText, Plus, Printer, Save, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import { PageHeader, StatCard, EmptyState } from "@/components/ui/page-header";
@@ -30,6 +30,14 @@ export default function InvoicesPage() {
   const [lines, setLines] = useState<InvoiceLine[]>([]);
   const [shipping, setShipping] = useState(0);
   const [draft, setDraft] = useState({ name: "", unit: "Kg", quantity: "", price: "" });
+
+  // After store hydration/sync the store ids can change; keep the selected
+  // store valid so createInvoice always resolves it.
+  useEffect(() => {
+    if (stores.length && !stores.some((s) => s.id === storeId)) {
+      setStoreId(stores[0].id);
+    }
+  }, [stores, storeId]);
 
   const [printTarget, setPrintTarget] = useState<{ store?: Store; data: InvoiceData } | null>(null);
 

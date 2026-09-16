@@ -9,7 +9,7 @@
     "lint": "eslint",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "tsx prisma/seed.ts"
+    "prisma:push": "prisma db push"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
@@ -40,8 +40,5 @@
     "tailwindcss": "^4",
     "tsx": "^4.23.0",
     "typescript": "^5"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
   }
 }
