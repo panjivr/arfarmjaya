@@ -72,7 +72,10 @@ export function printDocument(options?: { landscape?: boolean; margin?: string; 
   if (typeof document === "undefined") return;
   const style = document.createElement("style");
   style.media = "print";
-  style.textContent = `@page { size: A4 ${options?.landscape ? "landscape" : "portrait"}; margin: ${options?.margin ?? "10mm"}; }`;
+  // Orientasi saja (tanpa ukuran A4 yang dipaksakan) supaya hasil cetak mengikuti
+  // ukuran kertas apa pun yang dipilih pengguna di dialog cetak, dengan margin
+  // yang rapi di semua sisi.
+  style.textContent = `@page { size: ${options?.landscape ? "landscape" : "auto"}; margin: ${options?.margin ?? "12mm"}; }`;
   document.head.appendChild(style);
   if (options?.bodyClass) document.body.classList.add(options.bodyClass);
 

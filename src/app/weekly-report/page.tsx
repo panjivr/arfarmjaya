@@ -32,7 +32,7 @@ import { toast } from "@/components/ui/toast";
 import { ScaledPreview } from "@/components/ui/scaled-preview";
 import { WeeklyReportDocument, type WeeklyReportData } from "@/components/report/weekly-report-document";
 import { useUiStore } from "@/lib/store";
-import { A4_LANDSCAPE_PRINT, compressImage, currency, exportCsv, fitPrintZoom, formatDate, formatDateTime, printDocument } from "@/lib/utils";
+import { compressImage, currency, exportCsv, formatDate, formatDateTime, printDocument } from "@/lib/utils";
 import type { ReportProfile, WeeklyActivity, WeeklyReport } from "@/lib/types";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -213,11 +213,12 @@ export default function WeeklyReportPage() {
     if (asPdf) toast.info("Pada dialog cetak, pilih tujuan “Simpan sebagai PDF”.");
     setTimeout(() => {
       const area = document.getElementById("report-print-area");
-      if (area) {
-        const zoom = target.autoFit ? fitPrintZoom(area, A4_LANDSCAPE_PRINT) : 1;
-        area.style.setProperty("--report-print-zoom", String(zoom));
-      }
-      printDocument({ landscape: true, margin: "10mm", bodyClass: "printing-report" });
+      // Mengalir alami (tanpa zoom) supaya tidak ada bagian atas/bawah/logo yang
+      // terpotong; header tabel diulang tiap halaman bila laporan lebih panjang.
+      if (area) area.style.setProperty("--report-print-zoom", "1");
+      // size: landscape (bukan "A4 landscape") mengikuti ukuran kertas apa pun
+      // yang dipilih di dialog cetak; margin memberi jarak rapi di semua sisi.
+      printDocument({ landscape: true, margin: "12mm", bodyClass: "printing-report" });
     }, 150);
   }
 
