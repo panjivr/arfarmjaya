@@ -70,7 +70,7 @@ export default function InvoicesPage() {
 
   function printData(data: InvoiceData, s?: Store) {
     setPrintTarget({ store: s, data });
-    setTimeout(() => window.print(), 60);
+    setTimeout(() => window.print(), 250);
   }
 
   if (stores.length === 0) {

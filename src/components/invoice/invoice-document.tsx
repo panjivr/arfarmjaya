@@ -26,7 +26,7 @@ export function InvoiceDocument({ store, invoice, id }: { store?: Store; invoice
         <div className="flex items-start gap-3">
           <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded bg-white">
             {store?.logo ? (
-              <Image src={store.logo} alt={store.name} width={64} height={64} className="h-full w-full object-contain" unoptimized />
+              <Image src={store.logo} alt={store.name} width={64} height={64} className="h-full w-full object-contain" loading="eager" unoptimized />
             ) : (
               <StoreIcon className="h-8 w-8" style={{ color: accent }} />
             )}

@@ -219,7 +219,7 @@ export default function WeeklyReportPage() {
       // size: landscape (bukan "A4 landscape") mengikuti ukuran kertas apa pun
       // yang dipilih di dialog cetak; margin memberi jarak rapi di semua sisi.
       printDocument({ landscape: true, margin: "12mm", bodyClass: "printing-report" });
-    }, 150);
+    }, 350);
   }
 
   function exportReportCsv(data: WeeklyReportData) {

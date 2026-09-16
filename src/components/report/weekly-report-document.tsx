@@ -121,7 +121,7 @@ function SignatureColumn({
       </p>
       <div className="relative mx-auto flex h-[52px] w-full items-center justify-center">
         {signatureImage && (
-          <Image src={signatureImage} alt={`Tanda tangan ${name ?? role}`} width={180} height={64} className="max-h-[52px] w-auto object-contain" unoptimized />
+          <Image src={signatureImage} alt={`Tanda tangan ${name ?? role}`} width={180} height={64} className="max-h-[52px] w-auto object-contain" loading="eager" unoptimized />
         )}
       </div>
       <p className="font-bold underline" style={{ color: ink }}>
@@ -183,7 +183,7 @@ export function WeeklyReportDocument({
       <header className="flex items-center gap-4 pb-2" style={{ borderBottom: `2px solid ${accent}` }}>
         <div className="flex h-[52px] w-[124px] shrink-0 items-center justify-start">
           {profile.logo ? (
-            <Image src={profile.logo} alt={profile.organization} width={260} height={116} className="max-h-[52px] w-auto object-contain" unoptimized />
+            <Image src={profile.logo} alt={profile.organization} width={260} height={116} className="max-h-[52px] w-auto object-contain" loading="eager" unoptimized />
           ) : (
             <Leaf className="h-9 w-9" style={{ color: accent }} />
           )}
@@ -262,6 +262,7 @@ export function WeeklyReportDocument({
                           width={320}
                           height={220}
                           className="mx-auto h-[70px] w-auto max-w-full rounded-sm object-contain"
+                          loading="eager"
                           unoptimized
                         />
                       ) : (

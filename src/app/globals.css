@@ -73,9 +73,18 @@ textarea {
   background-clip: padding-box;
 }
 
+/* Area cetak disembunyikan di LUAR LAYAR (bukan display:none) supaya logo kop &
+   foto (termasuk data URL) tetap dimuat browser sebelum dialog cetak muncul —
+   display:none membuat gambar tidak pernah di-fetch sehingga hilang di PDF. */
 #print-area,
 #report-print-area {
-  display: none;
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 1000px;
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
 }
 
 @media print {
@@ -99,6 +108,8 @@ textarea {
     left: 0;
     top: 0;
     width: 100%;
+    opacity: 1;
+    z-index: auto;
   }
   .no-print {
     display: none !important;
@@ -113,7 +124,12 @@ textarea {
   }
   body.printing-report #report-print-area {
     display: block !important;
+    position: static;
+    left: auto;
+    top: auto;
     width: 100%;
+    opacity: 1;
+    z-index: auto;
     zoom: var(--report-print-zoom, 1);
   }
   #report-print-area,
