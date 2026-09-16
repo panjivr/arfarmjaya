@@ -39,7 +39,7 @@ function buildColumns(profile: ReportProfile): Column[] {
     { key: "activity", label: "Jenis Kegiatan", weight: 16, align: "left" },
     { key: "purpose", label: "Tujuan", weight: 21, align: "left" },
   ];
-  if (profile.showHst) columns.push({ key: "hst", label: "Umur HST\n(Hari Setelah Tanam)", weight: 9, align: "center" });
+  if (profile.showHst) columns.push({ key: "hst", label: "Umur HST", weight: 9, align: "center" });
   if (profile.showAmount) columns.push({ key: "amount", label: profile.currencyLabel || "Nominal (Rp)", weight: 11, align: "right" });
   if (profile.showOutput) columns.push({ key: "output", label: "Output", weight: 21, align: "left" });
   if (profile.showPhoto) columns.push({ key: "photo", label: "Foto Kegiatan", weight: 14, align: "center" });
@@ -103,13 +103,11 @@ function IdentityRow({ label, value }: { label: string; value: string }) {
 function SignatureColumn({
   role,
   name,
-  identifier,
   signatureImage,
   place,
 }: {
   role: string;
   name?: string;
-  identifier?: string;
   signatureImage?: string;
   place?: string;
 }) {
@@ -126,9 +124,6 @@ function SignatureColumn({
       </div>
       <p className="font-bold underline" style={{ color: ink }}>
         {name?.trim() ? `( ${name} )` : "(  ..............................................  )"}
-      </p>
-      <p className="mt-0.5" style={{ color: inkMuted }}>
-        {identifier?.trim() ? `NIP/ID. ${identifier}` : "NIP/ID. ........................................"}
       </p>
     </div>
   );
@@ -328,7 +323,7 @@ export function WeeklyReportDocument({
           {profile.showSummary && summary.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {summary.map((item) => (
-                <div key={item.label} className="rounded px-3 py-1.5" style={{ border: `1px solid ${line}`, background: zebra }}>
+                <div key={item.label} className="rounded px-3 py-1.5" style={{ border: `1px solid ${line}`, background: "#ffffff" }}>
                   <p className="text-[8px] uppercase tracking-wide" style={{ color: inkMuted }}>
                     {item.label}
                   </p>
@@ -339,31 +334,15 @@ export function WeeklyReportDocument({
               ))}
             </div>
           )}
-
-          {profile.showNotes && profile.notes.filter(Boolean).length > 0 && (
-            <div className="mt-3">
-              <p className="text-[9px] font-bold" style={{ color: accent }}>
-                Keterangan Pengisian:
-              </p>
-              <ul className="mt-1 space-y-0.5">
-                {profile.notes.filter(Boolean).map((note, index) => (
-                  <li key={index} className="text-[8.5px]" style={{ color: inkMuted }}>
-                    • {note}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
         </div>
 
         <div className="flex gap-8">
           {profile.approverRole?.trim() && (
-            <SignatureColumn role={`Mengetahui,\n${profile.approverRole}`} name={profile.approverName} identifier={profile.approverId} />
+            <SignatureColumn role={`Mengetahui,\n${profile.approverRole}`} name={profile.approverName} />
           )}
           <SignatureColumn
             role={profile.signatureRole}
             name={profile.signatureName || report.executor}
-            identifier={profile.signatureId}
             signatureImage={profile.signatureImage}
             place={`${report.signPlace || profile.signaturePlace || "................................"}, ${formatLongDate(report.signDate)}`}
           />

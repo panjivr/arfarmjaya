@@ -207,10 +207,25 @@ export default function WeeklyReportPage() {
     toast.success(`Laporan ${saved.number} tersimpan.`);
   }
 
+  // Nama berkas otomatis mengikuti judul laporan (dipakai untuk nama default
+  // "Simpan sebagai PDF" lewat document.title, dan untuk nama berkas CSV).
+  function reportFileName(p: ReportProfile, d: WeeklyReportData) {
+    const base = [p.reportTitle, d.week, d.number].filter((x) => x && x.trim()).join(" - ");
+    return (base || "Laporan Mingguan").replace(/[\\/:*?"<>|\n]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 120);
+  }
+
   function print(data: WeeklyReportData, target: ReportProfile, asPdf = false) {
     setPrintedAt(formatDateTime(new Date().toISOString()));
     setPrintTarget({ profile: target, data });
     if (asPdf) toast.info("Pada dialog cetak, pilih tujuan “Simpan sebagai PDF”.");
+    // Nama file PDF default mengikuti judul laporan (browser memakai document.title).
+    const previousTitle = document.title;
+    document.title = reportFileName(target, data);
+    const restoreTitle = () => {
+      document.title = previousTitle;
+      window.removeEventListener("afterprint", restoreTitle);
+    };
+    window.addEventListener("afterprint", restoreTitle);
     setTimeout(() => {
       const area = document.getElementById("report-print-area");
       // Mengalir alami (tanpa zoom) supaya tidak ada bagian atas/bawah/logo yang
@@ -219,13 +234,14 @@ export default function WeeklyReportPage() {
       // size: landscape (bukan "A4 landscape") mengikuti ukuran kertas apa pun
       // yang dipilih di dialog cetak; margin memberi jarak rapi di semua sisi.
       printDocument({ landscape: true, margin: "12mm", bodyClass: "printing-report" });
+      window.setTimeout(restoreTitle, 8000);
     }, 350);
   }
 
   function exportReportCsv(data: WeeklyReportData) {
     if (data.activities.length === 0) return toast.error("Belum ada kegiatan untuk diekspor.");
     exportCsv(
-      `${data.number || "laporan-mingguan"}.csv`,
+      `${reportFileName(profile, data)}.csv`,
       data.activities.map((a, index) => ({
         No: index + 1,
         Tanggal: formatDate(a.date),
