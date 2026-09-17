@@ -1,0 +1,33 @@
+# Auto-deploy ke Render setiap kali ada push ke `main`.
+#
+# Cara mengaktifkan (sekali saja):
+# 1. Di Render, buka web service "arfarmjaya" -> Settings -> Deploy Hook,
+#    salin URL-nya (bentuknya https://api.render.com/deploy/srv-xxxx?key=yyyy).
+# 2. Di GitHub repo ini: Settings -> Secrets and variables -> Actions ->
+#    New repository secret. Name: RENDER_DEPLOY_HOOK, Secret: tempel URL tadi.
+# 3. Selesai. Setiap push ke `main` akan memicu build & deploy Render otomatis.
+#
+# Catatan: kalau di Render "Auto-Deploy" sudah "Yes", cukup pilih salah satu
+# supaya tidak deploy dua kali — matikan Auto-Deploy di Render, atau jangan
+# pasang secret ini dan biarkan Render yang menangani.
+name: Deploy to Render
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::warning::RENDER_DEPLOY_HOOK belum diatur — deploy dilewati. Tambahkan secret sesuai petunjuk di atas berkas ini, atau gunakan Auto-Deploy bawaan Render."
+            exit 0
+          fi
+          echo "Memicu deploy Render..."
+          curl -fsS -X POST "$HOOK" && echo "" && echo "Deploy Render berhasil dipicu."
