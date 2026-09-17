@@ -20,7 +20,7 @@ export type WeeklyReportData = {
 };
 
 type Column = {
-  key: "no" | "date" | "activity" | "purpose" | "hst" | "amount" | "output" | "photo";
+  key: "no" | "date" | "activity" | "purpose" | "hst" | "amount" | "output" | "photo" | "payment";
   label: string;
   weight: number;
   align: "left" | "center" | "right";
@@ -41,8 +41,11 @@ function buildColumns(profile: ReportProfile): Column[] {
   ];
   if (profile.showHst) columns.push({ key: "hst", label: "Umur HST", weight: 9, align: "center" });
   if (profile.showAmount) columns.push({ key: "amount", label: profile.currencyLabel || "Nominal (Rp)", weight: 11, align: "right" });
-  if (profile.showOutput) columns.push({ key: "output", label: "Output", weight: 21, align: "left" });
-  if (profile.showPhoto) columns.push({ key: "photo", label: "Foto Kegiatan", weight: 14, align: "center" });
+  const showPayment = profile.showPayment !== false; // default aktif untuk profil lama dari server
+  const bothPhotos = profile.showPhoto && showPayment;
+  if (profile.showOutput) columns.push({ key: "output", label: "Output", weight: bothPhotos ? 17 : 21, align: "left" });
+  if (profile.showPhoto) columns.push({ key: "photo", label: "Foto Kegiatan", weight: bothPhotos ? 12 : 14, align: "center" });
+  if (showPayment) columns.push({ key: "payment", label: "Bukti Pembayaran\n(Nota / Kwitansi)", weight: bothPhotos ? 12 : 14, align: "center" });
   return columns;
 }
 
@@ -79,6 +82,8 @@ function cellValue(key: Column["key"], activity: WeeklyActivity, index: number) 
       return activity.hst;
     case "output":
       return activity.output;
+    case "payment":
+      return "";
     default:
       return "";
   }
@@ -247,13 +252,19 @@ export function WeeklyReportDocument({
           {rows.map((activity, index) => (
             <tr key={activity.id} style={{ breakInside: "avoid", background: index % 2 === 1 ? zebra : "#ffffff" }}>
               {columns.map((column) => {
-                if (column.key === "photo") {
+                if (column.key === "photo" || column.key === "payment") {
+                  const src = column.key === "photo" ? activity.photo : activity.paymentProof;
+                  const placeholder = column.key === "photo" ? "(tempel foto di sini)" : "(tempel nota/kwitansi)";
+                  const alt =
+                    column.key === "photo"
+                      ? `Foto ${activity.activity || `kegiatan ${index + 1}`}`
+                      : `Bukti pembayaran ${activity.activity || `kegiatan ${index + 1}`}`;
                   return (
                     <td key={column.key} className={`${cellBase} text-center`} style={borderStyle}>
-                      {activity.photo ? (
+                      {src ? (
                         <Image
-                          src={activity.photo}
-                          alt={`Foto ${activity.activity || `kegiatan ${index + 1}`}`}
+                          src={src}
+                          alt={alt}
                           width={320}
                           height={220}
                           className="mx-auto h-[70px] w-auto max-w-full rounded-sm object-contain"
@@ -265,7 +276,7 @@ export function WeeklyReportDocument({
                           className="flex h-[70px] items-center justify-center rounded-sm px-1 text-[8px]"
                           style={{ border: `1px dashed ${line}`, color: inkMuted }}
                         >
-                          (tempel foto di sini)
+                          {placeholder}
                         </span>
                       )}
                     </td>
@@ -290,7 +301,7 @@ export function WeeklyReportDocument({
           {Array.from({ length: blanks }).map((_, index) => (
             <tr key={`blank-${index}`} style={{ breakInside: "avoid" }}>
               {columns.map((column) => (
-                <td key={column.key} className={`${cellBase} text-center`} style={{ ...borderStyle, height: profile.showPhoto ? 28 : 22 }}>
+                <td key={column.key} className={`${cellBase} text-center`} style={{ ...borderStyle, height: profile.showPhoto || profile.showPayment !== false ? 28 : 22 }}>
                   {column.key === "no" ? <span style={{ color: inkMuted }}>{rows.length + index + 1}</span> : <span>&nbsp;</span>}
                 </td>
               ))}

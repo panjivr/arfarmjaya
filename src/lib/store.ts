@@ -117,6 +117,7 @@ const seedReportProfiles: ReportProfile[] = [
     showAmount: true,
     showOutput: true,
     showPhoto: true,
+    showPayment: true,
     showSummary: true,
     showNotes: true,
     autoFit: true,
@@ -691,7 +692,19 @@ export const useUiStore = create<State & Actions>()(
     }),
     {
       name: "arfarmjaya-wms",
-      version: 2,
+      version: 3,
+      // Backfill field baru pada profil laporan yang tersimpan dari versi lama
+      // agar kolom "Bukti Pembayaran" langsung aktif tanpa menghapus data.
+      migrate: (persisted) => {
+        const state = persisted as Partial<State> | undefined;
+        if (state?.reportProfiles) {
+          state.reportProfiles = state.reportProfiles.map((profile) => ({
+            ...profile,
+            showPayment: profile.showPayment ?? true,
+          }));
+        }
+        return state as State & Actions;
+      },
       partialize: (s) => ({
         theme: s.theme,
         user: s.user,

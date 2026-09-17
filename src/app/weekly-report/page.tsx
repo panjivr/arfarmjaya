@@ -97,6 +97,7 @@ const blankProfile: Omit<ReportProfile, "id" | "createdAt"> = {
   showAmount: true,
   showOutput: true,
   showPhoto: true,
+  showPayment: true,
   showSummary: true,
   showNotes: true,
   autoFit: true,
@@ -251,6 +252,7 @@ export default function WeeklyReportPage() {
         "Nominal (Rp)": a.amount,
         Output: a.output,
         Foto: a.photo ? "Ada" : "-",
+        "Bukti Pembayaran": a.paymentProof ? "Ada" : "-",
       })),
     );
     toast.success("Data kegiatan diekspor ke CSV.");
@@ -413,9 +415,14 @@ export default function WeeklyReportPage() {
                         </p>
                         {activity.purpose && <p className="mt-1 line-clamp-2 text-xs text-muted">{activity.purpose}</p>}
                       </div>
-                      {activity.photo && (
-                        <Image src={activity.photo} alt="" width={56} height={56} className="h-12 w-12 shrink-0 rounded object-cover" unoptimized />
-                      )}
+                      <div className="flex shrink-0 gap-1">
+                        {activity.photo && (
+                          <Image src={activity.photo} alt="Foto kegiatan" width={56} height={56} className="h-12 w-12 rounded object-cover" unoptimized />
+                        )}
+                        {activity.paymentProof && (
+                          <Image src={activity.paymentProof} alt="Bukti pembayaran" width={56} height={56} className="h-12 w-12 rounded object-cover ring-1 ring-primary/40" unoptimized />
+                        )}
+                      </div>
                     </div>
                     <div className="mt-2 flex justify-end gap-1">
                       <Button variant="ghost" className="h-8 w-8 px-0" aria-label="Naikkan" disabled={index === 0} onClick={() => moveActivity(index, -1)}>
@@ -606,18 +613,19 @@ function ActivityModal({
   onChange: (patch: Partial<WeeklyActivity>) => void;
   onSubmit: () => void;
 }) {
-  const fileRef = useRef<HTMLInputElement>(null);
+  const photoRef = useRef<HTMLInputElement>(null);
+  const paymentRef = useRef<HTMLInputElement>(null);
   const { draft } = state;
 
-  async function onPhoto(event: React.ChangeEvent<HTMLInputElement>) {
+  async function onUpload(event: React.ChangeEvent<HTMLInputElement>, key: "photo" | "paymentProof", label: string) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
     try {
-      onChange({ photo: await compressImage(file) });
-      toast.success("Foto kegiatan ditambahkan.");
+      onChange({ [key]: await compressImage(file) });
+      toast.success(`${label} ditambahkan.`);
     } catch {
-      toast.error("Gagal memproses foto.");
+      toast.error(`Gagal memproses ${label.toLowerCase()}.`);
     }
   }
 
@@ -683,12 +691,32 @@ function ActivityModal({
                 <ImagePlus className="h-4 w-4 text-muted" />
               )}
             </div>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPhoto} />
-            <Button type="button" variant="secondary" className="h-11" onClick={() => fileRef.current?.click()}>
+            <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={(e) => onUpload(e, "photo", "Foto kegiatan")} />
+            <Button type="button" variant="secondary" className="h-11" onClick={() => photoRef.current?.click()}>
               <ImagePlus className="h-4 w-4" /> Unggah
             </Button>
             {draft.photo && (
               <Button type="button" variant="ghost" className="h-11 w-11 px-0 text-danger" aria-label="Hapus foto" onClick={() => onChange({ photo: undefined })}>
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </Field>
+        <Field label="Bukti Pembayaran" hint="Foto nota / kwitansi. Otomatis dikecilkan.">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-white">
+              {draft.paymentProof ? (
+                <Image src={draft.paymentProof} alt="Bukti pembayaran" width={64} height={44} className="h-full w-full object-cover" unoptimized />
+              ) : (
+                <ImagePlus className="h-4 w-4 text-muted" />
+              )}
+            </div>
+            <input ref={paymentRef} type="file" accept="image/*" className="hidden" onChange={(e) => onUpload(e, "paymentProof", "Bukti pembayaran")} />
+            <Button type="button" variant="secondary" className="h-11" onClick={() => paymentRef.current?.click()}>
+              <ImagePlus className="h-4 w-4" /> Unggah
+            </Button>
+            {draft.paymentProof && (
+              <Button type="button" variant="ghost" className="h-11 w-11 px-0 text-danger" aria-label="Hapus bukti pembayaran" onClick={() => onChange({ paymentProof: undefined })}>
                 <X className="h-4 w-4" />
               </Button>
             )}
@@ -921,6 +949,7 @@ function ProfileModal({
             <Toggle label="Kolom Nominal" checked={draft.showAmount} onChange={(v) => set("showAmount", v)} />
             <Toggle label="Kolom Output" checked={draft.showOutput} onChange={(v) => set("showOutput", v)} />
             <Toggle label="Kolom Foto" checked={draft.showPhoto} onChange={(v) => set("showPhoto", v)} />
+            <Toggle label="Kolom Bukti Pembayaran" checked={draft.showPayment !== false} onChange={(v) => set("showPayment", v)} />
             <Toggle label="Ringkasan" checked={draft.showSummary} onChange={(v) => set("showSummary", v)} />
             <Toggle label="Keterangan Pengisian" checked={draft.showNotes} onChange={(v) => set("showNotes", v)} />
             <Toggle label="Muat Otomatis 1 Halaman" checked={draft.autoFit} onChange={(v) => set("autoFit", v)} />

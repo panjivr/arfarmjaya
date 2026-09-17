@@ -256,6 +256,7 @@ export type ReportProfile = {
   showAmount: boolean;
   showOutput: boolean;
   showPhoto: boolean;
+  showPayment: boolean; // kolom bukti pembayaran (nota/kwitansi)
   showSummary: boolean;
   showNotes: boolean;
   autoFit: boolean; // perkecil otomatis agar muat satu halaman saat dicetak
@@ -271,7 +272,8 @@ export type WeeklyActivity = {
   hst: string; // umur tanaman, mis. "0 HST"
   amount: number;
   output: string;
-  photo?: string; // data URL
+  photo?: string; // data URL — foto kegiatan
+  paymentProof?: string; // data URL — foto nota/kwitansi/bukti pembayaran
 };
 
 export type WeeklyReport = {
