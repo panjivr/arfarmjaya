@@ -90,12 +90,15 @@ Data model (all synced to the shared Postgres workspace like the rest of the app
 - `FishCycle` — one stock-to-harvest cycle on a pond: stock date, seed source, initial count, seed/other cost, target weight/date, status.
 - `PondDailyLog` — daily entry per cycle: feed kg + cost, deaths, optional weight sampling.
 - `PondHarvest` — partial or final harvest: count, weight, price/kg, revenue, buyer.
+- `PondJournal` — pond diary entries by category (water quality, health/disease, treatment, weather, maintenance, general), with optional water temp/pH.
+- `src/lib/feed.ts` — a reference catalog of common Indonesian catfish feeds (brand, product code, phase, pellet size, protein %, approx price/kg) used to pick feed on the daily log and to auto-estimate feed cost, plus an age→product suggestion.
 
 `src/lib/lele.ts` computes live metrics (age, current live count, survival rate, total
 feed, biomass estimate, running P&L, FCR, and a feeding recommendation from a
 percent-of-biomass table that decreases with age). Pages: `/lele` (monitoring grid +
-pond detail modal with daily input, harvest, and P&L), `/lele/kolam` (pond CRUD + stock a
-cycle + finished-cycle history), and `/lele/simulator` (single-cycle business projection:
+pond detail modal with daily input, harvest, per-pond journal, and P&L), `/lele/kolam` (pond
+CRUD + stock a cycle + finished-cycle history), `/lele/jurnal` (farm-wide journal timeline
+with filters + CSV export), and `/lele/simulator` (single-cycle business projection:
 harvest, feed need, cost, revenue, profit, HPP, BEP, ROI, and a feed-phase guide).
 
 ## ERD

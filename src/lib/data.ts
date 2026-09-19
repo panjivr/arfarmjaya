@@ -18,6 +18,7 @@ import {
   ShoppingCart,
   Sprout,
   Fish,
+  NotebookPen,
   Calculator,
   Waves,
   Store,
@@ -90,6 +91,7 @@ export const navigation: NavItem[] = [
 
   { label: "Monitoring Kolam", href: "/lele", icon: Fish, adminOnly: true, group: "Budidaya Lele" },
   { label: "Kolam & Tebar", href: "/lele/kolam", icon: Waves, adminOnly: true, group: "Budidaya Lele" },
+  { label: "Jurnal Lele", href: "/lele/jurnal", icon: NotebookPen, adminOnly: true, group: "Budidaya Lele" },
   { label: "Simulator Lele", href: "/lele/simulator", icon: Calculator, adminOnly: true, group: "Budidaya Lele" },
   { label: "Notifikasi", href: "/notifications", icon: Bell, adminOnly: true, group: "Sistem" },
   { label: "Log Audit", href: "/audit-log", icon: ShieldCheck, adminOnly: true, group: "Sistem" },

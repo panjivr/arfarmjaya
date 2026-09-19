@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Fish, Waves, Droplets, TrendingUp, AlertTriangle, Plus, Utensils } from "lucide-react";
+import { Fish, Waves, TrendingUp, AlertTriangle, Plus, Utensils, NotebookPen } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import { PageHeader, StatCard, EmptyState } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -10,15 +10,18 @@ import { Badge } from "@/components/ui/badge";
 import { PondDetailModal } from "@/components/lele/pond-detail";
 import { useUiStore } from "@/lib/store";
 import { pondViews, leleSummary } from "@/lib/lele";
+import { suggestFeed } from "@/lib/feed";
 import { currency, numberFmt } from "@/lib/utils";
 import type { FishCycle, Pond } from "@/lib/types";
 
 const statusStyle: Record<string, string> = {
   Kosong: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
-  Aktif: "bg-sky-50 text-sky-700 dark:bg-sky-950/40",
-  "Perlu Panen": "bg-amber-50 text-amber-700 dark:bg-amber-950/40",
+  Aktif: "bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300",
+  "Perlu Panen": "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
   Nonaktif: "bg-slate-100 text-slate-500",
 };
+
+const TARGET_DAYS = 80;
 
 export default function LeleMonitoringPage() {
   const ponds = useUiStore((s) => s.ponds);
@@ -38,9 +41,10 @@ export default function LeleMonitoringPage() {
         title="Monitoring Kolam"
         description="Pantau semua kolam secara langsung: umur lele, jumlah ikan hidup, pakan harian, kematian, dan hasil panen. Data tersinkron ke server sehingga bisa dibuka dari perangkat mana pun."
         action={
-          <Link href="/lele/kolam">
-            <Button><Plus className="h-4 w-4" /> Kolam &amp; Tebar</Button>
-          </Link>
+          <>
+            <Link href="/lele/jurnal"><Button variant="secondary"><NotebookPen className="h-4 w-4" /> Jurnal</Button></Link>
+            <Link href="/lele/kolam"><Button><Plus className="h-4 w-4" /> Kolam &amp; Tebar</Button></Link>
+          </>
         }
       />
 
@@ -60,56 +64,72 @@ export default function LeleMonitoringPage() {
         />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {views.map(({ pond, activeCycle, metrics, status }) => (
-            <button
-              key={pond.id}
-              onClick={() => setDetail({ pond, cycle: activeCycle })}
-              className="min-w-0 rounded-lg border border-border bg-card p-4 text-left shadow-sm transition hover:border-primary/40 hover:shadow-md"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-700 dark:bg-sky-950/50">
-                    <Fish className="h-5 w-5" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-base font-bold leading-tight">{pond.code}</p>
-                    <p className="truncate text-xs text-muted">{pond.name || pond.type}</p>
+          {views.map(({ pond, activeCycle, metrics, status }) => {
+            const progress = metrics ? Math.min(100, Math.round((metrics.ageDays / TARGET_DAYS) * 100)) : 0;
+            const feed = suggestFeed(metrics?.ageDays ?? 0);
+            return (
+              <button
+                key={pond.id}
+                onClick={() => setDetail({ pond, cycle: activeCycle })}
+                className="group min-w-0 rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+                      <Fish className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-bold leading-tight">{pond.code}</p>
+                      <p className="truncate text-xs text-muted">{pond.name || pond.type}</p>
+                    </div>
                   </div>
+                  <Badge className={statusStyle[status]}>{status}</Badge>
                 </div>
-                <Badge className={statusStyle[status]}>{status}</Badge>
-              </div>
 
-              {activeCycle && metrics ? (
-                <>
-                  <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                    <div className="rounded-md bg-background py-1.5">
-                      <p className="text-[10px] uppercase text-muted">Umur</p>
-                      <p className="text-sm font-bold">{metrics.ageDays} hr</p>
+                {activeCycle && metrics ? (
+                  <>
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded-lg bg-background py-1.5">
+                        <p className="text-[10px] uppercase text-muted">Umur</p>
+                        <p className="text-sm font-bold">{metrics.ageDays} hr</p>
+                      </div>
+                      <div className="rounded-lg bg-background py-1.5">
+                        <p className="text-[10px] uppercase text-muted">Hidup</p>
+                        <p className="text-sm font-bold">{numberFmt.format(metrics.currentCount)}</p>
+                      </div>
+                      <div className="rounded-lg bg-background py-1.5">
+                        <p className="text-[10px] uppercase text-muted">SR</p>
+                        <p className="text-sm font-bold">{Math.round(metrics.survivalRate * 100)}%</p>
+                      </div>
                     </div>
-                    <div className="rounded-md bg-background py-1.5">
-                      <p className="text-[10px] uppercase text-muted">Hidup</p>
-                      <p className="text-sm font-bold">{numberFmt.format(metrics.currentCount)}</p>
+
+                    {/* Progres umur menuju panen */}
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between text-[11px] text-muted">
+                        <span>Progres panen</span>
+                        <span>{progress}%</span>
+                      </div>
+                      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                        <div className={`h-full rounded-full ${status === "Perlu Panen" ? "bg-amber-500" : "bg-primary"}`} style={{ width: `${progress}%` }} />
+                      </div>
                     </div>
-                    <div className="rounded-md bg-background py-1.5">
-                      <p className="text-[10px] uppercase text-muted">SR</p>
-                      <p className="text-sm font-bold">{Math.round(metrics.survivalRate * 100)}%</p>
+
+                    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+                      <span className="inline-flex items-center gap-1"><Utensils className="h-3 w-3" /> {feed.brand} {feed.code}</span>
+                      {metrics.recommendedFeedKg != null && <span>saran {metrics.recommendedFeedKg} kg/hr</span>}
+                      {metrics.revenueRp > 0 && <span className="inline-flex items-center gap-1"><TrendingUp className="h-3 w-3" /> {currency.format(metrics.revenueRp)}</span>}
                     </div>
+                    <p className="mt-2 text-[11px] font-medium text-primary opacity-0 transition group-hover:opacity-100">Ketuk untuk input harian, panen &amp; jurnal →</p>
+                  </>
+                ) : (
+                  <div className="mt-3 flex items-center justify-between rounded-lg bg-background px-3 py-3 text-sm">
+                    <span className="text-muted">Kolam kosong</span>
+                    <span className="inline-flex items-center gap-1 font-medium text-primary"><Plus className="h-4 w-4" /> Tebar benih</span>
                   </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-                    <span className="inline-flex items-center gap-1"><Utensils className="h-3 w-3" /> {numberFmt.format(metrics.totalFeedKg)} kg</span>
-                    {metrics.recommendedFeedKg != null && <span className="inline-flex items-center gap-1"><Droplets className="h-3 w-3" /> saran {metrics.recommendedFeedKg} kg/hr</span>}
-                    {metrics.revenueRp > 0 && <span className="inline-flex items-center gap-1"><TrendingUp className="h-3 w-3" /> {currency.format(metrics.revenueRp)}</span>}
-                  </div>
-                  <p className="mt-2 text-[11px] text-muted">Ketuk untuk input harian &amp; panen →</p>
-                </>
-              ) : (
-                <div className="mt-3 flex items-center justify-between rounded-md bg-background px-3 py-3 text-sm">
-                  <span className="text-muted">Kolam kosong</span>
-                  <span className="inline-flex items-center gap-1 font-medium text-primary"><Plus className="h-4 w-4" /> Tebar benih</span>
-                </div>
-              )}
-            </button>
-          ))}
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
 

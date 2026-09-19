@@ -459,7 +459,7 @@ function Sidebar({
           </div>
           <div className="min-w-0">
             <p className="truncate font-bold tracking-tight">AR FARM JAYA</p>
-            <p className="truncate text-xs font-medium text-muted">Sistem Manajemen Gudang</p>
+            <p className="truncate text-xs font-medium text-muted">Pertanian · Budidaya · Supply</p>
           </div>
         </Link>
       </div>
@@ -497,8 +497,11 @@ function Sidebar({
         })}
       </nav>
 
-      <div className="border-t border-border p-4 text-xs leading-5 text-muted">
-        Data tersimpan lokal di browser. Semua modul terhubung ke inventori dan log audit.
+      <div className="border-t border-border p-4">
+        <div className="flex items-center gap-2 text-xs text-muted">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+          <span>Data tersinkron ke server — bisa diakses dari perangkat mana pun.</span>
+        </div>
       </div>
     </div>
   );
@@ -508,12 +511,14 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
   return (
     <Link
       href={item.href}
+      aria-current={active ? "page" : undefined}
       className={cn(
-        "mb-0.5 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted transition hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-900",
-        active && "bg-leaf/10 font-semibold text-primary dark:bg-green-950/40",
+        "group/nav relative mb-0.5 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted transition hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800/60",
+        active && "bg-primary/10 font-semibold text-primary dark:bg-primary/15",
       )}
     >
-      <item.icon className="h-4 w-4 shrink-0" />
+      {active && <span className="absolute inset-y-1.5 left-0 w-1 rounded-full bg-primary" />}
+      <item.icon className={cn("h-4 w-4 shrink-0 transition", active ? "text-primary" : "text-muted group-hover/nav:text-foreground")} />
       <span className="truncate">{item.label}</span>
     </Link>
   );

@@ -343,7 +343,8 @@ export type PondDailyLog = {
   pondId: string;
   date: string; // yyyy-mm-dd
   feedKg: number; // pakan hari itu (kg)
-  feedType?: string; // jenis pakan, mis. "781-2"
+  feedBrand?: string; // merk pakan, mis. "Hi-Pro-Vite"
+  feedType?: string; // jenis/kode pakan, mis. "781-2"
   feedCostRp: number; // biaya pakan hari itu (Rp)
   deaths: number; // kematian (ekor)
   avgWeightG?: number; // hasil sampling bobot rata-rata (gram/ekor)
@@ -366,6 +367,32 @@ export type PondHarvest = {
   buyer?: string;
   isFinal: boolean; // true = panen total, menutup siklus
   note?: string;
+  actor: string;
+  createdAt: string;
+};
+
+export type JournalCategory =
+  | "Kualitas Air"
+  | "Kesehatan & Penyakit"
+  | "Perlakuan"
+  | "Cuaca"
+  | "Pemeliharaan"
+  | "Catatan Umum";
+
+/** Jurnal/diary kolam: catatan kejadian, perlakuan, kondisi air, cuaca, dll. */
+export type PondJournal = {
+  id: string;
+  pondId?: string; // kolam terkait (opsional; kosong = catatan umum)
+  pondCode?: string;
+  cycleId?: string;
+  date: string; // yyyy-mm-dd
+  category: JournalCategory;
+  title: string;
+  note: string;
+  // ukuran air (opsional) untuk jurnal kualitas air
+  waterTemp?: number; // suhu (°C)
+  waterPh?: number; // pH
+  photo?: string; // data URL
   actor: string;
   createdAt: string;
 };

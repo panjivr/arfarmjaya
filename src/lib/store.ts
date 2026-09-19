@@ -23,6 +23,7 @@ import type {
   FishCycle,
   PondDailyLog,
   PondHarvest,
+  PondJournal,
   CycleStatus,
   Rack,
   Receipt,
@@ -177,6 +178,7 @@ type State = {
   fishCycles: FishCycle[];
   pondLogs: PondDailyLog[];
   pondHarvests: PondHarvest[];
+  pondJournals: PondJournal[];
   auditLog: AuditEntry[];
   readNotifications: string[];
   loginNoticeSeen: boolean;
@@ -295,6 +297,8 @@ type Actions = {
   removePondLog: (id: string) => void;
   addPondHarvest: (data: Omit<PondHarvest, "id" | "createdAt" | "actor" | "revenueRp">) => { ok: boolean; message?: string };
   removePondHarvest: (id: string) => void;
+  addPondJournal: (data: Omit<PondJournal, "id" | "createdAt" | "actor">) => { ok: boolean; message?: string };
+  removePondJournal: (id: string) => void;
 
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: (ids: string[]) => void;
@@ -314,7 +318,7 @@ const roleLabel: Record<Role, string> = {
   karyawan: "Barang keluar",
 };
 
-function seedLele(): { ponds: Pond[]; fishCycles: FishCycle[]; pondLogs: PondDailyLog[]; pondHarvests: PondHarvest[] } {
+function seedLele(): { ponds: Pond[]; fishCycles: FishCycle[]; pondLogs: PondDailyLog[]; pondHarvests: PondHarvest[]; pondJournals: PondJournal[] } {
   const t = now();
   const iso = (daysAgo: number) => new Date(Date.now() - daysAgo * 86400000).toISOString().slice(0, 10);
   const pondA = { id: uid(), code: "A12", name: "Kolam Terpal A12", type: "Terpal" as const, areaM2: 12, active: true, createdAt: t };
@@ -334,7 +338,7 @@ function seedLele(): { ponds: Pond[]; fishCycles: FishCycle[]; pondLogs: PondDai
     status: "Aktif", actor: "Sistem", createdAt: t,
   };
   const mkLog = (c: FishCycle, daysAgo: number, feedKg: number, feedCostRp: number, deaths: number, avg?: number): PondDailyLog => ({
-    id: uid(), cycleId: c.id, pondId: c.pondId, date: iso(daysAgo), feedKg, feedType: "781-2", feedCostRp, deaths, avgWeightG: avg, actor: "Sistem", createdAt: t,
+    id: uid(), cycleId: c.id, pondId: c.pondId, date: iso(daysAgo), feedKg, feedBrand: "Hi-Pro-Vite", feedType: "781-2", feedCostRp, deaths, avgWeightG: avg, actor: "Sistem", createdAt: t,
   });
   const logs: PondDailyLog[] = [
     mkLog(cycleA, 5, 22, 308000, 4, 78),
@@ -344,7 +348,11 @@ function seedLele(): { ponds: Pond[]; fishCycles: FishCycle[]; pondLogs: PondDai
     mkLog(cycleB, 2, 11, 154000, 8),
     mkLog(cycleB, 0, 12, 168000, 6, 28),
   ];
-  return { ponds: [pondA, pondB, pondC], fishCycles: [cycleA, cycleB], pondLogs: logs, pondHarvests: [] };
+  const journals: PondJournal[] = [
+    { id: uid(), pondId: pondA.id, pondCode: pondA.code, cycleId: cycleA.id, date: iso(3), category: "Kualitas Air", title: "Ganti air 30%", note: "Air mulai keruh, dilakukan penggantian sebagian dan penambahan probiotik.", waterTemp: 28, waterPh: 7.2, actor: "Sistem", createdAt: t },
+    { id: uid(), pondId: pondB.id, pondCode: pondB.code, cycleId: cycleB.id, date: iso(1), category: "Kesehatan & Penyakit", title: "Gejala jamur ringan", note: "Beberapa benih terlihat berjamur, diberi garam ikan 0,3%.", actor: "Sistem", createdAt: t },
+  ];
+  return { ponds: [pondA, pondB, pondC], fishCycles: [cycleA, cycleB], pondLogs: logs, pondHarvests: [], pondJournals: journals };
 }
 
 function buildInitial(): State {
@@ -824,6 +832,14 @@ export const useUiStore = create<State & Actions>()(
         return { ok: true };
       },
       removePondHarvest: (id) => set((s) => ({ pondHarvests: s.pondHarvests.filter((h) => h.id !== id) })),
+      addPondJournal: (data) => {
+        if (!data.title.trim() && !data.note.trim()) return { ok: false, message: "Isi judul atau catatan jurnal." };
+        const entry: PondJournal = { ...data, id: uid(), actor: get().user?.name ?? "Pengguna", createdAt: now() };
+        set((s) => ({ pondJournals: [entry, ...s.pondJournals] }));
+        get().audit("Jurnal", "Kolam Lele", `${entry.pondCode ?? "Umum"} · ${entry.category}: ${entry.title || entry.note.slice(0, 30)}`);
+        return { ok: true };
+      },
+      removePondJournal: (id) => set((s) => ({ pondJournals: s.pondJournals.filter((j) => j.id !== id) })),
 
       markNotificationRead: (id) => set((s) => ({ readNotifications: Array.from(new Set([...s.readNotifications, id])) })),
       setLoginNoticeSeen: (value) => set({ loginNoticeSeen: value }),
@@ -876,6 +892,7 @@ export const useUiStore = create<State & Actions>()(
         fishCycles: s.fishCycles,
         pondLogs: s.pondLogs,
         pondHarvests: s.pondHarvests,
+        pondJournals: s.pondJournals,
         auditLog: s.auditLog,
         readNotifications: s.readNotifications,
         loginNoticeSeen: s.loginNoticeSeen,

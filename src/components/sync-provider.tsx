@@ -27,6 +27,7 @@ const SYNC_KEYS = [
   "fishCycles",
   "pondLogs",
   "pondHarvests",
+  "pondJournals",
   "auditLog",
   "readNotifications",
   "settings",
@@ -47,7 +48,7 @@ function weight(data: Snapshot | null): number {
   const arrays = [
     "movements", "invoices", "posSales", "purchaseOrders", "distributions",
     "requests", "opnameSessions", "receipts", "auditLog", "stores", "weeklyReports",
-    "ponds", "fishCycles", "pondLogs", "pondHarvests",
+    "ponds", "fishCycles", "pondLogs", "pondHarvests", "pondJournals",
   ];
   return arrays.reduce((sum, k) => sum + (Array.isArray(data[k]) ? (data[k] as unknown[]).length : 0), 0);
 }
