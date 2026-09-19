@@ -295,3 +295,77 @@ export type WeeklyReport = {
   createdAt: string;
   updatedAt: string;
 };
+
+/* ── Budidaya Lele (peternakan / monitoring kolam) ─────────────────────── */
+
+export type PondType = "Terpal" | "Tanah" | "Beton" | "Bioflok";
+export type PondStatus = "Kosong" | "Aktif" | "Perlu Panen" | "Nonaktif";
+export type CycleStatus = "Aktif" | "Selesai" | "Gagal";
+
+/** Satu kolam fisik dengan kode unik (mis. "A12"). Bisa dipakai berulang
+ *  lewat beberapa siklus tebar–panen sepanjang waktu. */
+export type Pond = {
+  id: string;
+  code: string; // kode unik kolam, mis. "A12"
+  name?: string;
+  type: PondType;
+  areaM2?: number; // luas kolam
+  note?: string;
+  active: boolean; // kolam dipakai / dinonaktifkan
+  createdAt: string;
+};
+
+/** Satu siklus budidaya pada sebuah kolam: dari tebar benih sampai panen. */
+export type FishCycle = {
+  id: string;
+  pondId: string;
+  pondCode: string; // snapshot kode kolam untuk tampilan
+  species: string; // mis. "Lele Sangkuriang"
+  stockDate: string; // tanggal tebar benih (yyyy-mm-dd)
+  source: string; // asal benih (hatchery/pemasok)
+  initialCount: number; // jumlah benih ditebar (ekor)
+  sizeAtStock?: string; // ukuran benih, mis. "5-7 cm"
+  seedCostRp: number; // total biaya benih
+  otherCostRp: number; // biaya awal lain (kapur, probiotik, dll)
+  targetDate?: string; // target tanggal panen
+  targetWeightG?: number; // target bobot rata-rata per ekor (gram)
+  status: CycleStatus;
+  closedAt?: string;
+  note?: string;
+  actor: string;
+  createdAt: string;
+};
+
+/** Catatan harian per siklus: pakan, kematian, dan sampling bobot. */
+export type PondDailyLog = {
+  id: string;
+  cycleId: string;
+  pondId: string;
+  date: string; // yyyy-mm-dd
+  feedKg: number; // pakan hari itu (kg)
+  feedType?: string; // jenis pakan, mis. "781-2"
+  feedCostRp: number; // biaya pakan hari itu (Rp)
+  deaths: number; // kematian (ekor)
+  avgWeightG?: number; // hasil sampling bobot rata-rata (gram/ekor)
+  waterChanged?: boolean; // ganti/kuras air
+  note?: string;
+  actor: string;
+  createdAt: string;
+};
+
+/** Panen (bisa sebagian/sortir atau total menutup siklus). */
+export type PondHarvest = {
+  id: string;
+  cycleId: string;
+  pondId: string;
+  date: string; // yyyy-mm-dd
+  count: number; // jumlah ekor dipanen
+  weightKg: number; // total bobot panen (kg)
+  pricePerKg: number; // harga jual per kg
+  revenueRp: number; // weightKg * pricePerKg
+  buyer?: string;
+  isFinal: boolean; // true = panen total, menutup siklus
+  note?: string;
+  actor: string;
+  createdAt: string;
+};

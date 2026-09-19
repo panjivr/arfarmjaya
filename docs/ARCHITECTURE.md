@@ -48,6 +48,7 @@ The database schema includes role based access control via `Role` and `Permissio
 - Retail POS
 - Reports
 - Weekly Field Report (Laporan Pelaksanaan Mingguan)
+- Fish Pond Farming (Budidaya Lele)
 - Users and Roles
 - Notifications
 - Audit Log
@@ -76,6 +77,26 @@ Recommended production services:
 - `src/components/report/weekly-report-document.tsx` renders both the on-screen preview and the print output from the same component, so what is previewed is what is printed.
 - Printing renders the document through a React portal into `document.body` (`#report-print-area`) and toggles `body.printing-report`, which hides the application layout with `display: none` — that keeps the PDF free of blank pages. `printDocument()` injects the `@page` rule (A4 landscape, 10 mm margins) for the duration of the print, and `fitPrintZoom()` measures the document at the real print width to pick a `zoom` factor that keeps it on one page.
 - Photos are downscaled in the browser (`compressImage`) before being stored as data URLs, keeping the persisted store within localStorage limits.
+
+## Fish Pond Farming Module (Budidaya Lele)
+
+`/lele` is a self-contained aquaculture (catfish) monitoring area, separated in the
+sidebar under its own "Budidaya Lele" group so the farming business is one click away
+from the agriculture/warehouse side.
+
+Data model (all synced to the shared Postgres workspace like the rest of the app):
+
+- `Pond` — a physical pond with a unique code (e.g. "A12"), type (Terpal/Tanah/Beton/Bioflok), and area. Reused across many cycles.
+- `FishCycle` — one stock-to-harvest cycle on a pond: stock date, seed source, initial count, seed/other cost, target weight/date, status.
+- `PondDailyLog` — daily entry per cycle: feed kg + cost, deaths, optional weight sampling.
+- `PondHarvest` — partial or final harvest: count, weight, price/kg, revenue, buyer.
+
+`src/lib/lele.ts` computes live metrics (age, current live count, survival rate, total
+feed, biomass estimate, running P&L, FCR, and a feeding recommendation from a
+percent-of-biomass table that decreases with age). Pages: `/lele` (monitoring grid +
+pond detail modal with daily input, harvest, and P&L), `/lele/kolam` (pond CRUD + stock a
+cycle + finished-cycle history), and `/lele/simulator` (single-cycle business projection:
+harvest, feed need, cost, revenue, profit, HPP, BEP, ROI, and a feed-phase guide).
 
 ## ERD
 

@@ -19,6 +19,11 @@ import type {
   PaymentMethod,
   PosSale,
   PurchaseOrder,
+  Pond,
+  FishCycle,
+  PondDailyLog,
+  PondHarvest,
+  CycleStatus,
   Rack,
   Receipt,
   ReportProfile,
@@ -168,6 +173,10 @@ type State = {
   invoices: Invoice[];
   reportProfiles: ReportProfile[];
   weeklyReports: WeeklyReport[];
+  ponds: Pond[];
+  fishCycles: FishCycle[];
+  pondLogs: PondDailyLog[];
+  pondHarvests: PondHarvest[];
   auditLog: AuditEntry[];
   readNotifications: string[];
   loginNoticeSeen: boolean;
@@ -264,6 +273,29 @@ type Actions = {
   duplicateWeeklyReport: (id: string) => { ok: boolean; report?: WeeklyReport };
   deleteWeeklyReport: (id: string) => void;
 
+  // budidaya lele
+  addPond: (data: Omit<Pond, "id" | "createdAt" | "active">) => { ok: boolean; message?: string; pond?: Pond };
+  updatePond: (id: string, patch: Partial<Pond>) => void;
+  removePond: (id: string) => { ok: boolean; message?: string };
+  startCycle: (data: {
+    pondId: string;
+    species: string;
+    stockDate: string;
+    source: string;
+    initialCount: number;
+    sizeAtStock?: string;
+    seedCostRp: number;
+    otherCostRp?: number;
+    targetDate?: string;
+    targetWeightG?: number;
+    note?: string;
+  }) => { ok: boolean; message?: string; cycle?: FishCycle };
+  closeCycle: (id: string, status?: CycleStatus) => void;
+  addPondLog: (data: Omit<PondDailyLog, "id" | "createdAt" | "actor">) => { ok: boolean; message?: string };
+  removePondLog: (id: string) => void;
+  addPondHarvest: (data: Omit<PondHarvest, "id" | "createdAt" | "actor" | "revenueRp">) => { ok: boolean; message?: string };
+  removePondHarvest: (id: string) => void;
+
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: (ids: string[]) => void;
   setLoginNoticeSeen: (value: boolean) => void;
@@ -281,6 +313,39 @@ const roleLabel: Record<Role, string> = {
   viewer: "Hanya lihat",
   karyawan: "Barang keluar",
 };
+
+function seedLele(): { ponds: Pond[]; fishCycles: FishCycle[]; pondLogs: PondDailyLog[]; pondHarvests: PondHarvest[] } {
+  const t = now();
+  const iso = (daysAgo: number) => new Date(Date.now() - daysAgo * 86400000).toISOString().slice(0, 10);
+  const pondA = { id: uid(), code: "A12", name: "Kolam Terpal A12", type: "Terpal" as const, areaM2: 12, active: true, createdAt: t };
+  const pondB = { id: uid(), code: "B03", name: "Kolam Bioflok B03", type: "Bioflok" as const, areaM2: 10, active: true, createdAt: t };
+  const pondC = { id: uid(), code: "C07", name: "Kolam Tanah C07", type: "Tanah" as const, areaM2: 25, active: true, createdAt: t };
+
+  const cycleA: FishCycle = {
+    id: uid(), pondId: pondA.id, pondCode: pondA.code, species: "Lele Sangkuriang",
+    stockDate: iso(42), source: "Hatchery Mina Jaya", initialCount: 2000, sizeAtStock: "5-7 cm",
+    seedCostRp: 400000, otherCostRp: 120000, targetDate: iso(-45), targetWeightG: 110,
+    status: "Aktif", actor: "Sistem", createdAt: t,
+  };
+  const cycleB: FishCycle = {
+    id: uid(), pondId: pondB.id, pondCode: pondB.code, species: "Lele Mutiara",
+    stockDate: iso(18), source: "Hatchery Mina Jaya", initialCount: 3000, sizeAtStock: "4-6 cm",
+    seedCostRp: 540000, otherCostRp: 150000, targetDate: iso(-60), targetWeightG: 120,
+    status: "Aktif", actor: "Sistem", createdAt: t,
+  };
+  const mkLog = (c: FishCycle, daysAgo: number, feedKg: number, feedCostRp: number, deaths: number, avg?: number): PondDailyLog => ({
+    id: uid(), cycleId: c.id, pondId: c.pondId, date: iso(daysAgo), feedKg, feedType: "781-2", feedCostRp, deaths, avgWeightG: avg, actor: "Sistem", createdAt: t,
+  });
+  const logs: PondDailyLog[] = [
+    mkLog(cycleA, 5, 22, 308000, 4, 78),
+    mkLog(cycleA, 3, 24, 336000, 3),
+    mkLog(cycleA, 1, 26, 364000, 2, 92),
+    mkLog(cycleB, 4, 9, 126000, 12, 22),
+    mkLog(cycleB, 2, 11, 154000, 8),
+    mkLog(cycleB, 0, 12, 168000, 6, 28),
+  ];
+  return { ponds: [pondA, pondB, pondC], fishCycles: [cycleA, cycleB], pondLogs: logs, pondHarvests: [] };
+}
 
 function buildInitial(): State {
   const products = realStockProducts.map((p) => ({ ...p }));
@@ -307,6 +372,7 @@ function buildInitial(): State {
     invoices: [],
     reportProfiles: seedReportProfiles,
     weeklyReports: [],
+    ...seedLele(),
     auditLog: [],
     readNotifications: [],
     loginNoticeSeen: false,
@@ -678,6 +744,87 @@ export const useUiStore = create<State & Actions>()(
         get().audit("Hapus", "Laporan Mingguan", report?.number ?? id);
       },
 
+      // ── budidaya lele ───────────────────────────────────────────────────
+      addPond: (data) => {
+        const code = data.code.trim();
+        if (!code) return { ok: false, message: "Kode kolam wajib diisi." };
+        if (get().ponds.some((p) => p.code.toLowerCase() === code.toLowerCase())) {
+          return { ok: false, message: `Kode kolam "${code}" sudah dipakai.` };
+        }
+        const pond: Pond = { ...data, code, id: uid(), active: true, createdAt: now() };
+        set((s) => ({ ponds: [...s.ponds, pond] }));
+        get().audit("Tambah", "Kolam Lele", `${pond.code}${pond.name ? ` · ${pond.name}` : ""}`);
+        return { ok: true, pond };
+      },
+      updatePond: (id, patch) => {
+        set((s) => ({ ponds: s.ponds.map((p) => (p.id === id ? { ...p, ...patch } : p)) }));
+        get().audit("Ubah", "Kolam Lele", get().ponds.find((p) => p.id === id)?.code ?? id);
+      },
+      removePond: (id) => {
+        const pond = get().ponds.find((p) => p.id === id);
+        if (!pond) return { ok: false, message: "Kolam tidak ditemukan." };
+        if (get().fishCycles.some((c) => c.pondId === id && c.status === "Aktif")) {
+          return { ok: false, message: "Kolam masih punya siklus aktif. Tutup/panen dulu." };
+        }
+        set((s) => ({ ponds: s.ponds.filter((p) => p.id !== id) }));
+        get().audit("Hapus", "Kolam Lele", pond.code);
+        return { ok: true };
+      },
+      startCycle: (data) => {
+        const pond = get().ponds.find((p) => p.id === data.pondId);
+        if (!pond) return { ok: false, message: "Kolam tidak ditemukan." };
+        if (get().fishCycles.some((c) => c.pondId === data.pondId && c.status === "Aktif")) {
+          return { ok: false, message: "Kolam ini sedang ada siklus aktif." };
+        }
+        if (!(data.initialCount > 0)) return { ok: false, message: "Jumlah benih harus lebih dari 0." };
+        const cycle: FishCycle = {
+          id: uid(),
+          pondId: pond.id,
+          pondCode: pond.code,
+          species: data.species.trim() || "Lele",
+          stockDate: data.stockDate,
+          source: data.source.trim(),
+          initialCount: data.initialCount,
+          sizeAtStock: data.sizeAtStock,
+          seedCostRp: data.seedCostRp || 0,
+          otherCostRp: data.otherCostRp || 0,
+          targetDate: data.targetDate,
+          targetWeightG: data.targetWeightG,
+          status: "Aktif",
+          note: data.note,
+          actor: get().user?.name ?? "Pengguna",
+          createdAt: now(),
+        };
+        set((s) => ({ fishCycles: [cycle, ...s.fishCycles] }));
+        get().audit("Tebar Benih", "Kolam Lele", `${pond.code} · ${cycle.initialCount} ekor ${cycle.species}`);
+        return { ok: true, cycle };
+      },
+      closeCycle: (id, status = "Selesai") => {
+        const cycle = get().fishCycles.find((c) => c.id === id);
+        set((s) => ({ fishCycles: s.fishCycles.map((c) => (c.id === id ? { ...c, status, closedAt: now() } : c)) }));
+        if (cycle) get().audit("Tutup Siklus", "Kolam Lele", `${cycle.pondCode} → ${status}`);
+      },
+      addPondLog: (data) => {
+        const cycle = get().fishCycles.find((c) => c.id === data.cycleId);
+        if (!cycle) return { ok: false, message: "Siklus tidak ditemukan." };
+        const log: PondDailyLog = { ...data, id: uid(), actor: get().user?.name ?? "Pengguna", createdAt: now() };
+        set((s) => ({ pondLogs: [log, ...s.pondLogs] }));
+        get().audit("Catatan Harian", "Kolam Lele", `${cycle.pondCode} · pakan ${log.feedKg}kg, mati ${log.deaths}`);
+        return { ok: true };
+      },
+      removePondLog: (id) => set((s) => ({ pondLogs: s.pondLogs.filter((l) => l.id !== id) })),
+      addPondHarvest: (data) => {
+        const cycle = get().fishCycles.find((c) => c.id === data.cycleId);
+        if (!cycle) return { ok: false, message: "Siklus tidak ditemukan." };
+        const revenueRp = Math.round((Number(data.weightKg) || 0) * (Number(data.pricePerKg) || 0));
+        const harvest: PondHarvest = { ...data, revenueRp, id: uid(), actor: get().user?.name ?? "Pengguna", createdAt: now() };
+        set((s) => ({ pondHarvests: [harvest, ...s.pondHarvests] }));
+        get().audit("Panen", "Kolam Lele", `${cycle.pondCode} · ${harvest.count} ekor / ${harvest.weightKg}kg`);
+        if (harvest.isFinal) get().closeCycle(cycle.id, "Selesai");
+        return { ok: true };
+      },
+      removePondHarvest: (id) => set((s) => ({ pondHarvests: s.pondHarvests.filter((h) => h.id !== id) })),
+
       markNotificationRead: (id) => set((s) => ({ readNotifications: Array.from(new Set([...s.readNotifications, id])) })),
       setLoginNoticeSeen: (value) => set({ loginNoticeSeen: value }),
       markAllNotificationsRead: (ids) => set((s) => ({ readNotifications: Array.from(new Set([...s.readNotifications, ...ids])) })),
@@ -725,6 +872,10 @@ export const useUiStore = create<State & Actions>()(
         invoices: s.invoices,
         reportProfiles: s.reportProfiles,
         weeklyReports: s.weeklyReports,
+        ponds: s.ponds,
+        fishCycles: s.fishCycles,
+        pondLogs: s.pondLogs,
+        pondHarvests: s.pondHarvests,
         auditLog: s.auditLog,
         readNotifications: s.readNotifications,
         loginNoticeSeen: s.loginNoticeSeen,
