@@ -302,6 +302,9 @@ export type PondType = "Terpal" | "Tanah" | "Beton" | "Bioflok";
 export type PondStatus = "Kosong" | "Aktif" | "Perlu Panen" | "Nonaktif";
 export type CycleStatus = "Aktif" | "Selesai" | "Gagal";
 
+/** Peran kolam: produksi (pembesaran) atau tampungan/stok siap jual (T1–T4). */
+export type PondKind = "produksi" | "tampungan";
+
 /** Satu kolam fisik dengan kode unik (mis. "A12"). Bisa dipakai berulang
  *  lewat beberapa siklus tebar–panen sepanjang waktu. */
 export type Pond = {
@@ -309,6 +312,7 @@ export type Pond = {
   code: string; // kode unik kolam, mis. "A12"
   name?: string;
   type: PondType;
+  kind?: PondKind; // default "produksi"; "tampungan" = kolam siap jual (T1–T4)
   areaM2?: number; // luas kolam
   note?: string;
   active: boolean; // kolam dipakai / dinonaktifkan
@@ -342,6 +346,7 @@ export type PondDailyLog = {
   cycleId: string;
   pondId: string;
   date: string; // yyyy-mm-dd
+  session?: "Pagi" | "Sore" | "Tambahan"; // sesi pemberian pakan
   feedKg: number; // pakan hari itu (kg)
   feedBrand?: string; // merk pakan, mis. "Hi-Pro-Vite"
   feedType?: string; // jenis/kode pakan, mis. "781-2"
@@ -393,6 +398,88 @@ export type PondJournal = {
   waterTemp?: number; // suhu (°C)
   waterPh?: number; // pH
   photo?: string; // data URL
+  actor: string;
+  createdAt: string;
+};
+
+/* ── Keuangan Lele (penjualan, piutang, utang usaha, kas) ──────────────── */
+
+export type PayMethod = "Tunai" | "Transfer" | "QRIS" | "Tempo";
+
+/** Satu kali pembayaran/cicilan pada piutang atau utang. */
+export type PaymentEntry = {
+  id: string;
+  date: string; // yyyy-mm-dd
+  amount: number;
+  method: PayMethod;
+  note?: string;
+};
+
+/**
+ * Penjualan lele (konsumsi/sortir/tampungan). PENTING: tidak ada validasi
+ * bobot terhadap tebar — biomassa tumbuh, jumlah panen bisa jauh > tebar.
+ */
+export type LeleSale = {
+  id: string;
+  number: string;
+  date: string; // yyyy-mm-dd
+  buyer: string;
+  item: string; // mis. "Lele Konsumsi", "Brojolan", "Sortir"
+  pondCode?: string; // asal kolam (opsional)
+  weightKg: number;
+  pricePerKg: number;
+  total: number; // total nilai penjualan (bisa diedit manual utk borongan)
+  paid: number; // dibayar saat transaksi (sisa → piutang)
+  method: PayMethod;
+  note?: string;
+  actor: string;
+  createdAt: string;
+};
+
+/** Piutang: tagihan ke pembeli (penjualan tempo / kurang bayar). */
+export type Receivable = {
+  id: string;
+  saleId?: string; // penjualan terkait (opsional)
+  party: string; // nama pembeli
+  description: string;
+  amount: number; // total tagihan
+  payments: PaymentEntry[]; // cicilan (bisa beberapa kali)
+  dueDate?: string;
+  actor: string;
+  createdAt: string;
+};
+
+/** Utang usaha: kewajiban ke pemasok/pihak lain (pakan, benih, dll). */
+export type Payable = {
+  id: string;
+  party: string; // pemasok / pihak
+  description: string;
+  amount: number;
+  payments: PaymentEntry[];
+  dueDate?: string;
+  actor: string;
+  createdAt: string;
+};
+
+export type FinanceKind = "masuk" | "keluar";
+
+/** Kategori keuangan yang bisa diedit admin (mis. Bon, Ops Ardhi, Inves). */
+export type FinanceCategory = {
+  id: string;
+  name: string;
+  kind: FinanceKind | "both";
+  createdAt: string;
+};
+
+/** Transaksi kas/keuangan umum di luar penjualan lele. */
+export type FinanceTx = {
+  id: string;
+  date: string; // yyyy-mm-dd
+  kind: FinanceKind;
+  category: string; // nama kategori
+  amount: number;
+  party?: string;
+  note?: string;
   actor: string;
   createdAt: string;
 };

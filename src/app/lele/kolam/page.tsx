@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Waves, Plus, Pencil, Trash2, Fish, Sprout, History } from "lucide-react";
+import { Waves, Plus, Pencil, Trash2, Fish, Sprout, History, Layers } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import { PageHeader, StatCard, EmptyState } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,12 +14,12 @@ import { PondDetailModal } from "@/components/lele/pond-detail";
 import { useUiStore } from "@/lib/store";
 import { cycleMetrics } from "@/lib/lele";
 import { currency, formatDate, numberFmt } from "@/lib/utils";
-import type { FishCycle, Pond, PondType } from "@/lib/types";
+import type { FishCycle, Pond, PondType, PondKind } from "@/lib/types";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const POND_TYPES: PondType[] = ["Terpal", "Tanah", "Beton", "Bioflok"];
 
-const emptyPond = { code: "", name: "", type: "Terpal" as PondType, areaM2: "", note: "" };
+const emptyPond = { code: "", name: "", type: "Terpal" as PondType, kind: "produksi" as PondKind, areaM2: "", note: "" };
 const emptyStock = { pondId: "", species: "Lele Sangkuriang", stockDate: today(), source: "", initialCount: "", sizeAtStock: "5-7 cm", seedCostRp: "", otherCostRp: "", targetDate: "", targetWeightG: "110", note: "" };
 
 export default function KolamPage() {
@@ -31,6 +31,7 @@ export default function KolamPage() {
   const updatePond = useUiStore((s) => s.updatePond);
   const removePond = useUiStore((s) => s.removePond);
   const startCycle = useUiStore((s) => s.startCycle);
+  const addStandardPonds = useUiStore((s) => s.addStandardPonds);
 
   const [pondModal, setPondModal] = useState(false);
   const [editingPond, setEditingPond] = useState<Pond | null>(null);
@@ -50,12 +51,17 @@ export default function KolamPage() {
   function openCreatePond() { setEditingPond(null); setPondForm(emptyPond); setPondModal(true); }
   function openEditPond(p: Pond) {
     setEditingPond(p);
-    setPondForm({ code: p.code, name: p.name ?? "", type: p.type, areaM2: p.areaM2?.toString() ?? "", note: p.note ?? "" });
+    setPondForm({ code: p.code, name: p.name ?? "", type: p.type, kind: p.kind ?? "produksi", areaM2: p.areaM2?.toString() ?? "", note: p.note ?? "" });
     setPondModal(true);
+  }
+  function addStandard() {
+    const res = addStandardPonds();
+    if (res.added === 0) toast.info("Semua kolam standar sudah ada.");
+    else toast.success(`${res.added} kolam standar ditambahkan (A/B/D/E + T1–T4).`);
   }
   function submitPond(e: React.FormEvent) {
     e.preventDefault();
-    const payload = { code: pondForm.code.trim(), name: pondForm.name.trim() || undefined, type: pondForm.type, areaM2: pondForm.areaM2 ? Number(pondForm.areaM2) : undefined, note: pondForm.note.trim() || undefined };
+    const payload = { code: pondForm.code.trim(), name: pondForm.name.trim() || undefined, type: pondForm.type, kind: pondForm.kind, areaM2: pondForm.areaM2 ? Number(pondForm.areaM2) : undefined, note: pondForm.note.trim() || undefined };
     if (editingPond) {
       updatePond(editingPond.id, payload);
       toast.success("Kolam diperbarui.");
@@ -96,11 +102,16 @@ export default function KolamPage() {
         eyebrow="Budidaya Lele"
         title="Kolam & Tebar"
         description="Kelola daftar kolam dengan kode khusus, lalu tebar benih untuk memulai siklus budidaya. Satu kolam bisa dipakai berulang untuk banyak siklus."
-        action={<Button onClick={openCreatePond}><Plus className="h-4 w-4" /> Tambah Kolam</Button>}
+        action={
+          <>
+            <Button variant="secondary" onClick={addStandard}><Layers className="h-4 w-4" /> Kolam Standar</Button>
+            <Button onClick={openCreatePond}><Plus className="h-4 w-4" /> Tambah Kolam</Button>
+          </>
+        }
       />
 
       <section className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
-        <StatCard label="Total Kolam" value={ponds.length} icon={Waves} />
+        <StatCard label="Total Kolam" value={ponds.length} hint={`${ponds.filter((p) => p.kind === "tampungan").length} tampungan`} icon={Waves} />
         <StatCard label="Siklus Aktif" value={activeByPond.size} icon={Fish} tone="primary" />
         <StatCard label="Kolam Kosong" value={ponds.filter((p) => !activeByPond.has(p.id)).length} icon={Sprout} tone="amber" />
         <StatCard label="Siklus Selesai" value={finishedCycles.length} icon={History} tone="slate" />
@@ -118,7 +129,10 @@ export default function KolamPage() {
                 <CardContent>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-base font-bold">{pond.code}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-base font-bold">{pond.code}</p>
+                        {pond.kind === "tampungan" && <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">Tampungan</Badge>}
+                      </div>
                       <p className="truncate text-xs text-muted">{pond.name || "Tanpa nama"} · {pond.type}{pond.areaM2 ? ` · ${pond.areaM2} m²` : ""}</p>
                     </div>
                     <div className="flex shrink-0 gap-1">
@@ -194,6 +208,14 @@ export default function KolamPage() {
               {POND_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </Select>
           </Field>
+          <div className="sm:col-span-2">
+            <Field label="Peran Kolam" hint="Tampungan (T1–T4) = stok lele siap jual, bukan pembesaran.">
+              <Select value={pondForm.kind} onChange={(e) => setPondForm((f) => ({ ...f, kind: e.target.value as PondKind }))}>
+                <option value="produksi">Produksi (pembesaran)</option>
+                <option value="tampungan">Tampungan (siap jual)</option>
+              </Select>
+            </Field>
+          </div>
           <div className="sm:col-span-2"><Field label="Nama (opsional)"><Input value={pondForm.name} onChange={(e) => setPondForm((f) => ({ ...f, name: e.target.value }))} placeholder="Kolam Terpal Belakang" /></Field></div>
           <Field label="Luas (m²)"><Input type="number" min={0} step="any" value={pondForm.areaM2} onChange={(e) => setPondForm((f) => ({ ...f, areaM2: e.target.value }))} placeholder="12" /></Field>
           <div className="sm:col-span-2"><Field label="Catatan"><Textarea value={pondForm.note} onChange={(e) => setPondForm((f) => ({ ...f, note: e.target.value }))} /></Field></div>

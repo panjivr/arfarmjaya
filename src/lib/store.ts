@@ -20,11 +20,20 @@ import type {
   PosSale,
   PurchaseOrder,
   Pond,
+  PondType,
+  PondKind,
   FishCycle,
   PondDailyLog,
   PondHarvest,
   PondJournal,
   CycleStatus,
+  LeleSale,
+  Receivable,
+  Payable,
+  PaymentEntry,
+  PayMethod,
+  FinanceTx,
+  FinanceCategory,
   Rack,
   Receipt,
   ReportProfile,
@@ -48,6 +57,8 @@ const stamp = () => {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
 };
 const seq = (n: number) => String(n + 1).padStart(4, "0");
+const rupiah = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 });
+const currencyStr = (n: number) => rupiah.format(Math.round(n) || 0);
 
 function unique(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b, "id"));
@@ -179,6 +190,11 @@ type State = {
   pondLogs: PondDailyLog[];
   pondHarvests: PondHarvest[];
   pondJournals: PondJournal[];
+  leleSales: LeleSale[];
+  receivables: Receivable[];
+  payables: Payable[];
+  financeTx: FinanceTx[];
+  financeCategories: FinanceCategory[];
   auditLog: AuditEntry[];
   readNotifications: string[];
   loginNoticeSeen: boolean;
@@ -299,6 +315,33 @@ type Actions = {
   removePondHarvest: (id: string) => void;
   addPondJournal: (data: Omit<PondJournal, "id" | "createdAt" | "actor">) => { ok: boolean; message?: string };
   removePondJournal: (id: string) => void;
+  addStandardPonds: () => { ok: boolean; added: number };
+
+  // keuangan lele: penjualan, piutang, utang, kas
+  recordSale: (data: {
+    date: string;
+    buyer: string;
+    item: string;
+    pondCode?: string;
+    weightKg: number;
+    pricePerKg: number;
+    total?: number;
+    paid: number;
+    method: PayMethod;
+    dueDate?: string;
+    note?: string;
+  }) => { ok: boolean; message?: string; sale?: LeleSale };
+  removeSale: (id: string) => void;
+  addReceivable: (data: Omit<Receivable, "id" | "createdAt" | "actor" | "payments"> & { payments?: PaymentEntry[] }) => { ok: boolean };
+  payReceivable: (id: string, entry: Omit<PaymentEntry, "id">) => { ok: boolean; message?: string };
+  removeReceivable: (id: string) => void;
+  addPayable: (data: Omit<Payable, "id" | "createdAt" | "actor" | "payments"> & { payments?: PaymentEntry[] }) => { ok: boolean };
+  payPayable: (id: string, entry: Omit<PaymentEntry, "id">) => { ok: boolean; message?: string };
+  removePayable: (id: string) => void;
+  addFinanceTx: (data: Omit<FinanceTx, "id" | "createdAt" | "actor">) => { ok: boolean; message?: string };
+  removeFinanceTx: (id: string) => void;
+  addFinanceCategory: (name: string, kind: FinanceCategory["kind"]) => { ok: boolean; message?: string };
+  removeFinanceCategory: (id: string) => void;
 
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: (ids: string[]) => void;
@@ -355,6 +398,41 @@ function seedLele(): { ponds: Pond[]; fishCycles: FishCycle[]; pondLogs: PondDai
   return { ponds: [pondA, pondB, pondC], fishCycles: [cycleA, cycleB], pondLogs: logs, pondHarvests: [], pondJournals: journals };
 }
 
+// Kategori keuangan bawaan (bisa ditambah/hapus admin). Mencakup Bon, Ops
+// Ardhi, dan Inves sesuai kebutuhan operasional AR FARM JAYA.
+function seedFinanceCategories(): FinanceCategory[] {
+  const t = now();
+  const rows: Array<[string, FinanceCategory["kind"]]> = [
+    ["Penjualan Lele", "masuk"],
+    ["Pemasukan Lain", "masuk"],
+    ["Pakan", "keluar"],
+    ["Benih", "keluar"],
+    ["Obat & Probiotik", "keluar"],
+    ["Listrik & Air", "keluar"],
+    ["Gaji & Tenaga Kerja", "keluar"],
+    ["Perawatan Kolam", "keluar"],
+    ["Bon", "keluar"],
+    ["Ops Ardhi", "keluar"],
+    ["Inves", "keluar"],
+    ["Lain-lain", "both"],
+  ];
+  return rows.map(([name, kind]) => ({ id: uid(), name, kind, createdAt: t }));
+}
+
+// Daftar kolam standar AR FARM JAYA: blok produksi A/B/D/E + tampungan T1–T4.
+type RosterEntry = { code: string; type: PondType; kind: PondKind };
+function standardRoster(): RosterEntry[] {
+  const block = (prefix: string, n: number, type: PondType, kind: PondKind): RosterEntry[] =>
+    Array.from({ length: n }, (_, i) => ({ code: `${prefix}${i + 1}`, type, kind }));
+  return [
+    ...block("A", 7, "Terpal", "produksi"),
+    ...block("B", 4, "Terpal", "produksi"),
+    ...block("D", 6, "Terpal", "produksi"),
+    ...block("E", 6, "Terpal", "produksi"),
+    ...block("T", 4, "Terpal", "tampungan"),
+  ];
+}
+
 function buildInitial(): State {
   const products = realStockProducts.map((p) => ({ ...p }));
   return {
@@ -381,6 +459,11 @@ function buildInitial(): State {
     reportProfiles: seedReportProfiles,
     weeklyReports: [],
     ...seedLele(),
+    leleSales: [],
+    receivables: [],
+    payables: [],
+    financeTx: [],
+    financeCategories: seedFinanceCategories(),
     auditLog: [],
     readNotifications: [],
     loginNoticeSeen: false,
@@ -841,6 +924,159 @@ export const useUiStore = create<State & Actions>()(
       },
       removePondJournal: (id) => set((s) => ({ pondJournals: s.pondJournals.filter((j) => j.id !== id) })),
 
+      addStandardPonds: () => {
+        const existing = new Set(get().ponds.map((p) => p.code.toLowerCase()));
+        const t = now();
+        const toAdd: Pond[] = standardRoster()
+          .filter((r) => !existing.has(r.code.toLowerCase()))
+          .map((r) => ({
+            id: uid(),
+            code: r.code,
+            name: r.kind === "tampungan" ? `Tampungan ${r.code}` : `Kolam ${r.code}`,
+            type: r.type,
+            kind: r.kind,
+            active: true,
+            createdAt: t,
+          }));
+        if (toAdd.length === 0) return { ok: true, added: 0 };
+        set((s) => ({ ponds: [...s.ponds, ...toAdd] }));
+        get().audit("Tambah", "Kolam Lele", `${toAdd.length} kolam standar (A/B/D/E + T1–T4)`);
+        return { ok: true, added: toAdd.length };
+      },
+
+      // ── keuangan lele ───────────────────────────────────────────────────
+      recordSale: (data) => {
+        if (!data.buyer.trim()) return { ok: false, message: "Nama pembeli wajib diisi." };
+        const weightKg = Number(data.weightKg) || 0;
+        const pricePerKg = Number(data.pricePerKg) || 0;
+        // Tidak ada validasi bobot terhadap tebar — biomassa memang tumbuh.
+        const total = data.total != null && data.total > 0 ? Math.round(data.total) : Math.round(weightKg * pricePerKg);
+        if (total <= 0) return { ok: false, message: "Nilai penjualan harus lebih dari 0." };
+        const paid = Math.min(Math.max(Number(data.paid) || 0, 0), total);
+        const number = `JL-${stamp()}-${seq(get().leleSales.length)}`;
+        const sale: LeleSale = {
+          id: uid(),
+          number,
+          date: data.date,
+          buyer: data.buyer.trim(),
+          item: data.item.trim() || "Lele Konsumsi",
+          pondCode: data.pondCode,
+          weightKg,
+          pricePerKg,
+          total,
+          paid,
+          method: data.method,
+          note: data.note,
+          actor: get().user?.name ?? "Pengguna",
+          createdAt: now(),
+        };
+        set((s) => ({ leleSales: [sale, ...s.leleSales] }));
+        // Uang yang benar-benar diterima → kas masuk.
+        if (paid > 0) {
+          set((s) => ({
+            financeTx: [
+              { id: uid(), date: sale.date, kind: "masuk", category: "Penjualan Lele", amount: paid, party: sale.buyer, note: `${sale.number} · ${sale.item}`, actor: sale.actor, createdAt: now() },
+              ...s.financeTx,
+            ],
+          }));
+        }
+        // Sisa yang belum dibayar → piutang.
+        const remainder = total - paid;
+        if (remainder > 0) {
+          set((s) => ({
+            receivables: [
+              { id: uid(), saleId: sale.id, party: sale.buyer, description: `${sale.number} · ${sale.item}`, amount: remainder, payments: [], dueDate: data.dueDate, actor: sale.actor, createdAt: now() },
+              ...s.receivables,
+            ],
+          }));
+        }
+        get().audit("Penjualan", "Keuangan Lele", `${sale.number} · ${sale.buyer} · ${currencyStr(total)}${remainder > 0 ? ` (piutang ${currencyStr(remainder)})` : ""}`);
+        return { ok: true, sale };
+      },
+      removeSale: (id) => {
+        const sale = get().leleSales.find((x) => x.id === id);
+        set((s) => ({
+          leleSales: s.leleSales.filter((x) => x.id !== id),
+          receivables: s.receivables.filter((r) => r.saleId !== id),
+        }));
+        if (sale) get().audit("Hapus", "Keuangan Lele", sale.number);
+      },
+      addReceivable: (data) => {
+        set((s) => ({
+          receivables: [
+            { ...data, payments: data.payments ?? [], id: uid(), actor: get().user?.name ?? "Pengguna", createdAt: now() },
+            ...s.receivables,
+          ],
+        }));
+        get().audit("Tambah", "Piutang", `${data.party} · ${currencyStr(data.amount)}`);
+        return { ok: true };
+      },
+      payReceivable: (id, entry) => {
+        const r = get().receivables.find((x) => x.id === id);
+        if (!r) return { ok: false, message: "Piutang tidak ditemukan." };
+        const amount = Number(entry.amount) || 0;
+        if (amount <= 0) return { ok: false, message: "Nominal bayar harus lebih dari 0." };
+        const payment: PaymentEntry = { ...entry, amount, id: uid() };
+        set((s) => ({
+          receivables: s.receivables.map((x) => (x.id === id ? { ...x, payments: [...x.payments, payment] } : x)),
+          financeTx: [
+            { id: uid(), date: payment.date, kind: "masuk", category: "Penjualan Lele", amount, party: r.party, note: `Pelunasan piutang · ${r.description}`, actor: get().user?.name ?? "Pengguna", createdAt: now() },
+            ...s.financeTx,
+          ],
+        }));
+        get().audit("Bayar", "Piutang", `${r.party} · ${currencyStr(amount)}`);
+        return { ok: true };
+      },
+      removeReceivable: (id) => set((s) => ({ receivables: s.receivables.filter((x) => x.id !== id) })),
+      addPayable: (data) => {
+        set((s) => ({
+          payables: [
+            { ...data, payments: data.payments ?? [], id: uid(), actor: get().user?.name ?? "Pengguna", createdAt: now() },
+            ...s.payables,
+          ],
+        }));
+        get().audit("Tambah", "Utang", `${data.party} · ${currencyStr(data.amount)}`);
+        return { ok: true };
+      },
+      payPayable: (id, entry) => {
+        const p = get().payables.find((x) => x.id === id);
+        if (!p) return { ok: false, message: "Utang tidak ditemukan." };
+        const amount = Number(entry.amount) || 0;
+        if (amount <= 0) return { ok: false, message: "Nominal bayar harus lebih dari 0." };
+        const payment: PaymentEntry = { ...entry, amount, id: uid() };
+        set((s) => ({
+          payables: s.payables.map((x) => (x.id === id ? { ...x, payments: [...x.payments, payment] } : x)),
+          financeTx: [
+            { id: uid(), date: payment.date, kind: "keluar", category: "Lain-lain", amount, party: p.party, note: `Bayar utang · ${p.description}`, actor: get().user?.name ?? "Pengguna", createdAt: now() },
+            ...s.financeTx,
+          ],
+        }));
+        get().audit("Bayar", "Utang", `${p.party} · ${currencyStr(amount)}`);
+        return { ok: true };
+      },
+      removePayable: (id) => set((s) => ({ payables: s.payables.filter((x) => x.id !== id) })),
+      addFinanceTx: (data) => {
+        const amount = Number(data.amount) || 0;
+        if (amount <= 0) return { ok: false, message: "Nominal harus lebih dari 0." };
+        set((s) => ({
+          financeTx: [{ ...data, amount, id: uid(), actor: get().user?.name ?? "Pengguna", createdAt: now() }, ...s.financeTx],
+        }));
+        get().audit(data.kind === "masuk" ? "Kas Masuk" : "Kas Keluar", "Keuangan", `${data.category} · ${currencyStr(amount)}`);
+        return { ok: true };
+      },
+      removeFinanceTx: (id) => set((s) => ({ financeTx: s.financeTx.filter((x) => x.id !== id) })),
+      addFinanceCategory: (name, kind) => {
+        const trimmed = name.trim();
+        if (!trimmed) return { ok: false, message: "Nama kategori wajib diisi." };
+        if (get().financeCategories.some((c) => c.name.toLowerCase() === trimmed.toLowerCase())) {
+          return { ok: false, message: "Kategori sudah ada." };
+        }
+        set((s) => ({ financeCategories: [...s.financeCategories, { id: uid(), name: trimmed, kind, createdAt: now() }] }));
+        get().audit("Tambah", "Kategori Keuangan", trimmed);
+        return { ok: true };
+      },
+      removeFinanceCategory: (id) => set((s) => ({ financeCategories: s.financeCategories.filter((c) => c.id !== id) })),
+
       markNotificationRead: (id) => set((s) => ({ readNotifications: Array.from(new Set([...s.readNotifications, id])) })),
       setLoginNoticeSeen: (value) => set({ loginNoticeSeen: value }),
       markAllNotificationsRead: (ids) => set((s) => ({ readNotifications: Array.from(new Set([...s.readNotifications, ...ids])) })),
@@ -893,6 +1129,11 @@ export const useUiStore = create<State & Actions>()(
         pondLogs: s.pondLogs,
         pondHarvests: s.pondHarvests,
         pondJournals: s.pondJournals,
+        leleSales: s.leleSales,
+        receivables: s.receivables,
+        payables: s.payables,
+        financeTx: s.financeTx,
+        financeCategories: s.financeCategories,
         auditLog: s.auditLog,
         readNotifications: s.readNotifications,
         loginNoticeSeen: s.loginNoticeSeen,

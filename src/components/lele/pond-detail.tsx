@@ -73,7 +73,7 @@ export function PondDetailModal({ pond, cycle, onClose }: { pond: Pond; cycle: F
   );
 
   const suggested = suggestFeed(metrics?.ageDays ?? 0);
-  const [feed, setFeed] = useState({ date: today(), feedKg: "", feedBrand: "", feedType: "", feedCostRp: "", pricePerKg: 0, deaths: "", avgWeightG: "", note: "" });
+  const [feed, setFeed] = useState<{ date: string; session: "Pagi" | "Sore" | "Tambahan"; feedKg: string; feedBrand: string; feedType: string; feedCostRp: string; pricePerKg: number; deaths: string; avgWeightG: string; note: string }>({ date: today(), session: "Pagi", feedKg: "", feedBrand: "", feedType: "", feedCostRp: "", pricePerKg: 0, deaths: "", avgWeightG: "", note: "" });
   const [harvest, setHarvest] = useState({ date: today(), count: "", weightKg: "", pricePerKg: "", buyer: "", isFinal: false, note: "" });
   const [journal, setJournal] = useState<{ date: string; category: JournalCategory; title: string; note: string; waterTemp: string; waterPh: string }>({ date: today(), category: "Catatan Umum", title: "", note: "", waterTemp: "", waterPh: "" });
 
@@ -86,6 +86,7 @@ export function PondDetailModal({ pond, cycle, onClose }: { pond: Pond; cycle: F
       cycleId: cycle.id,
       pondId: pond.id,
       date: feed.date,
+      session: feed.session,
       feedKg,
       feedBrand: feed.feedBrand || suggested.brand,
       feedType: feed.feedType || suggested.code,
@@ -96,7 +97,7 @@ export function PondDetailModal({ pond, cycle, onClose }: { pond: Pond; cycle: F
     });
     if (!res.ok) return toast.error(res.message ?? "Gagal menyimpan.");
     toast.success("Catatan harian tersimpan.");
-    setFeed({ date: today(), feedKg: "", feedBrand: feed.feedBrand, feedType: feed.feedType, feedCostRp: "", pricePerKg: feed.pricePerKg, deaths: "", avgWeightG: "", note: "" });
+    setFeed({ date: today(), session: feed.session, feedKg: "", feedBrand: feed.feedBrand, feedType: feed.feedType, feedCostRp: "", pricePerKg: feed.pricePerKg, deaths: "", avgWeightG: "", note: "" });
   }
 
   function onFeedKg(v: string) {
@@ -192,7 +193,8 @@ export function PondDetailModal({ pond, cycle, onClose }: { pond: Pond; cycle: F
               <p className="mb-2 flex items-center gap-2 text-sm font-semibold"><Utensils className="h-4 w-4 text-primary" /> Input Pakan &amp; Kondisi Harian</p>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 <Field label="Tanggal"><Input type="date" value={feed.date} onChange={(e) => setFeed((f) => ({ ...f, date: e.target.value }))} /></Field>
-                <div className="col-span-2 sm:col-span-2">
+                <Field label="Sesi"><Select value={feed.session} onChange={(e) => setFeed((f) => ({ ...f, session: e.target.value as typeof f.session }))}><option value="Pagi">Pagi</option><option value="Sore">Sore</option><option value="Tambahan">Tambahan</option></Select></Field>
+                <div className="col-span-2 sm:col-span-3">
                   <FeedSelect
                     brand={feed.feedBrand}
                     code={feed.feedType}
@@ -220,6 +222,7 @@ export function PondDetailModal({ pond, cycle, onClose }: { pond: Pond; cycle: F
                 <thead className="bg-slate-50 text-xs uppercase text-muted dark:bg-slate-900/60">
                   <tr>
                     <th className="px-3 py-2 font-semibold">Tanggal</th>
+                    <th className="px-3 py-2 font-semibold">Sesi</th>
                     <th className="px-3 py-2 font-semibold">Pakan</th>
                     <th className="px-3 py-2 text-right font-semibold">Kg</th>
                     <th className="px-3 py-2 text-right font-semibold">Biaya</th>
@@ -230,11 +233,12 @@ export function PondDetailModal({ pond, cycle, onClose }: { pond: Pond; cycle: F
                 </thead>
                 <tbody>
                   {cycleLogs.length === 0 ? (
-                    <tr><td colSpan={7} className="px-3 py-6 text-center text-muted">Belum ada catatan harian.</td></tr>
+                    <tr><td colSpan={8} className="px-3 py-6 text-center text-muted">Belum ada catatan harian.</td></tr>
                   ) : (
                     cycleLogs.map((l) => (
                       <tr key={l.id} className="border-t border-border">
                         <td className="whitespace-nowrap px-3 py-2">{formatDate(l.date)}</td>
+                        <td className="px-3 py-2 text-muted">{l.session ?? "-"}</td>
                         <td className="px-3 py-2"><span className="font-medium">{l.feedType || "-"}</span>{l.feedBrand && <span className="block text-[11px] text-muted">{l.feedBrand}</span>}</td>
                         <td className="px-3 py-2 text-right">{l.feedKg || "-"}</td>
                         <td className="px-3 py-2 text-right">{l.feedCostRp ? currency.format(l.feedCostRp) : "-"}</td>

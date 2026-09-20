@@ -1,8 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeApplier } from "@/components/theme-applier";
 import { SyncProvider } from "@/components/sync-provider";
+import { PwaRegister } from "@/components/pwa-register";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -18,7 +19,12 @@ export const metadata: Metadata = {
   description:
     "AR FARM JAYA (ARFARM BHINNEKA NUSA JAYA) — sistem manajemen gudang & retail: inventori real-time, pembelian, penerimaan, distribusi, POS, invoice multi-toko, laporan, dan analitik.",
   keywords: ["manajemen gudang", "WMS", "inventori", "AR FARM JAYA", "ARFARM", "invoice", "POS", "Ponorogo"],
-  applicationName: "AR FARM JAYA WMS",
+  applicationName: "AR FARM JAYA",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "AR FARM JAYA",
+  },
   openGraph: {
     title: "AR FARM JAYA — Sistem Manajemen Gudang & Retail",
     description:
@@ -26,6 +32,16 @@ export const metadata: Metadata = {
     type: "website",
     locale: "id_ID",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#007a4b" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b1220" },
+  ],
 };
 
 export default function RootLayout({
@@ -38,6 +54,7 @@ export default function RootLayout({
       <body>
         <ThemeApplier />
         <SyncProvider />
+        <PwaRegister />
         {children}
       </body>
     </html>
