@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Save, RotateCcw, Palette, Info } from "lucide-react";
+import { useRef, useState } from "react";
+import { Save, RotateCcw, Palette, Info, Download, Upload } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -16,8 +16,36 @@ export default function SettingsPage() {
   const theme = useUiStore((s) => s.theme);
   const updateSettings = useUiStore((s) => s.updateSettings);
   const resetData = useUiStore((s) => s.resetData);
+  const exportBackup = useUiStore((s) => s.exportBackup);
+  const importBackup = useUiStore((s) => s.importBackup);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<AppSettings>(settings);
+
+  function downloadBackup() {
+    const blob = new Blob([exportBackup()], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `arfarmjaya-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Cadangan diunduh.");
+  }
+  function onRestoreFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!confirm("Pulihkan data dari berkas ini? Data saat ini akan diganti.")) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const res = importBackup(String(reader.result));
+      if (!res.ok) return toast.error(res.message ?? "Gagal memulihkan.");
+      setForm(useUiStore.getState().settings);
+      toast.success(res.message ?? "Data dipulihkan.");
+    };
+    reader.readAsText(file);
+  }
 
   function set<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -134,6 +162,23 @@ export default function SettingsPage() {
               <div className="flex justify-between gap-3">
                 <span className="text-muted">Penyimpanan</span>
                 <span className="font-medium">Lokal (browser)</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex items-center gap-2">
+              <Download className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-bold">Cadangan & Pemulihan</h2>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted">
+                Unduh seluruh data sebagai berkas cadangan (JSON), atau pulihkan dari berkas cadangan. Berguna sebelum perubahan besar.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" onClick={downloadBackup}><Download className="h-4 w-4" /> Unduh Cadangan</Button>
+                <Button variant="secondary" onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4" /> Pulihkan</Button>
+                <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={onRestoreFile} />
               </div>
             </CardContent>
           </Card>

@@ -471,6 +471,41 @@ export type FinanceCategory = {
   createdAt: string;
 };
 
+/* ── Mutasi stok lele (ledger pergerakan biomassa antar-kolam) ─────────── */
+
+export type LeleMoveType =
+  | "MASUK" // tebar/masuk luar
+  | "KELUAR" // keluar umum
+  | "TRANSFER_KELUAR" // pindah ke kolam lain (sisi asal)
+  | "TRANSFER_MASUK" // pindah dari kolam lain (sisi tujuan)
+  | "SORTIR" // sortir grading
+  | "PANEN" // panen
+  | "PENJUALAN" // terjual
+  | "KEMATIAN" // mati
+  | "PENYUSUTAN" // susut (bukan omzet)
+  | "PENYESUAIAN"; // koreksi stok
+
+export type SortirKategori = "Konsumsi" | "Brojolan" | "Pemindahan";
+
+/** Satu baris pergerakan fisik lele pada sebuah kolam. Informatif untuk laporan
+ *  & jejak; transfer antar-kolam selalu tercatat berpasangan (keluar + masuk). */
+export type LeleMovement = {
+  id: string;
+  date: string; // yyyy-mm-dd
+  type: LeleMoveType;
+  pondId: string;
+  pondCode: string;
+  toPondId?: string; // tujuan (transfer)
+  toPondCode?: string;
+  kategori?: SortirKategori;
+  qtyKg?: number; // bobot (kg)
+  qtyEkor?: number; // jumlah ekor
+  ref?: string; // pasangan transfer / nomor rujukan
+  note?: string;
+  actor: string;
+  createdAt: string;
+};
+
 /** Transaksi kas/keuangan umum di luar penjualan lele. */
 export type FinanceTx = {
   id: string;

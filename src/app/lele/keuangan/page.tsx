@@ -70,7 +70,12 @@ export default function KeuanganLelePage() {
     const kasKeluar = txR.filter((t) => t.kind === "keluar").reduce((t, x) => t + x.amount, 0);
     const piutangAktif = receivables.reduce((t, r) => t + outstanding(r), 0);
     const utangAktif = payables.reduce((t, p) => t + outstanding(p), 0);
-    return { omzet, kasMasuk, kasKeluar, arusKas: kasMasuk - kasKeluar, piutangAktif, utangAktif, salesCount: salesR.length };
+    // HPP ≈ beban produksi langsung (pakan, benih, obat, perawatan kolam).
+    const HPP_CATS = ["Pakan", "Benih", "Obat & Probiotik", "Perawatan Kolam"];
+    const hpp = txR.filter((t) => t.kind === "keluar" && HPP_CATS.includes(t.category)).reduce((t, x) => t + x.amount, 0);
+    const labaKotor = omzet - hpp; // omzet − HPP
+    const labaBersih = omzet - kasKeluar; // omzet − seluruh beban
+    return { omzet, kasMasuk, kasKeluar, arusKas: kasMasuk - kasKeluar, piutangAktif, utangAktif, hpp, labaKotor, labaBersih, salesCount: salesR.length };
   }, [sales, financeTx, receivables, payables, inRange]);
 
   // ── Form Penjualan ──
@@ -176,6 +181,12 @@ export default function KeuanganLelePage() {
         <StatCard label="Arus Kas" value={currency.format(summary.arusKas)} hint="masuk − keluar" icon={Wallet} tone={summary.arusKas >= 0 ? "primary" : "danger"} />
         <StatCard label="Piutang Aktif" value={currency.format(summary.piutangAktif)} hint="belum tertagih" icon={HandCoins} tone={summary.piutangAktif > 0 ? "amber" : "slate"} />
         <StatCard label="Utang Aktif" value={currency.format(summary.utangAktif)} hint="belum dibayar" icon={Banknote} tone={summary.utangAktif > 0 ? "danger" : "slate"} />
+      </section>
+
+      <section className="mb-4 grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-3">
+        <StatCard label="HPP (periode)" value={currency.format(summary.hpp)} hint="pakan+benih+obat+perawatan" icon={TrendingDown} tone="amber" />
+        <StatCard label="Laba Kotor" value={currency.format(summary.labaKotor)} hint="omzet − HPP" icon={Coins} tone={summary.labaKotor >= 0 ? "primary" : "danger"} />
+        <StatCard label="Laba Bersih" value={currency.format(summary.labaBersih)} hint="omzet − seluruh beban" icon={Wallet} tone={summary.labaBersih >= 0 ? "primary" : "danger"} />
       </section>
 
       {/* Tabs */}

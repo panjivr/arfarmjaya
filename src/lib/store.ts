@@ -34,6 +34,9 @@ import type {
   PayMethod,
   FinanceTx,
   FinanceCategory,
+  LeleMovement,
+  LeleMoveType,
+  SortirKategori,
   Rack,
   Receipt,
   ReportProfile,
@@ -59,6 +62,16 @@ const stamp = () => {
 const seq = (n: number) => String(n + 1).padStart(4, "0");
 const rupiah = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 });
 const currencyStr = (n: number) => rupiah.format(Math.round(n) || 0);
+
+// Kunci data bisnis yang ikut dicadangkan/dipulihkan (sama dengan data ter-sync).
+const BACKUP_KEYS = [
+  "products", "movements", "categories", "suppliers", "warehouses", "racks", "users",
+  "purchaseOrders", "receipts", "distributions", "requests", "opnameSessions", "posSales",
+  "stores", "invoices", "reportProfiles", "weeklyReports",
+  "ponds", "fishCycles", "pondLogs", "pondHarvests", "pondJournals",
+  "leleSales", "receivables", "payables", "financeTx", "financeCategories", "leleMovements",
+  "auditLog", "settings",
+] as const;
 
 function unique(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b, "id"));
@@ -195,6 +208,7 @@ type State = {
   payables: Payable[];
   financeTx: FinanceTx[];
   financeCategories: FinanceCategory[];
+  leleMovements: LeleMovement[];
   auditLog: AuditEntry[];
   readNotifications: string[];
   loginNoticeSeen: boolean;
@@ -343,6 +357,15 @@ type Actions = {
   addFinanceCategory: (name: string, kind: FinanceCategory["kind"]) => { ok: boolean; message?: string };
   removeFinanceCategory: (id: string) => void;
 
+  // mutasi stok lele: sortir, transfer antar-kolam (atomik), penyusutan
+  recordLeleMovement: (data: { date: string; type: LeleMoveType; pondId: string; kategori?: SortirKategori; qtyKg?: number; qtyEkor?: number; note?: string }) => { ok: boolean; message?: string };
+  transferLele: (data: { date: string; fromPondId: string; toPondId: string; qtyKg?: number; qtyEkor?: number; kategori?: SortirKategori; note?: string }) => { ok: boolean; message?: string };
+  removeLeleMovement: (id: string) => void;
+
+  // cadangan data (backup) & pemulihan (restore)
+  exportBackup: () => string;
+  importBackup: (json: string) => { ok: boolean; message?: string };
+
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: (ids: string[]) => void;
   setLoginNoticeSeen: (value: boolean) => void;
@@ -464,6 +487,7 @@ function buildInitial(): State {
     payables: [],
     financeTx: [],
     financeCategories: seedFinanceCategories(),
+    leleMovements: [],
     auditLog: [],
     readNotifications: [],
     loginNoticeSeen: false,
@@ -1077,6 +1101,68 @@ export const useUiStore = create<State & Actions>()(
       },
       removeFinanceCategory: (id) => set((s) => ({ financeCategories: s.financeCategories.filter((c) => c.id !== id) })),
 
+      // ── mutasi stok lele ────────────────────────────────────────────────
+      recordLeleMovement: (data) => {
+        const pond = get().ponds.find((p) => p.id === data.pondId);
+        if (!pond) return { ok: false, message: "Kolam tidak ditemukan." };
+        const qtyKg = data.qtyKg != null ? Number(data.qtyKg) : undefined;
+        const qtyEkor = data.qtyEkor != null ? Number(data.qtyEkor) : undefined;
+        if (!(qtyKg && qtyKg > 0) && !(qtyEkor && qtyEkor > 0)) return { ok: false, message: "Isi jumlah kg atau ekor." };
+        const mv: LeleMovement = {
+          id: uid(), date: data.date, type: data.type, pondId: pond.id, pondCode: pond.code,
+          kategori: data.kategori, qtyKg, qtyEkor, note: data.note, actor: get().user?.name ?? "Pengguna", createdAt: now(),
+        };
+        set((s) => ({ leleMovements: [mv, ...s.leleMovements].slice(0, 5000) }));
+        get().audit("Mutasi", "Stok Lele", `${pond.code} · ${data.type}${data.kategori ? ` (${data.kategori})` : ""}${qtyKg ? ` · ${qtyKg}kg` : ""}`);
+        return { ok: true };
+      },
+      // Transfer antar-kolam: SELALU dua sisi (keluar di asal, masuk di tujuan)
+      // dengan ref yang sama supaya bisa ditelusuri dan tidak pernah timpang.
+      transferLele: (data) => {
+        const from = get().ponds.find((p) => p.id === data.fromPondId);
+        const to = get().ponds.find((p) => p.id === data.toPondId);
+        if (!from || !to) return { ok: false, message: "Kolam asal/tujuan tidak ditemukan." };
+        if (from.id === to.id) return { ok: false, message: "Kolam asal dan tujuan tidak boleh sama." };
+        const qtyKg = data.qtyKg != null ? Number(data.qtyKg) : undefined;
+        const qtyEkor = data.qtyEkor != null ? Number(data.qtyEkor) : undefined;
+        if (!(qtyKg && qtyKg > 0) && !(qtyEkor && qtyEkor > 0)) return { ok: false, message: "Isi jumlah kg atau ekor." };
+        const ref = `TF-${stamp()}-${seq(get().leleMovements.length)}`;
+        const actor = get().user?.name ?? "Pengguna";
+        const t = now();
+        const out: LeleMovement = { id: uid(), date: data.date, type: "TRANSFER_KELUAR", pondId: from.id, pondCode: from.code, toPondId: to.id, toPondCode: to.code, kategori: data.kategori, qtyKg, qtyEkor, ref, note: data.note, actor, createdAt: t };
+        const inn: LeleMovement = { id: uid(), date: data.date, type: "TRANSFER_MASUK", pondId: to.id, pondCode: to.code, toPondId: from.id, toPondCode: from.code, kategori: data.kategori, qtyKg, qtyEkor, ref, note: data.note, actor, createdAt: t };
+        set((s) => ({ leleMovements: [inn, out, ...s.leleMovements].slice(0, 5000) }));
+        get().audit("Transfer", "Stok Lele", `${from.code} → ${to.code}${qtyKg ? ` · ${qtyKg}kg` : ""}${qtyEkor ? ` · ${qtyEkor} ekor` : ""} (${ref})`);
+        return { ok: true };
+      },
+      // Hapus satu mutasi; jika bagian dari transfer (punya ref), hapus pasangannya juga.
+      removeLeleMovement: (id) => {
+        const mv = get().leleMovements.find((m) => m.id === id);
+        set((s) => ({ leleMovements: s.leleMovements.filter((m) => (mv?.ref ? m.ref !== mv.ref : m.id !== id)) }));
+      },
+
+      // ── backup & restore ────────────────────────────────────────────────
+      exportBackup: () => {
+        const s = get();
+        const payload: Record<string, unknown> = { __backup: "arfarmjaya", version: 3, exportedAt: now() };
+        for (const k of BACKUP_KEYS) payload[k] = (s as unknown as Record<string, unknown>)[k];
+        return JSON.stringify(payload, null, 2);
+      },
+      importBackup: (json) => {
+        let parsed: Record<string, unknown>;
+        try { parsed = JSON.parse(json); } catch { return { ok: false, message: "Berkas bukan JSON yang valid." }; }
+        if (!parsed || typeof parsed !== "object") return { ok: false, message: "Format cadangan tidak dikenali." };
+        const patch: Record<string, unknown> = {};
+        let found = 0;
+        for (const k of BACKUP_KEYS) {
+          if (k in parsed) { patch[k] = parsed[k]; found++; }
+        }
+        if (found === 0) return { ok: false, message: "Tidak ada data yang bisa dipulihkan dari berkas ini." };
+        set(patch as never);
+        get().audit("Pulihkan", "Cadangan Data", `${found} bagian data dipulihkan`);
+        return { ok: true, message: `${found} bagian data dipulihkan.` };
+      },
+
       markNotificationRead: (id) => set((s) => ({ readNotifications: Array.from(new Set([...s.readNotifications, id])) })),
       setLoginNoticeSeen: (value) => set({ loginNoticeSeen: value }),
       markAllNotificationsRead: (ids) => set((s) => ({ readNotifications: Array.from(new Set([...s.readNotifications, ...ids])) })),
@@ -1134,6 +1220,7 @@ export const useUiStore = create<State & Actions>()(
         payables: s.payables,
         financeTx: s.financeTx,
         financeCategories: s.financeCategories,
+        leleMovements: s.leleMovements,
         auditLog: s.auditLog,
         readNotifications: s.readNotifications,
         loginNoticeSeen: s.loginNoticeSeen,
