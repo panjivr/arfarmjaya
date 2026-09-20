@@ -11,7 +11,7 @@ import { PondDetailModal } from "@/components/lele/pond-detail";
 import { useUiStore } from "@/lib/store";
 import { pondViews, leleSummary } from "@/lib/lele";
 import { suggestFeed } from "@/lib/feed";
-import { currency, numberFmt } from "@/lib/utils";
+import { cn, currency, numberFmt } from "@/lib/utils";
 import type { FishCycle, Pond } from "@/lib/types";
 
 const statusStyle: Record<string, string> = {
@@ -71,11 +71,21 @@ export default function LeleMonitoringPage() {
               <button
                 key={pond.id}
                 onClick={() => setDetail({ pond, cycle: activeCycle })}
-                className="group min-w-0 rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+                className={cn(
+                  "group hover-lift flex min-w-0 flex-col rounded-2xl p-4 text-left",
+                  activeCycle
+                    ? "border border-border bg-card shadow-soft"
+                    : "border border-dashed border-border-strong bg-card-muted",
+                )}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2.5">
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+                    <span
+                      className={cn(
+                        "grid h-11 w-11 shrink-0 place-items-center rounded-xl",
+                        activeCycle ? "bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300" : "bg-slate-100 text-muted dark:bg-slate-800",
+                      )}
+                    >
                       <Fish className="h-5 w-5" />
                     </span>
                     <div className="min-w-0">
@@ -88,43 +98,46 @@ export default function LeleMonitoringPage() {
 
                 {activeCycle && metrics ? (
                   <>
-                    <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                      <div className="rounded-lg bg-background py-1.5">
-                        <p className="text-[10px] uppercase text-muted">Umur</p>
-                        <p className="text-sm font-bold">{metrics.ageDays} hr</p>
-                      </div>
-                      <div className="rounded-lg bg-background py-1.5">
-                        <p className="text-[10px] uppercase text-muted">Hidup</p>
-                        <p className="text-sm font-bold">{numberFmt.format(metrics.currentCount)}</p>
-                      </div>
-                      <div className="rounded-lg bg-background py-1.5">
-                        <p className="text-[10px] uppercase text-muted">SR</p>
-                        <p className="text-sm font-bold">{Math.round(metrics.survivalRate * 100)}%</p>
-                      </div>
+                    <div className="mt-3.5 grid grid-cols-3 gap-2 text-center">
+                      {[
+                        { k: "Umur", v: `${metrics.ageDays} hr` },
+                        { k: "Hidup", v: numberFmt.format(metrics.currentCount) },
+                        { k: "SR", v: `${Math.round(metrics.survivalRate * 100)}%` },
+                      ].map((s) => (
+                        <div key={s.k} className="rounded-xl bg-card-muted py-2">
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted">{s.k}</p>
+                          <p className="mt-0.5 text-[15px] font-bold">{s.v}</p>
+                        </div>
+                      ))}
                     </div>
 
                     {/* Progres umur menuju panen */}
-                    <div className="mt-3">
-                      <div className="flex items-center justify-between text-[11px] text-muted">
+                    <div className="mt-3.5">
+                      <div className="flex items-center justify-between text-[11px] font-medium text-muted">
                         <span>Progres panen</span>
-                        <span>{progress}%</span>
+                        <span className="tabular-nums">{progress}%</span>
                       </div>
-                      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                        <div className={`h-full rounded-full ${status === "Perlu Panen" ? "bg-amber-500" : "bg-primary"}`} style={{ width: `${progress}%` }} />
+                      <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-card-muted">
+                        <div
+                          className={cn("h-full rounded-full transition-all", status === "Perlu Panen" ? "bg-amber-500" : "bg-primary")}
+                          style={{ width: `${Math.max(4, progress)}%` }}
+                        />
                       </div>
                     </div>
 
-                    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-                      <span className="inline-flex items-center gap-1"><Utensils className="h-3 w-3" /> {feed.brand} {feed.code}</span>
-                      {metrics.recommendedFeedKg != null && <span>saran {metrics.recommendedFeedKg} kg/hr</span>}
-                      {metrics.revenueRp > 0 && <span className="inline-flex items-center gap-1"><TrendingUp className="h-3 w-3" /> {currency.format(metrics.revenueRp)}</span>}
+                    <div className="mt-3.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-3 text-xs text-muted">
+                      <span className="inline-flex items-center gap-1.5"><Utensils className="h-3.5 w-3.5 text-primary/70" /> {feed.brand} {feed.code}</span>
+                      {metrics.recommendedFeedKg != null && <span className="tabular-nums">saran {metrics.recommendedFeedKg} kg/hr</span>}
+                      {metrics.revenueRp > 0 && <span className="inline-flex items-center gap-1.5 font-medium text-primary"><TrendingUp className="h-3.5 w-3.5" /> {currency.format(metrics.revenueRp)}</span>}
                     </div>
-                    <p className="mt-2 text-[11px] font-medium text-primary opacity-0 transition group-hover:opacity-100">Ketuk untuk input harian, panen &amp; jurnal →</p>
                   </>
                 ) : (
-                  <div className="mt-3 flex items-center justify-between rounded-lg bg-background px-3 py-3 text-sm">
-                    <span className="text-muted">Kolam kosong</span>
-                    <span className="inline-flex items-center gap-1 font-medium text-primary"><Plus className="h-4 w-4" /> Tebar benih</span>
+                  <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border-strong py-6 text-center">
+                    <span className="grid h-9 w-9 place-items-center rounded-full bg-primary/10 text-primary">
+                      <Plus className="h-5 w-5" />
+                    </span>
+                    <span className="text-sm font-semibold text-primary">Tebar benih</span>
+                    <span className="text-xs text-muted">Kolam siap dipakai</span>
                   </div>
                 )}
               </button>

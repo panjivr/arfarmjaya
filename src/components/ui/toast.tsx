@@ -50,7 +50,7 @@ export function Toaster() {
               initial={{ opacity: 0, x: 40 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 40 }}
-              className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left text-sm font-medium shadow-lg ${colors[t.kind]}`}
+              className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm font-medium shadow-soft-lg ${colors[t.kind]}`}
             >
               <Icon className="h-5 w-5 shrink-0" />
               <span>{t.message}</span>

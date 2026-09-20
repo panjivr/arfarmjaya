@@ -38,7 +38,7 @@ export function Modal({
           onClick={onClose}
         >
           <motion.div
-            className={`w-full rounded-lg border border-border bg-card shadow-xl ${size === "lg" ? "max-w-3xl" : "max-w-lg"}`}
+            className={`w-full rounded-2xl border border-border bg-card shadow-soft-lg ${size === "lg" ? "max-w-3xl" : "max-w-lg"}`}
             style={{ marginBottom: "1rem" }}
             initial={{ y: -16, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}

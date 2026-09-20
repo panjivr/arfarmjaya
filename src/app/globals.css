@@ -1,46 +1,98 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f6faf4;
-  --foreground: #102316;
+  --background: #f4f8f1;
+  --foreground: #0f1f14;
   --card: #ffffff;
-  --muted: #5f705f;
-  --primary: #007a4b;
+  --card-muted: #f6f9f3;
+  --muted: #64756a;
+  --primary: #00794b;
+  --primary-strong: #056a43;
   --secondary: #76b852;
   --accent: #f6b333;
   --danger: #dc2626;
-  --border: #dbe8d5;
+  --border: #e2ebdc;
+  --border-strong: #cfddc6;
   --leaf: #76b852;
   --harvest: #f6b333;
   --corn: #fbd46d;
+  --ring: rgba(0, 121, 75, 0.35);
+  /* Bayangan berlapis lembut untuk kedalaman yang halus (nirmana: gelap-terang) */
+  --shadow-sm: 0 1px 2px rgba(15, 31, 20, 0.04), 0 1px 3px rgba(15, 31, 20, 0.06);
+  --shadow-md: 0 6px 16px -6px rgba(15, 31, 20, 0.1), 0 2px 6px -2px rgba(15, 31, 20, 0.06);
+  --shadow-lg: 0 18px 40px -14px rgba(15, 31, 20, 0.18);
 }
 
 .dark {
-  --background: #020617;
-  --foreground: #f8fafc;
-  --card: #0f172a;
-  --muted: #94a3b8;
-  --border: #1e293b;
+  --background: #0a1120;
+  --foreground: #eef2f8;
+  --card: #121b2e;
+  --card-muted: #17223a;
+  --muted: #9aa8bf;
+  --primary: #23a06d;
+  --primary-strong: #1c8a5d;
+  --border: #26324c;
+  --border-strong: #33415f;
+  --ring: rgba(35, 160, 109, 0.4);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 20px -8px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 22px 48px -16px rgba(0, 0, 0, 0.65);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
+  --color-card-muted: var(--card-muted);
   --color-muted: var(--muted);
   --color-primary: var(--primary);
+  --color-primary-strong: var(--primary-strong);
   --color-secondary: var(--secondary);
   --color-accent: var(--accent);
   --color-danger: var(--danger);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-leaf: var(--leaf);
   --color-harvest: var(--harvest);
   --color-corn: var(--corn);
   --font-sans: var(--font-inter);
 }
 
+/* Utilitas kedalaman & interaksi — dipakai konsisten agar tampil satu kesatuan */
+.shadow-soft {
+  box-shadow: var(--shadow-sm);
+}
+.shadow-soft-md {
+  box-shadow: var(--shadow-md);
+}
+.shadow-soft-lg {
+  box-shadow: var(--shadow-lg);
+}
+.card-surface {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  box-shadow: var(--shadow-sm);
+}
+.hover-lift {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
 * {
   box-sizing: border-box;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 
 html {
@@ -67,10 +119,13 @@ textarea {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: color-mix(in srgb, var(--muted) 45%, transparent);
   border: 2px solid transparent;
   border-radius: 999px;
   background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--muted) 65%, transparent);
 }
 
 /* Area cetak disembunyikan di LUAR LAYAR (bukan display:none) supaya logo kop &

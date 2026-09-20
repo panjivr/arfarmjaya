@@ -125,7 +125,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </AnimatePresence>
 
       <div className="lg:pl-72">
-        <header className="sticky top-0 z-20 border-b border-border bg-background/90 backdrop-blur">
+        <header className="sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur-md">
           <div className="flex h-14 items-center gap-2 px-3 sm:h-16 sm:gap-3 sm:px-6">
             <Button variant="ghost" className="h-10 w-10 shrink-0 px-0 lg:hidden" onClick={toggleSidebar} aria-label="Buka menu">
               <Menu className="h-5 w-5" />
@@ -139,7 +139,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
             {/* Pencarian: kolom penuh di layar lebar, tombol ikon di layar kecil */}
             <button
-              className="hidden h-10 min-w-0 flex-1 items-center gap-3 rounded-lg border border-border bg-card px-3 text-left text-sm text-muted lg:flex"
+              className="hidden h-10 min-w-0 flex-1 items-center gap-3 rounded-xl border border-border bg-card-muted px-3 text-left text-sm text-muted transition hover:border-border-strong lg:flex"
               onClick={() => setCommandOpen(true)}
             >
               <Search className="h-4 w-4 shrink-0" />
