@@ -934,13 +934,32 @@ export const useUiStore = create<State & Actions>()(
         const cycle = get().fishCycles.find((c) => c.id === data.cycleId);
         if (!cycle) return { ok: false, message: "Siklus tidak ditemukan." };
         const revenueRp = Math.round((Number(data.weightKg) || 0) * (Number(data.pricePerKg) || 0));
-        const harvest: PondHarvest = { ...data, revenueRp, id: uid(), actor: get().user?.name ?? "Pengguna", createdAt: now() };
+        const actor = get().user?.name ?? "Pengguna";
+        // Lengkapi kode kolam tujuan pada tiap output grading.
+        const outputs = data.outputs?.map((o) => {
+          const target = o.targetPondId ? get().ponds.find((p) => p.id === o.targetPondId) : undefined;
+          return { ...o, targetPondCode: target?.code ?? o.targetPondCode };
+        });
+        const harvest: PondHarvest = { ...data, outputs, revenueRp, id: uid(), actor, createdAt: now() };
         set((s) => ({ pondHarvests: [harvest, ...s.pondHarvests] }));
-        get().audit("Panen", "Kolam Lele", `${cycle.pondCode} · ${harvest.count} ekor / ${harvest.weightKg}kg`);
+        // Setiap output yang dialihkan ke kolam → catat sebagai PANEN MASUK di
+        // kolam tujuan (jadi stok siap jual / pembesaran per kolam).
+        const t = now();
+        const inbound: LeleMovement[] = (outputs ?? [])
+          .filter((o) => o.targetPondId && (Number(o.weightKg) > 0 || Number(o.count) > 0))
+          .map((o) => ({
+            id: uid(), date: harvest.date, type: "PANEN" as LeleMoveType,
+            pondId: o.targetPondId!, pondCode: o.targetPondCode ?? "",
+            toPondId: cycle.pondId, toPondCode: cycle.pondCode,
+            kategori: o.kategori, qtyKg: Number(o.weightKg) || undefined, qtyEkor: Number(o.count) || undefined,
+            ref: harvest.id, note: `Hasil panen ${cycle.pondCode}`, actor, createdAt: t,
+          }));
+        if (inbound.length) set((s) => ({ leleMovements: [...inbound, ...s.leleMovements].slice(0, 5000) }));
+        get().audit("Panen", "Kolam Lele", `${cycle.pondCode} · ${harvest.count} ekor / ${harvest.weightKg}kg${outputs?.length ? ` · ${outputs.length} grading` : ""}`);
         if (harvest.isFinal) get().closeCycle(cycle.id, "Selesai");
         return { ok: true };
       },
-      removePondHarvest: (id) => set((s) => ({ pondHarvests: s.pondHarvests.filter((h) => h.id !== id) })),
+      removePondHarvest: (id) => set((s) => ({ pondHarvests: s.pondHarvests.filter((h) => h.id !== id), leleMovements: s.leleMovements.filter((m) => m.ref !== id) })),
       addPondJournal: (data) => {
         if (!data.title.trim() && !data.note.trim()) return { ok: false, message: "Isi judul atau catatan jurnal." };
         const entry: PondJournal = { ...data, id: uid(), actor: get().user?.name ?? "Pengguna", createdAt: now() };

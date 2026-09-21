@@ -23,6 +23,7 @@ import {
   Waves,
   Wallet,
   ArrowLeftRight,
+  History,
   Store,
   Truck,
   Users,
@@ -77,6 +78,7 @@ export const navigation: NavItem[] = [
   { label: "Kolam & Tebar", href: "/lele/kolam", icon: Waves, adminOnly: false, group: "Budidaya Lele" },
   { label: "Jurnal Lele", href: "/lele/jurnal", icon: NotebookPen, adminOnly: false, group: "Budidaya Lele" },
   { label: "Mutasi & Sortir", href: "/lele/mutasi", icon: ArrowLeftRight, adminOnly: false, group: "Budidaya Lele" },
+  { label: "Bekas Panen", href: "/lele/bekas-panen", icon: History, adminOnly: false, group: "Budidaya Lele" },
   { label: "Keuangan Lele", href: "/lele/keuangan", icon: Wallet, adminOnly: false, group: "Budidaya Lele" },
   { label: "Simulator Lele", href: "/lele/simulator", icon: Calculator, adminOnly: false, group: "Budidaya Lele" },
 

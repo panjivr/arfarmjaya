@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Utensils,
   Wallet,
+  X,
 } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
@@ -45,7 +46,12 @@ function Stat({ label, value, hint, tone = "slate" }: { label: string; value: st
   );
 }
 
+const gid = () => Math.random().toString(36).slice(2);
+
+type GradeRow = { id: string; kategori: "Konsumsi" | "Brojolan"; weightKg: string; count: string; targetPondId: string };
+
 export function PondDetailModal({ pond, cycle, onClose }: { pond: Pond; cycle: FishCycle | null; onClose: () => void }) {
+  const ponds = useUiStore((s) => s.ponds);
   const logs = useUiStore((s) => s.pondLogs);
   const harvests = useUiStore((s) => s.pondHarvests);
   const journals = useUiStore((s) => s.pondJournals);
@@ -74,7 +80,9 @@ export function PondDetailModal({ pond, cycle, onClose }: { pond: Pond; cycle: F
 
   const suggested = suggestFeed(metrics?.ageDays ?? 0);
   const [feed, setFeed] = useState<{ date: string; session: "Pagi" | "Sore" | "Tambahan"; feedKg: string; feedBrand: string; feedType: string; feedCostRp: string; pricePerKg: number; deaths: string; avgWeightG: string; note: string }>({ date: today(), session: "Pagi", feedKg: "", feedBrand: "", feedType: "", feedCostRp: "", pricePerKg: 0, deaths: "", avgWeightG: "", note: "" });
-  const [harvest, setHarvest] = useState({ date: today(), count: "", weightKg: "", pricePerKg: "", buyer: "", isFinal: false, note: "" });
+  const [harvest, setHarvest] = useState<{ date: string; buyer: string; isFinal: boolean; note: string; pricePerKg: string; outputs: GradeRow[] }>({ date: today(), buyer: "", isFinal: false, note: "", pricePerKg: "", outputs: [{ id: gid(), kategori: "Konsumsi", weightKg: "", count: "", targetPondId: "" }] });
+  const harvestTargets = useMemo(() => ponds.filter((p) => p.active && p.id !== pond.id).sort((a, b) => (a.kind === "tampungan" ? -1 : 1) - (b.kind === "tampungan" ? -1 : 1) || a.code.localeCompare(b.code, "id", { numeric: true })), [ponds, pond.id]);
+  const harvestTotalKg = harvest.outputs.reduce((t, o) => t + (Number(o.weightKg) || 0), 0);
   const [journal, setJournal] = useState<{ date: string; category: JournalCategory; title: string; note: string; waterTemp: string; waterPh: string }>({ date: today(), category: "Catatan Umum", title: "", note: "", waterTemp: "", waterPh: "" });
 
   function submitFeed(close = false) {
@@ -108,24 +116,36 @@ export function PondDetailModal({ pond, cycle, onClose }: { pond: Pond; cycle: F
     });
   }
 
+  function setGrade(id: string, patch: Partial<GradeRow>) {
+    setHarvest((h) => ({ ...h, outputs: h.outputs.map((o) => (o.id === id ? { ...o, ...patch } : o)) }));
+  }
+  function addGrade() {
+    setHarvest((h) => ({ ...h, outputs: [...h.outputs, { id: gid(), kategori: "Konsumsi", weightKg: "", count: "", targetPondId: "" }] }));
+  }
+  function removeGrade(id: string) {
+    setHarvest((h) => ({ ...h, outputs: h.outputs.length > 1 ? h.outputs.filter((o) => o.id !== id) : h.outputs }));
+  }
   function submitHarvest() {
     if (!cycle) return;
-    const weightKg = Number(harvest.weightKg) || 0;
-    if (weightKg <= 0) return toast.error("Isi bobot panen (kg).");
+    const outs = harvest.outputs.filter((o) => Number(o.weightKg) > 0 || Number(o.count) > 0);
+    if (outs.length === 0) return toast.error("Isi minimal satu hasil panen (kg atau ekor).");
+    const totalKg = outs.reduce((t, o) => t + (Number(o.weightKg) || 0), 0);
+    const totalCount = outs.reduce((t, o) => t + (Number(o.count) || 0), 0);
     const res = addPondHarvest({
       cycleId: cycle.id,
       pondId: pond.id,
       date: harvest.date,
-      count: Number(harvest.count) || 0,
-      weightKg,
+      count: totalCount,
+      weightKg: totalKg,
       pricePerKg: Number(harvest.pricePerKg) || 0,
       buyer: harvest.buyer.trim() || undefined,
       isFinal: harvest.isFinal,
       note: harvest.note.trim() || undefined,
+      outputs: outs.map((o) => ({ id: o.id, kategori: o.kategori, weightKg: Number(o.weightKg) || 0, count: Number(o.count) || undefined, targetPondId: o.targetPondId || undefined })),
     });
     if (!res.ok) return toast.error(res.message ?? "Gagal menyimpan.");
-    toast.success(harvest.isFinal ? "Panen total tersimpan, siklus ditutup." : "Panen tersimpan.");
-    setHarvest({ date: today(), count: "", weightKg: "", pricePerKg: harvest.pricePerKg, buyer: harvest.buyer, isFinal: false, note: "" });
+    toast.success(harvest.isFinal ? "Panen total tersimpan, siklus ditutup." : "Panen tersimpan & didistribusikan.");
+    setHarvest({ date: today(), buyer: harvest.buyer, isFinal: false, note: "", pricePerKg: harvest.pricePerKg, outputs: [{ id: gid(), kategori: "Konsumsi", weightKg: "", count: "", targetPondId: "" }] });
   }
 
   function submitJournal() {
@@ -266,22 +286,43 @@ export function PondDetailModal({ pond, cycle, onClose }: { pond: Pond; cycle: F
         ) : tab === "panen" && cycle ? (
           <div className="space-y-4">
             <div className="rounded-xl border border-border bg-background p-3 sm:p-4">
-              <p className="mb-2 flex items-center gap-2 text-sm font-semibold"><TrendingUp className="h-4 w-4 text-primary" /> Catat Panen</p>
+              <p className="mb-2 flex items-center gap-2 text-sm font-semibold"><TrendingUp className="h-4 w-4 text-primary" /> Catat Panen &amp; Sortir</p>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 <Field label="Tanggal"><Input type="date" value={harvest.date} onChange={(e) => setHarvest((h) => ({ ...h, date: e.target.value }))} /></Field>
-                <Field label="Jumlah (ekor)"><Input type="number" min={0} value={harvest.count} onChange={(e) => setHarvest((h) => ({ ...h, count: e.target.value }))} /></Field>
-                <Field label="Bobot (kg)"><Input type="number" min={0} step="any" value={harvest.weightKg} onChange={(e) => setHarvest((h) => ({ ...h, weightKg: e.target.value }))} /></Field>
-                <Field label="Harga/kg (Rp)"><Input type="number" min={0} value={harvest.pricePerKg} onChange={(e) => setHarvest((h) => ({ ...h, pricePerKg: e.target.value }))} placeholder="20000" /></Field>
-                <Field label="Pembeli"><Input value={harvest.buyer} onChange={(e) => setHarvest((h) => ({ ...h, buyer: e.target.value }))} placeholder="Pengepul" /></Field>
-                <label className="flex items-end gap-2 pb-2 text-sm">
-                  <input type="checkbox" checked={harvest.isFinal} onChange={(e) => setHarvest((h) => ({ ...h, isFinal: e.target.checked }))} className="h-4 w-4 accent-[var(--primary)]" />
-                  Panen total (tutup siklus)
-                </label>
+                <Field label="Pembeli (opsional)"><Input value={harvest.buyer} onChange={(e) => setHarvest((h) => ({ ...h, buyer: e.target.value }))} placeholder="jika langsung jual" /></Field>
+                <Field label="Harga/kg (opsional)"><Input type="number" min={0} value={harvest.pricePerKg} onChange={(e) => setHarvest((h) => ({ ...h, pricePerKg: e.target.value }))} placeholder="jika langsung jual" /></Field>
               </div>
-              {Number(harvest.weightKg) > 0 && Number(harvest.pricePerKg) > 0 && (
-                <p className="mt-2 text-sm text-muted">Perkiraan omzet: <span className="font-bold text-foreground">{currency.format(Number(harvest.weightKg) * Number(harvest.pricePerKg))}</span></p>
-              )}
-              <div className="mt-2 flex justify-end"><Button onClick={submitHarvest}><TrendingUp className="h-4 w-4" /> Simpan Panen</Button></div>
+
+              {/* Grading: Konsumsi / Brojolan → kolam tujuan */}
+              <p className="mt-3 mb-1.5 text-xs font-semibold text-muted">Hasil sortir → taruh di kolam</p>
+              <div className="space-y-2">
+                {harvest.outputs.map((o, i) => (
+                  <div key={o.id} className="rounded-lg border border-border p-2.5">
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-muted">Bagian {i + 1}</span>
+                      {harvest.outputs.length > 1 && <button onClick={() => removeGrade(o.id)} className="text-danger" aria-label="Hapus"><X className="h-4 w-4" /></button>}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      <Field label="Kategori"><Select value={o.kategori} onChange={(e) => setGrade(o.id, { kategori: e.target.value as GradeRow["kategori"] })}><option value="Konsumsi">Konsumsi</option><option value="Brojolan">Brojolan</option></Select></Field>
+                      <Field label="Kg"><Input type="number" min={0} step="any" value={o.weightKg} onChange={(e) => setGrade(o.id, { weightKg: e.target.value })} /></Field>
+                      <Field label="Ekor"><Input type="number" min={0} value={o.count} onChange={(e) => setGrade(o.id, { count: e.target.value })} /></Field>
+                      <Field label="Taruh di kolam"><Select value={o.targetPondId} onChange={(e) => setGrade(o.id, { targetPondId: e.target.value })}><option value="">— pilih kolam</option>{harvestTargets.map((p) => <option key={p.id} value={p.id}>{p.code}{p.kind === "tampungan" ? " (Tampungan)" : ""}</option>)}</Select></Field>
+                    </div>
+                  </div>
+                ))}
+                <Button variant="secondary" className="w-full" onClick={addGrade}><Plus className="h-4 w-4" /> Tambah bagian</Button>
+              </div>
+
+              <label className="mt-3 flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={harvest.isFinal} onChange={(e) => setHarvest((h) => ({ ...h, isFinal: e.target.checked }))} className="h-4 w-4 accent-[var(--primary)]" />
+                Panen total (tutup siklus)
+              </label>
+
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm text-muted">Total panen: <span className="font-bold text-foreground">{harvestTotalKg.toFixed(1)} kg</span>{Number(harvest.pricePerKg) > 0 && <> · omzet ± {currency.format(harvestTotalKg * Number(harvest.pricePerKg))}</>}</p>
+                <Button onClick={submitHarvest}><TrendingUp className="h-4 w-4" /> Simpan Panen</Button>
+              </div>
+              <p className="mt-1 text-[11px] text-muted">Bagian Konsumsi yang ditaruh di tampungan otomatis jadi stok siap jual kolam tujuan.</p>
             </div>
 
             <div className="overflow-x-auto rounded-xl border border-border">
@@ -302,7 +343,7 @@ export function PondDetailModal({ pond, cycle, onClose }: { pond: Pond; cycle: F
                   ) : (
                     cycleHarvests.map((h) => (
                       <tr key={h.id} className="border-t border-border">
-                        <td className="whitespace-nowrap px-3 py-2">{formatDate(h.date)}{h.isFinal && <Badge className="ml-1 bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">total</Badge>}{h.buyer && <span className="block text-[11px] text-muted">{h.buyer}</span>}</td>
+                        <td className="px-3 py-2">{formatDate(h.date)}{h.isFinal && <Badge className="ml-1 bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">total</Badge>}{h.buyer && <span className="block text-[11px] text-muted">{h.buyer}</span>}{h.outputs?.length ? <span className="mt-0.5 block text-[11px] text-muted">{h.outputs.map((o) => `${o.kategori} ${o.weightKg}kg${o.targetPondCode ? `→${o.targetPondCode}` : ""}`).join(" · ")}</span> : null}</td>
                         <td className="px-3 py-2 text-right">{h.count || "-"}</td>
                         <td className="px-3 py-2 text-right">{h.weightKg} kg</td>
                         <td className="px-3 py-2 text-right">{h.pricePerKg ? currency.format(h.pricePerKg) : "-"}</td>

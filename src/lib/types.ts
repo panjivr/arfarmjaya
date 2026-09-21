@@ -362,18 +362,30 @@ export type PondDailyLog = {
   createdAt: string;
 };
 
+/** Hasil sortir/grading panen: bagian panen yang masuk kategori tertentu dan
+ *  bisa dialihkan ke kolam lain (mis. Konsumsi → T3, Brojolan → D2). */
+export type HarvestOutput = {
+  id: string;
+  kategori: "Konsumsi" | "Brojolan";
+  weightKg: number;
+  count?: number; // ekor (opsional)
+  targetPondId?: string; // kolam tujuan (tampungan/pembesaran)
+  targetPondCode?: string;
+};
+
 /** Panen (bisa sebagian/sortir atau total menutup siklus). */
 export type PondHarvest = {
   id: string;
   cycleId: string;
   pondId: string;
   date: string; // yyyy-mm-dd
-  count: number; // jumlah ekor dipanen
+  count: number; // jumlah ekor dipanen (total)
   weightKg: number; // total bobot panen (kg)
-  pricePerKg: number; // harga jual per kg
+  pricePerKg: number; // harga jual per kg (0 bila hanya grading, jual menyusul)
   revenueRp: number; // weightKg * pricePerKg
   buyer?: string;
   isFinal: boolean; // true = panen total, menutup siklus
+  outputs?: HarvestOutput[]; // rincian grading + tujuan kolam
   note?: string;
   actor: string;
   createdAt: string;

@@ -1,4 +1,4 @@
-import type { FishCycle, Pond, PondDailyLog, PondHarvest, PondStatus } from "@/lib/types";
+import type { FishCycle, Pond, PondDailyLog, PondHarvest, PondStatus, LeleMovement, LeleSale } from "@/lib/types";
 
 const DAY = 1000 * 60 * 60 * 24;
 
@@ -162,4 +162,28 @@ export function leleSummary(views: PondView[], logs: PondDailyLog[]): LeleSummar
     biomassKg: views.reduce((t, v) => t + (v.metrics?.biomassKg ?? 0), 0),
     recommendedFeedKg: views.reduce((t, v) => t + (v.metrics?.recommendedFeedKg ?? 0), 0),
   };
+}
+
+/**
+ * Stok "siap jual" (kategori Konsumsi) per kolam, dalam kg. Dihitung dari
+ * pergerakan masuk (panen/transfer masuk) dikurangi keluar & penjualan kolam itu.
+ * Dipakai untuk melihat tampungan mana yang sudah siap dijual berapa kg.
+ */
+const IN_TYPES = new Set(["PANEN", "MASUK", "TRANSFER_MASUK"]);
+const OUT_TYPES = new Set(["TRANSFER_KELUAR", "KELUAR", "PENYUSUTAN", "PENJUALAN"]);
+
+export function readyToSellByPond(movements: LeleMovement[], sales: LeleSale[]): Map<string, number> {
+  const map = new Map<string, number>();
+  const add = (code: string, kg: number) => { if (code) map.set(code, (map.get(code) ?? 0) + kg); };
+  for (const m of movements) {
+    if (m.kategori !== "Konsumsi" || !m.qtyKg) continue;
+    if (IN_TYPES.has(m.type)) add(m.pondCode, m.qtyKg);
+    else if (OUT_TYPES.has(m.type)) add(m.pondCode, -m.qtyKg);
+  }
+  for (const s of sales) {
+    if (s.pondCode && s.weightKg) add(s.pondCode, -s.weightKg);
+  }
+  // Bulatkan agar rapi, buang nilai ≈ 0.
+  for (const [k, v] of map) { const r = Math.round(v * 10) / 10; if (Math.abs(r) < 0.05) map.delete(k); else map.set(k, r); }
+  return map;
 }
