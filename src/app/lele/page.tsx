@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Fish, Waves, TrendingUp, AlertTriangle, Plus, Utensils, NotebookPen } from "lucide-react";
+import { Fish, Waves, TrendingUp, AlertTriangle, Plus, Utensils, NotebookPen, ArrowLeftRight, Wallet } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import { PageHeader, StatCard, EmptyState } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,8 @@ export default function LeleMonitoringPage() {
         description="Pantau semua kolam secara langsung: umur lele, jumlah ikan hidup, pakan harian, kematian, dan hasil panen. Data tersinkron ke server sehingga bisa dibuka dari perangkat mana pun."
         action={
           <>
+            <Link href="/lele/mutasi"><Button variant="secondary"><ArrowLeftRight className="h-4 w-4" /> Mutasi</Button></Link>
+            <Link href="/lele/keuangan"><Button variant="secondary"><Wallet className="h-4 w-4" /> Keuangan</Button></Link>
             <Link href="/lele/jurnal"><Button variant="secondary"><NotebookPen className="h-4 w-4" /> Jurnal</Button></Link>
             <Link href="/lele/kolam"><Button><Plus className="h-4 w-4" /> Kolam &amp; Tebar</Button></Link>
           </>

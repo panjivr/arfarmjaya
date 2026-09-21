@@ -77,7 +77,7 @@ export function PondDetailModal({ pond, cycle, onClose }: { pond: Pond; cycle: F
   const [harvest, setHarvest] = useState({ date: today(), count: "", weightKg: "", pricePerKg: "", buyer: "", isFinal: false, note: "" });
   const [journal, setJournal] = useState<{ date: string; category: JournalCategory; title: string; note: string; waterTemp: string; waterPh: string }>({ date: today(), category: "Catatan Umum", title: "", note: "", waterTemp: "", waterPh: "" });
 
-  function submitFeed() {
+  function submitFeed(close = false) {
     if (!cycle) return;
     const feedKg = Number(feed.feedKg) || 0;
     const deaths = Number(feed.deaths) || 0;
@@ -98,6 +98,7 @@ export function PondDetailModal({ pond, cycle, onClose }: { pond: Pond; cycle: F
     if (!res.ok) return toast.error(res.message ?? "Gagal menyimpan.");
     toast.success("Catatan harian tersimpan.");
     setFeed({ date: today(), session: feed.session, feedKg: "", feedBrand: feed.feedBrand, feedType: feed.feedType, feedCostRp: "", pricePerKg: feed.pricePerKg, deaths: "", avgWeightG: "", note: "" });
+    if (close) onClose();
   }
 
   function onFeedKg(v: string) {
@@ -167,6 +168,15 @@ export function PondDetailModal({ pond, cycle, onClose }: { pond: Pond; cycle: F
           </div>
         )}
 
+        {/* Aksi cepat */}
+        {cycle && (
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" className="h-9" onClick={() => setTab("harian")}><Utensils className="h-4 w-4" /> Pakan</Button>
+            <Button variant="secondary" className="h-9" onClick={() => setTab("jurnal")}><NotebookPen className="h-4 w-4" /> Kondisi</Button>
+            <Button variant="secondary" className="h-9" onClick={() => setTab("panen")}><TrendingUp className="h-4 w-4" /> Panen</Button>
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="flex gap-1 overflow-x-auto border-b border-border">
           {tabs.map((t) => (
@@ -212,8 +222,9 @@ export function PondDetailModal({ pond, cycle, onClose }: { pond: Pond; cycle: F
                 <Field label="Sampling bobot (g)"><Input type="number" min={0} step="any" value={feed.avgWeightG} onChange={(e) => setFeed((f) => ({ ...f, avgWeightG: e.target.value }))} placeholder="opsional" /></Field>
                 <div className="col-span-2 sm:col-span-1"><Field label="Catatan"><Input value={feed.note} onChange={(e) => setFeed((f) => ({ ...f, note: e.target.value }))} placeholder="opsional" /></Field></div>
               </div>
-              <div className="mt-2 flex justify-end">
-                <Button onClick={submitFeed}><Plus className="h-4 w-4" /> Simpan Catatan</Button>
+              <div className="mt-2 flex flex-wrap justify-end gap-2">
+                <Button variant="secondary" onClick={() => submitFeed(true)}>Simpan &amp; tutup</Button>
+                <Button onClick={() => submitFeed(false)}><Plus className="h-4 w-4" /> Simpan &amp; lanjut</Button>
               </div>
             </div>
 

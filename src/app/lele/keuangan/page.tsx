@@ -12,6 +12,7 @@ import {
   Trash2,
   Banknote,
   Tag,
+  X,
 } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import { PageHeader, StatCard } from "@/components/ui/page-header";
@@ -58,6 +59,7 @@ export default function KeuanganLelePage() {
   const [from, setFrom] = useState(monthStart());
   const [to, setTo] = useState(today());
   const [tab, setTab] = useState<Tab>("penjualan");
+  const [showForm, setShowForm] = useState(false);
 
   const inRange = useCallback((d: string) => (!from || d >= from) && (!to || d <= to), [from, to]);
 
@@ -99,6 +101,7 @@ export default function KeuanganLelePage() {
     if (!res.ok) return toast.error(res.message ?? "Gagal menyimpan penjualan.");
     toast.success(`Penjualan ${res.sale?.number} tersimpan.`);
     setSale({ date: today(), buyer: "", item: sale.item, pondCode: "", weightKg: "", pricePerKg: sale.pricePerKg, total: "", paid: "", method: sale.method, dueDate: "", note: "" });
+    setShowForm(false);
   }
 
   // ── Form Utang ──
@@ -108,6 +111,7 @@ export default function KeuanganLelePage() {
     addPayable({ party: payable.party.trim(), description: payable.description.trim(), amount: Number(payable.amount), dueDate: payable.dueDate || undefined });
     toast.success("Utang dicatat.");
     setPayable({ party: "", description: "", amount: "", dueDate: "" });
+    setShowForm(false);
   }
 
   // ── Form Kas ──
@@ -119,6 +123,7 @@ export default function KeuanganLelePage() {
     if (!res.ok) return toast.error(res.message ?? "Gagal menyimpan.");
     toast.success("Transaksi kas tersimpan.");
     setTx({ date: today(), kind: tx.kind, category: "", amount: "", party: "", note: "" });
+    setShowForm(false);
   }
   const [newCat, setNewCat] = useState("");
   function addCat() {
@@ -194,7 +199,7 @@ export default function KeuanganLelePage() {
         {tabs.map((t) => (
           <button
             key={t.key}
-            onClick={() => setTab(t.key)}
+            onClick={() => { setTab(t.key); setShowForm(false); }}
             className={`-mb-px shrink-0 border-b-2 px-3 py-2 text-sm font-semibold transition ${tab === t.key ? "border-primary text-primary" : "border-transparent text-muted hover:text-foreground"}`}
           >
             {t.label} ({t.count})
@@ -204,6 +209,10 @@ export default function KeuanganLelePage() {
 
       {tab === "penjualan" && (
         <div className="space-y-4">
+          <div className="flex justify-end">
+            <Button variant={showForm ? "secondary" : "primary"} onClick={() => setShowForm((v) => !v)}>{showForm ? <><X className="h-4 w-4" /> Tutup Form</> : <><Plus className="h-4 w-4" /> Catat Penjualan</>}</Button>
+          </div>
+          {showForm && (
           <Card>
             <CardContent>
               <p className="mb-3 flex items-center gap-2 text-sm font-semibold"><Receipt className="h-4 w-4 text-primary" /> Catat Penjualan</p>
@@ -231,6 +240,7 @@ export default function KeuanganLelePage() {
               </div>
             </CardContent>
           </Card>
+          )}
 
           <div className="flex justify-end">
             <Button variant="secondary" onClick={() => exportCsv(`penjualan-lele-${from || "semua"}`, salesInRange.map((s) => ({ Tanggal: s.date, Nomor: s.number, Pembeli: s.buyer, Item: s.item, Kolam: s.pondCode ?? "", Kg: s.weightKg, HargaKg: s.pricePerKg, Total: s.total, Dibayar: s.paid, Metode: s.method })))} disabled={salesInRange.length === 0}>Ekspor CSV</Button>
@@ -313,6 +323,10 @@ export default function KeuanganLelePage() {
 
       {tab === "utang" && (
         <div className="space-y-4">
+          <div className="flex justify-end">
+            <Button variant={showForm ? "secondary" : "primary"} onClick={() => setShowForm((v) => !v)}>{showForm ? <><X className="h-4 w-4" /> Tutup Form</> : <><Plus className="h-4 w-4" /> Catat Utang</>}</Button>
+          </div>
+          {showForm && (
           <Card>
             <CardContent>
               <p className="mb-3 flex items-center gap-2 text-sm font-semibold"><Banknote className="h-4 w-4 text-primary" /> Catat Utang Usaha</p>
@@ -325,6 +339,7 @@ export default function KeuanganLelePage() {
               <div className="mt-3 flex justify-end"><Button onClick={submitPayable}><Plus className="h-4 w-4" /> Simpan Utang</Button></div>
             </CardContent>
           </Card>
+          )}
           <div className="overflow-x-auto rounded-2xl border border-border">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase text-muted dark:bg-slate-900/60">
@@ -368,6 +383,10 @@ export default function KeuanganLelePage() {
 
       {tab === "kas" && (
         <div className="space-y-4">
+          <div className="flex justify-end">
+            <Button variant={showForm ? "secondary" : "primary"} onClick={() => setShowForm((v) => !v)}>{showForm ? <><X className="h-4 w-4" /> Tutup Form</> : <><Plus className="h-4 w-4" /> Catat Kas</>}</Button>
+          </div>
+          {showForm && (
           <Card>
             <CardContent>
               <p className="mb-3 flex items-center gap-2 text-sm font-semibold"><Wallet className="h-4 w-4 text-primary" /> Catat Kas Masuk / Keluar</p>
@@ -388,6 +407,7 @@ export default function KeuanganLelePage() {
               </div>
             </CardContent>
           </Card>
+          )}
           <div className="flex justify-end">
             <Button variant="secondary" onClick={() => exportCsv(`kas-lele-${from || "semua"}`, txInRange.map((t) => ({ Tanggal: t.date, Jenis: t.kind, Kategori: t.category, Nominal: t.amount, Pihak: t.party ?? "", Catatan: t.note ?? "" })))} disabled={txInRange.length === 0}>Ekspor CSV</Button>
           </div>
