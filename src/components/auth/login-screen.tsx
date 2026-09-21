@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ArrowLeft, LockKeyhole } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState } from "react";
@@ -13,7 +12,6 @@ import { ROLE_META, roleHome, canAccessPath, type AppRole } from "@/lib/rbac";
 
 export function LoginScreen() {
   const setUser = useUiStore((state) => state.setUser);
-  const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -38,7 +36,9 @@ export function LoginScreen() {
       setUser({ id: json.user.id, name: json.user.name, username: json.user.username, role, label: ROLE_META[role]?.workspace ?? "" });
       const next = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("next") : null;
       const dest = next && canAccessPath(role, next) ? next : roleHome(role);
-      router.push(dest);
+      // Navigasi penuh: memastikan cookie sesi terpasang & middleware berjalan
+      // dengan state segar (menghindari kasus tepi router/cache).
+      window.location.assign(dest);
     } catch {
       setError("Tidak dapat terhubung ke server. Coba lagi.");
     } finally {
