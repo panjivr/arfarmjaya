@@ -25,7 +25,7 @@ export function LoginNotice() {
   const critical = items.filter((i) => i.kind === "danger").length;
   const warnings = items.filter((i) => i.kind === "warning").length;
   const open = Boolean(user) && hasHydrated && !seen;
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "ADMIN_UTAMA";
 
   function close() {
     setSeen(true);

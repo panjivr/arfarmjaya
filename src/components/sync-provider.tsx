@@ -78,9 +78,12 @@ function writeSyncedAt(value?: string | null) {
 
 export function SyncProvider() {
   const hasHydrated = useUiStore((s) => s.hasHydrated);
+  // Sinkronisasi hanya berjalan untuk pengguna yang sudah login — /api/state
+  // butuh sesi, jadi tanpa user kita tidak menyentuh server sama sekali.
+  const userId = useUiStore((s) => s.user?.id ?? null);
 
   useEffect(() => {
-    if (!hasHydrated) return;
+    if (!hasHydrated || !userId) return;
     let cancelled = false;
     let lastSent = "";
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -161,7 +164,7 @@ export function SyncProvider() {
       if (timer) clearTimeout(timer);
       unsubscribe();
     };
-  }, [hasHydrated]);
+  }, [hasHydrated, userId]);
 
   return null;
 }

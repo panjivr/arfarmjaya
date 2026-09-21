@@ -1,3 +1,5 @@
+import type { AppRole } from "@/lib/rbac";
+
 export type Role =
   | "admin"
   | "manajer"
@@ -8,11 +10,12 @@ export type Role =
   | "viewer"
   | "karyawan";
 
+// Pengguna yang sedang login. `role` memakai peran RBAC baru (AppRole).
 export type SessionUser = {
   id: string;
   name: string;
   username: string;
-  role: Role;
+  role: AppRole;
   label: string;
 };
 

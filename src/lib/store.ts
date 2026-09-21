@@ -222,6 +222,7 @@ type Actions = {
   setSidebar: (open: boolean) => void;
   setCommandOpen: (open: boolean) => void;
   login: (user: SessionUser) => void;
+  setUser: (user: SessionUser | null) => void;
   logout: () => void;
 
   audit: (action: string, entity: string, detail: string) => void;
@@ -506,6 +507,7 @@ export const useUiStore = create<State & Actions>()(
       setSidebar: (open) => set({ sidebarOpen: open }),
       setCommandOpen: (open) => set({ commandOpen: open }),
       login: (user) => set({ user, loginNoticeSeen: false }),
+      setUser: (user) => set({ user }),
       logout: () => set({ user: null, sidebarOpen: false, commandOpen: false }),
 
       audit: (action, entity, detail) => {

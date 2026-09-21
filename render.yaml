@@ -9,12 +9,15 @@ services:
     region: singapore
     buildCommand: npm install --include=dev && npx prisma generate && npm run build
     startCommand: npx prisma db push --skip-generate && npm run start
-    healthCheckPath: /api/state
+    healthCheckPath: /login
     envVars:
       - key: DATABASE_URL
         fromDatabase:
           name: arfarmjaya-db
           property: connectionString
+      # Rahasia penanda-tangan sesi login (dibuat otomatis & tetap oleh Render).
+      - key: AUTH_SECRET
+        generateValue: true
       - key: NODE_VERSION
         value: "22"
       - key: NPM_CONFIG_PRODUCTION

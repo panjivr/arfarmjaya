@@ -23,6 +23,7 @@ import {
   Warehouse,
 } from "lucide-react";
 import { useUiStore } from "@/lib/store";
+import { roleHome } from "@/lib/rbac";
 
 const features = [
   { icon: Boxes, title: "Inventori Real-time", desc: "Stok, batch, rak, dan kedaluwarsa terpantau langsung dengan status otomatis." },
@@ -48,7 +49,7 @@ export default function LandingPage() {
   const user = useUiStore((s) => s.user);
   const theme = useUiStore((s) => s.theme);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
-  const target = user ? (user.role === "admin" ? "/dashboard" : "/transactions") : "/login";
+  const target = user ? roleHome(user.role) : "/login";
   const cta = user ? "Buka Aplikasi" : "Masuk ke Sistem";
 
   return (

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { currentSession } from "@/lib/session-server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -9,6 +10,9 @@ const WORKSPACE_ID = "main";
 
 // GET /api/state -> shared workspace data (or null if none yet / no DB)
 export async function GET() {
+  // Tanpa sesi → jangan bocorkan data (kembalikan null), tetap 200 agar health
+  // check tetap sehat. Data nyata hanya diberikan untuk pengguna yang login.
+  if (!(await currentSession())) return NextResponse.json({ data: null, auth: false });
   if (!prisma) return NextResponse.json({ data: null, db: false });
   try {
     const row = await prisma.workspace.findUnique({ where: { id: WORKSPACE_ID } });
@@ -21,6 +25,7 @@ export async function GET() {
 
 // PUT /api/state -> replace shared workspace data
 export async function PUT(request: Request) {
+  if (!(await currentSession())) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   if (!prisma) return NextResponse.json({ ok: false, db: false });
   try {
     const body = await request.json();

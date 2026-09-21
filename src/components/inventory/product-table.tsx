@@ -18,7 +18,7 @@ export function ProductTable({ compact = false }: { compact?: boolean }) {
   const categories = useUiStore((s) => s.categories);
   const addProduct = useUiStore((s) => s.addProduct);
   const deleteProduct = useUiStore((s) => s.deleteProduct);
-  const isAdmin = useUiStore((s) => s.user?.role === "admin");
+  const isAdmin = useUiStore((s) => s.user?.role === "ADMIN_UTAMA");
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");

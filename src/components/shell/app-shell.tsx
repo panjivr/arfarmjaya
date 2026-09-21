@@ -17,12 +17,16 @@ import {
   Settings2,
   ShieldCheck,
   Sun,
+  KeyRound,
+  Users as UsersIcon,
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { navigation, type NavItem } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/lib/store";
+import { canAccessPath, roleHome, ROLE_META } from "@/lib/rbac";
+import { PasswordModal } from "@/components/auth/password-modal";
 import { buildNotifications } from "@/lib/selectors";
 import { Button } from "@/components/ui/button";
 import { LoginScreen } from "@/components/auth/login-screen";
@@ -32,6 +36,7 @@ import { Toaster } from "@/components/ui/toast";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const theme = useUiStore((s) => s.theme);
   const user = useUiStore((s) => s.user);
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
@@ -41,6 +46,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const setCommandOpen = useUiStore((s) => s.setCommandOpen);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
   const logout = useUiStore((s) => s.logout);
+
+  async function handleLogout() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      /* abaikan — tetap keluar di sisi klien */
+    }
+    logout();
+    router.push("/login");
+  }
 
   useEffect(() => {
     const root = document.documentElement;
@@ -83,9 +98,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const visibleNavigation = navigation.filter((item) => user.role === "admin" || !item.adminOnly);
-  const homeHref = user.role === "admin" ? "/dashboard" : "/transactions";
-  const isRestricted = user.role !== "admin" && navigation.some((n) => n.href === pathname && n.adminOnly);
+  const isAdmin = user.role === "ADMIN_UTAMA";
+  const visibleNavigation = navigation.filter((item) => canAccessPath(user.role, item.href));
+  const homeHref = roleHome(user.role);
+  const isRestricted = !canAccessPath(user.role, pathname);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -152,8 +168,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Search className="h-5 w-5" />
             </Button>
 
-            <NotificationBell isAdmin={user.role === "admin"} />
-            <UserMenu name={user.name} label={user.label} isAdmin={user.role === "admin"} theme={theme} onToggleTheme={toggleTheme} onLogout={logout} />
+            <NotificationBell isAdmin={isAdmin} />
+            <UserMenu name={user.name} label={ROLE_META[user.role]?.workspace ?? user.label} isAdmin={isAdmin} theme={theme} onToggleTheme={toggleTheme} onLogout={handleLogout} />
           </div>
         </header>
         <main className="min-w-0 px-4 py-5 sm:px-6 sm:py-6 lg:px-8">{isRestricted ? <RestrictedAccess /> : children}</main>
@@ -186,6 +202,7 @@ function UserMenu({
   onLogout: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [pwOpen, setPwOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -250,6 +267,26 @@ function UserMenu({
               {theme === "dark" ? <Sun className="h-4 w-4 text-muted" /> : <Moon className="h-4 w-4 text-muted" />}
               Mode {theme === "dark" ? "terang" : "gelap"}
             </button>
+            <button
+              role="menuitem"
+              onClick={() => {
+                setPwOpen(true);
+                setOpen(false);
+              }}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-900"
+            >
+              <KeyRound className="h-4 w-4 text-muted" /> Ganti Password
+            </button>
+            {isAdmin && (
+              <Link
+                role="menuitem"
+                href="/users"
+                onClick={() => setOpen(false)}
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-sm hover:bg-slate-100 dark:hover:bg-slate-900"
+              >
+                <UsersIcon className="h-4 w-4 text-muted" /> Kelola Pengguna
+              </Link>
+            )}
             {isAdmin && (
               <Link
                 role="menuitem"
@@ -270,6 +307,7 @@ function UserMenu({
           </motion.div>
         )}
       </AnimatePresence>
+      <PasswordModal open={pwOpen} onClose={() => setPwOpen(false)} />
     </div>
   );
 }

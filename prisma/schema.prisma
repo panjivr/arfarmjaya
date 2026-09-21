@@ -15,3 +15,17 @@ model Workspace {
   data      Json
   updatedAt DateTime @updatedAt
 }
+
+// Akun pengguna untuk RBAC (auth server-side). Password disimpan sebagai hash
+// (scrypt), bukan plaintext. Akun lama tidak dihapus — nonaktifkan via `active`.
+model AppUser {
+  id           String    @id @default(cuid())
+  name         String
+  username     String    @unique
+  passwordHash String
+  role         String    @default("STAFF_LELE")
+  active       Boolean   @default(true)
+  permissions  String[]  @default([])
+  lastLogin    DateTime?
+  createdAt    DateTime  @default(now())
+}

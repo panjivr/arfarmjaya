@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeApplier } from "@/components/theme-applier";
 import { SyncProvider } from "@/components/sync-provider";
 import { PwaRegister } from "@/components/pwa-register";
+import { AuthProvider } from "@/components/auth/auth-provider";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -53,6 +54,7 @@ export default function RootLayout({
     <html lang="id" className={inter.variable} suppressHydrationWarning>
       <body>
         <ThemeApplier />
+        <AuthProvider />
         <SyncProvider />
         <PwaRegister />
         {children}

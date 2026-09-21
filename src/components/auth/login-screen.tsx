@@ -3,43 +3,47 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, LockKeyhole, ShieldCheck, UserRoundCheck } from "lucide-react";
+import { ArrowLeft, LockKeyhole } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useUiStore } from "@/lib/store";
-import { roleLabel } from "@/lib/store";
-import type { Role } from "@/lib/types";
+import { ROLE_META, roleHome, canAccessPath, type AppRole } from "@/lib/rbac";
 
 export function LoginScreen() {
-  const login = useUiStore((state) => state.login);
-  const audit = useUiStore((state) => state.audit);
+  const setUser = useUiStore((state) => state.setUser);
   const router = useRouter();
-  const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("admin123");
-  const [role, setRole] = useState<Role>("admin");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  function submitLogin(event: React.FormEvent<HTMLFormElement>) {
+  async function submitLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const validAdmin = role === "admin" && username === "admin" && password === "admin123";
-    const validStaff = role === "karyawan" && username === "karyawan" && password === "gudang123";
-
-    if (!validAdmin && !validStaff) {
-      setError("Username, password, atau role tidak sesuai.");
-      return;
+    setError("");
+    setBusy(true);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.ok || !json.user) {
+        setError(json?.message ?? "Gagal masuk. Periksa username dan password.");
+        return;
+      }
+      const role = json.user.role as AppRole;
+      setUser({ id: json.user.id, name: json.user.name, username: json.user.username, role, label: ROLE_META[role]?.workspace ?? "" });
+      const next = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("next") : null;
+      const dest = next && canAccessPath(role, next) ? next : roleHome(role);
+      router.push(dest);
+    } catch {
+      setError("Tidak dapat terhubung ke server. Coba lagi.");
+    } finally {
+      setBusy(false);
     }
-
-    login({
-      id: role,
-      name: role === "admin" ? "Admin Utama" : "Karyawan Gudang",
-      username,
-      role,
-      label: roleLabel[role],
-    });
-    audit("Login", "Autentikasi", `${username} masuk sebagai ${role}`);
-    router.push(role === "admin" ? "/dashboard" : "/transactions");
   }
 
   return (
@@ -53,20 +57,20 @@ export function LoginScreen() {
             </div>
             <div>
               <p className="text-xl font-bold">ARFARM BHINNEKA NUSA JAYA</p>
-              <p className="text-sm text-white/75">Sistem Manajemen Gudang</p>
+              <p className="text-sm text-white/75">Sistem Manajemen Operasional</p>
             </div>
           </div>
           <motion.div initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.5 }}>
             <h1 className="max-w-2xl text-5xl font-bold leading-tight">
-              Kontrol stok, barang keluar, pembelian, dan distribusi dalam satu sistem.
+              Satu sistem, banyak ruang kerja sesuai peran.
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-white/75">
-              Admin Utama memiliki akses penuh. Karyawan gudang hanya dapat mencatat barang keluar sesuai kebutuhan operasional.
+              Admin Utama mengelola seluruh perusahaan dan akun. Staff Lele, Gudang, dan Reporting masing-masing fokus pada ruang kerjanya. Akses dilindungi di sisi server.
             </p>
           </motion.div>
-          <div className="grid grid-cols-3 gap-3 text-sm">
-            {["RBAC", "Audit Log", "FIFO/FEFO"].map((item) => (
-              <div key={item} className="rounded-lg border border-white/20 bg-white/10 px-4 py-3 backdrop-blur">
+          <div className="grid grid-cols-4 gap-3 text-sm">
+            {["Admin", "Lele", "Gudang", "Reporting"].map((item) => (
+              <div key={item} className="rounded-lg border border-white/20 bg-white/10 px-3 py-3 text-center backdrop-blur">
                 {item}
               </div>
             ))}
@@ -83,7 +87,7 @@ export function LoginScreen() {
             <Image src="/logo.png" alt="Logo AR FARM JAYA" width={68} height={68} className="object-contain" priority />
             <div>
               <p className="text-lg font-bold">AR FARM JAYA</p>
-              <p className="text-sm text-muted">Sistem Manajemen Gudang</p>
+              <p className="text-sm text-muted">Sistem Manajemen Operasional</p>
             </div>
           </div>
           <Card>
@@ -94,7 +98,7 @@ export function LoginScreen() {
                 </div>
                 <h2 className="text-2xl font-bold tracking-tight">Masuk ke Sistem</h2>
                 <p className="mt-2 text-sm leading-6 text-muted">
-                  Pilih mode akses untuk masuk. Hak akses admin dan karyawan sudah dipisahkan untuk alur operasional gudang.
+                  Masukkan username dan password akun Anda. Sistem akan membuka ruang kerja sesuai peran.
                 </p>
               </div>
 
@@ -104,8 +108,10 @@ export function LoginScreen() {
                   <input
                     value={username}
                     onChange={(event) => setUsername(event.target.value)}
+                    autoComplete="username"
+                    autoFocus
                     className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-                    placeholder="admin atau karyawan"
+                    placeholder="mis. admin"
                   />
                 </label>
                 <label className="block">
@@ -114,73 +120,22 @@ export function LoginScreen() {
                     type="password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
+                    autoComplete="current-password"
                     className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
                     placeholder="Masukkan password"
                   />
                 </label>
-                <div>
-                  <span className="mb-2 block text-sm font-semibold">Hak Akses</span>
-                  <div className="grid gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRole("admin");
-                        setUsername("admin");
-                        setPassword("admin123");
-                      }}
-                      className={`rounded-lg border p-4 text-left transition ${
-                        role === "admin" ? "border-primary bg-leaf/10" : "border-border hover:border-primary hover:bg-leaf/10"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white">
-                          <ShieldCheck className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="font-semibold">Admin Utama</p>
-                          <p className="text-sm text-muted">Akses penuh ke seluruh menu dan laporan.</p>
-                        </div>
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRole("karyawan");
-                        setUsername("karyawan");
-                        setPassword("gudang123");
-                      }}
-                      className={`rounded-lg border p-4 text-left transition ${
-                        role === "karyawan" ? "border-primary bg-leaf/10" : "border-border hover:border-primary hover:bg-leaf/10"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-leaf text-white">
-                          <UserRoundCheck className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="font-semibold">Karyawan Gudang</p>
-                          <p className="text-sm text-muted">Hanya mencatat barang keluar dari gudang.</p>
-                        </div>
-                      </div>
-                    </button>
-                  </div>
-                </div>
 
                 {error && (
-                  <div className="rounded-lg border border-danger/20 bg-red-50 px-3 py-2 text-sm font-medium text-danger">
+                  <div className="rounded-lg border border-danger/20 bg-red-50 px-3 py-2 text-sm font-medium text-danger dark:bg-red-950/30">
                     {error}
                   </div>
                 )}
 
-                <div className="rounded-lg bg-slate-50 p-4 text-sm text-muted dark:bg-slate-900">
-                  Gunakan akun yang sudah diberikan untuk Admin Utama atau Karyawan Gudang.
-                </div>
-
-                <Button className="w-full" type="submit">
-                  Masuk ke Sistem
+                <Button className="w-full" type="submit" disabled={busy}>
+                  {busy ? "Memverifikasi…" : "Masuk ke Sistem"}
                 </Button>
               </form>
-
             </CardContent>
           </Card>
         </div>
