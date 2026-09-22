@@ -12,7 +12,7 @@ import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { toast } from "@/components/ui/toast";
 import { PondDetailModal } from "@/components/lele/pond-detail";
 import { useUiStore } from "@/lib/store";
-import { cycleMetrics } from "@/lib/lele";
+import { cycleMetrics, stockByPond } from "@/lib/lele";
 import { currency, formatDate, numberFmt } from "@/lib/utils";
 import type { FishCycle, Pond, PondType, PondKind } from "@/lib/types";
 
@@ -32,6 +32,9 @@ export default function KolamPage() {
   const removePond = useUiStore((s) => s.removePond);
   const startCycle = useUiStore((s) => s.startCycle);
   const addStandardPonds = useUiStore((s) => s.addStandardPonds);
+  const movements = useUiStore((s) => s.leleMovements);
+  const sales = useUiStore((s) => s.leleSales);
+  const stock = useMemo(() => stockByPond(movements, sales), [movements, sales]);
 
   const [pondModal, setPondModal] = useState(false);
   const [editingPond, setEditingPond] = useState<Pond | null>(null);
@@ -124,6 +127,7 @@ export default function KolamPage() {
           {[...ponds].sort((a, b) => a.code.localeCompare(b.code, "id", { numeric: true })).map((pond) => {
             const cycle = activeByPond.get(pond.id) ?? null;
             const metrics = cycle ? cycleMetrics(cycle, logs, harvests) : null;
+            const st = stock.get(pond.code);
             return (
               <Card key={pond.id}>
                 <CardContent>
@@ -151,8 +155,33 @@ export default function KolamPage() {
                       <p className="text-xs text-muted">Ditebar {formatDate(cycle.stockDate)} dari {cycle.source || "-"}</p>
                       <Button variant="secondary" className="mt-2 h-9 w-full" onClick={() => setDetail({ pond, cycle })}>Buka Detail &amp; Input</Button>
                     </div>
+                  ) : pond.kind === "tampungan" ? (
+                    <div className="mt-3 rounded-lg border border-border bg-background p-3 text-sm">
+                      <div className="flex items-center justify-between">
+                        <Badge className="bg-amber-50 text-amber-700 dark:bg-amber-950/40">Kolam Tampungan</Badge>
+                        <span className="text-[11px] text-muted">terisi dari panen</span>
+                      </div>
+                      {st ? (
+                        <>
+                          <p className="mt-2 text-lg font-bold text-primary">{numberFmt.format(st.totalKg)} kg</p>
+                          <p className="text-xs text-muted">
+                            {st.konsumsiKg > 0 && `Konsumsi ${numberFmt.format(st.konsumsiKg)} kg`}
+                            {st.konsumsiKg > 0 && st.brojolanKg > 0 && " · "}
+                            {st.brojolanKg > 0 && `Brojolan ${numberFmt.format(st.brojolanKg)} kg`}
+                            {st.ekor > 0 && ` · ${numberFmt.format(st.ekor)} ekor`}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="mt-2 text-xs text-muted">Belum ada isi. Pindahkan hasil panen (Konsumsi/Brojolan) ke sini.</p>
+                      )}
+                    </div>
                   ) : (
-                    <Button className="mt-3 w-full" onClick={() => openStock(pond.id)}><Sprout className="h-4 w-4" /> Tebar Benih</Button>
+                    <>
+                      <Button className="mt-3 w-full" onClick={() => openStock(pond.id)}><Sprout className="h-4 w-4" /> Tebar Benih</Button>
+                      {st && st.totalKg > 0 && (
+                        <p className="mt-2 text-center text-xs text-muted">Berisi {numberFmt.format(st.totalKg)} kg{st.brojolanKg > 0 ? ` · Brojolan ${numberFmt.format(st.brojolanKg)} kg` : ""}{st.konsumsiKg > 0 ? ` · Konsumsi ${numberFmt.format(st.konsumsiKg)} kg` : ""}</p>
+                      )}
+                    </>
                   )}
                 </CardContent>
               </Card>

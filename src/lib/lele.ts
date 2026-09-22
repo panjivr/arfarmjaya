@@ -187,3 +187,44 @@ export function readyToSellByPond(movements: LeleMovement[], sales: LeleSale[]):
   for (const [k, v] of map) { const r = Math.round(v * 10) / 10; if (Math.abs(r) < 0.05) map.delete(k); else map.set(k, r); }
   return map;
 }
+
+/** Isi stok per kolam dari pergerakan (panen/transfer masuk − keluar/jual),
+ *  dipecah per kategori Konsumsi & Brojolan. Kolam tampungan/tujuan otomatis
+ *  terisi dari ikan yang dipindah ke sana. */
+export type PondStock = { konsumsiKg: number; brojolanKg: number; totalKg: number; ekor: number };
+
+export function stockByPond(movements: LeleMovement[], sales: LeleSale[]): Map<string, PondStock> {
+  const map = new Map<string, PondStock>();
+  const get = (c: string) => {
+    let s = map.get(c);
+    if (!s) { s = { konsumsiKg: 0, brojolanKg: 0, totalKg: 0, ekor: 0 }; map.set(c, s); }
+    return s;
+  };
+  for (const m of movements) {
+    if (!m.pondCode) continue;
+    const kg = m.qtyKg ?? 0;
+    const ekor = m.qtyEkor ?? 0;
+    if (!kg && !ekor) continue;
+    const sign = IN_TYPES.has(m.type) ? 1 : OUT_TYPES.has(m.type) ? -1 : 0;
+    if (!sign) continue;
+    const s = get(m.pondCode);
+    s.totalKg += sign * kg;
+    s.ekor += sign * ekor;
+    if (m.kategori === "Konsumsi") s.konsumsiKg += sign * kg;
+    else if (m.kategori === "Brojolan") s.brojolanKg += sign * kg;
+  }
+  for (const sale of sales) {
+    if (!sale.pondCode || !sale.weightKg) continue;
+    const s = get(sale.pondCode);
+    s.totalKg -= sale.weightKg;
+    s.konsumsiKg -= sale.weightKg; // penjualan diasumsikan dari stok Konsumsi
+  }
+  for (const [k, s] of map) {
+    s.konsumsiKg = Math.round(s.konsumsiKg * 10) / 10;
+    s.brojolanKg = Math.round(s.brojolanKg * 10) / 10;
+    s.totalKg = Math.round(s.totalKg * 10) / 10;
+    s.ekor = Math.round(s.ekor);
+    if (Math.abs(s.totalKg) < 0.05 && Math.abs(s.ekor) < 1) map.delete(k);
+  }
+  return map;
+}

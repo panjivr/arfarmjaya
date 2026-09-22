@@ -890,6 +890,9 @@ export const useUiStore = create<State & Actions>()(
       startCycle: (data) => {
         const pond = get().ponds.find((p) => p.id === data.pondId);
         if (!pond) return { ok: false, message: "Kolam tidak ditemukan." };
+        if (pond.kind === "tampungan") {
+          return { ok: false, message: `Kolam ${pond.code} adalah tampungan (siap jual), bukan untuk tebar benih.` };
+        }
         if (get().fishCycles.some((c) => c.pondId === data.pondId && c.status === "Aktif")) {
           return { ok: false, message: "Kolam ini sedang ada siklus aktif." };
         }

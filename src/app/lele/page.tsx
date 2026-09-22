@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PondDetailModal } from "@/components/lele/pond-detail";
 import { useUiStore } from "@/lib/store";
-import { pondViews, leleSummary } from "@/lib/lele";
+import { pondViews, leleSummary, stockByPond } from "@/lib/lele";
 import { suggestFeed } from "@/lib/feed";
 import { cn, currency, numberFmt } from "@/lib/utils";
 import type { FishCycle, Pond } from "@/lib/types";
@@ -28,9 +28,12 @@ export default function LeleMonitoringPage() {
   const cycles = useUiStore((s) => s.fishCycles);
   const logs = useUiStore((s) => s.pondLogs);
   const harvests = useUiStore((s) => s.pondHarvests);
+  const movements = useUiStore((s) => s.leleMovements);
+  const sales = useUiStore((s) => s.leleSales);
 
   const views = useMemo(() => pondViews(ponds, cycles, logs, harvests), [ponds, cycles, logs, harvests]);
   const summary = useMemo(() => leleSummary(views, logs), [views, logs]);
+  const stock = useMemo(() => stockByPond(movements, sales), [movements, sales]);
 
   const [detail, setDetail] = useState<{ pond: Pond; cycle: FishCycle | null } | null>(null);
 
@@ -69,6 +72,7 @@ export default function LeleMonitoringPage() {
           {views.map(({ pond, activeCycle, metrics, status }) => {
             const progress = metrics ? Math.min(100, Math.round((metrics.ageDays / TARGET_DAYS) * 100)) : 0;
             const feed = suggestFeed(metrics?.ageDays ?? 0);
+            const st = stock.get(pond.code);
             return (
               <button
                 key={pond.id}
@@ -95,7 +99,7 @@ export default function LeleMonitoringPage() {
                       <p className="truncate text-xs text-muted">{pond.name || pond.type}</p>
                     </div>
                   </div>
-                  <Badge className={statusStyle[status]}>{status}</Badge>
+                  <Badge className={pond.kind === "tampungan" ? "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300" : statusStyle[status]}>{pond.kind === "tampungan" ? "Tampungan" : status}</Badge>
                 </div>
 
                 {activeCycle && metrics ? (
@@ -133,6 +137,22 @@ export default function LeleMonitoringPage() {
                       {metrics.revenueRp > 0 && <span className="inline-flex items-center gap-1.5 font-medium text-primary"><TrendingUp className="h-3.5 w-3.5" /> {currency.format(metrics.revenueRp)}</span>}
                     </div>
                   </>
+                ) : pond.kind === "tampungan" ? (
+                  <div className="mt-4 flex flex-1 flex-col justify-center rounded-xl border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Kolam Tampungan · siap jual</span>
+                    {st ? (
+                      <>
+                        <span className="mt-1 text-xl font-bold text-primary">{numberFmt.format(st.totalKg)} kg</span>
+                        <span className="text-xs text-muted">
+                          {st.konsumsiKg > 0 && `Konsumsi ${numberFmt.format(st.konsumsiKg)} kg`}
+                          {st.konsumsiKg > 0 && st.brojolanKg > 0 && " · "}
+                          {st.brojolanKg > 0 && `Brojolan ${numberFmt.format(st.brojolanKg)} kg`}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="mt-1 text-xs text-muted">Belum ada isi. Pindahkan hasil panen ke sini.</span>
+                    )}
+                  </div>
                 ) : (
                   <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border-strong py-6 text-center">
                     <span className="grid h-9 w-9 place-items-center rounded-full bg-primary/10 text-primary">
@@ -140,6 +160,7 @@ export default function LeleMonitoringPage() {
                     </span>
                     <span className="text-sm font-semibold text-primary">Tebar benih</span>
                     <span className="text-xs text-muted">Kolam siap dipakai</span>
+                    {st && st.totalKg > 0 && <span className="text-[11px] text-muted">berisi {numberFmt.format(st.totalKg)} kg</span>}
                   </div>
                 )}
               </button>
