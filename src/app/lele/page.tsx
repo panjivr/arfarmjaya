@@ -8,6 +8,7 @@ import { PageHeader, StatCard, EmptyState } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PondDetailModal } from "@/components/lele/pond-detail";
+import { TampunganDetailModal } from "@/components/lele/tampungan-detail";
 import { useUiStore } from "@/lib/store";
 import { pondViews, leleSummary, stockByPond } from "@/lib/lele";
 import { suggestFeed } from "@/lib/feed";
@@ -36,6 +37,7 @@ export default function LeleMonitoringPage() {
   const stock = useMemo(() => stockByPond(movements, sales), [movements, sales]);
 
   const [detail, setDetail] = useState<{ pond: Pond; cycle: FishCycle | null } | null>(null);
+  const [tampungan, setTampungan] = useState<Pond | null>(null);
 
   return (
     <AppShell>
@@ -76,7 +78,7 @@ export default function LeleMonitoringPage() {
             return (
               <button
                 key={pond.id}
-                onClick={() => setDetail({ pond, cycle: activeCycle })}
+                onClick={() => (pond.kind === "tampungan" ? setTampungan(pond) : setDetail({ pond, cycle: activeCycle }))}
                 className={cn(
                   "group hover-lift flex min-w-0 flex-col rounded-2xl p-4 text-left",
                   activeCycle
@@ -170,6 +172,7 @@ export default function LeleMonitoringPage() {
       )}
 
       {detail && <PondDetailModal pond={detail.pond} cycle={detail.cycle} onClose={() => setDetail(null)} />}
+      {tampungan && <TampunganDetailModal pond={tampungan} onClose={() => setTampungan(null)} />}
     </AppShell>
   );
 }

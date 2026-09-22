@@ -11,6 +11,7 @@ import { Modal } from "@/components/ui/modal";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { toast } from "@/components/ui/toast";
 import { PondDetailModal } from "@/components/lele/pond-detail";
+import { TampunganDetailModal } from "@/components/lele/tampungan-detail";
 import { useUiStore } from "@/lib/store";
 import { cycleMetrics, stockByPond } from "@/lib/lele";
 import { currency, formatDate, numberFmt } from "@/lib/utils";
@@ -44,6 +45,7 @@ export default function KolamPage() {
   const [stockForm, setStockForm] = useState(emptyStock);
 
   const [detail, setDetail] = useState<{ pond: Pond; cycle: FishCycle | null } | null>(null);
+  const [tampungan, setTampungan] = useState<Pond | null>(null);
 
   const activeByPond = useMemo(() => {
     const map = new Map<string, FishCycle>();
@@ -174,6 +176,7 @@ export default function KolamPage() {
                       ) : (
                         <p className="mt-2 text-xs text-muted">Belum ada isi. Pindahkan hasil panen (Konsumsi/Brojolan) ke sini.</p>
                       )}
+                      <Button variant="secondary" className="mt-2 h-9 w-full" onClick={() => setTampungan(pond)}>Buka Detail &amp; Jual</Button>
                     </div>
                   ) : (
                     <>
@@ -276,6 +279,7 @@ export default function KolamPage() {
       </Modal>
 
       {detail && <PondDetailModal pond={detail.pond} cycle={detail.cycle} onClose={() => setDetail(null)} />}
+      {tampungan && <TampunganDetailModal pond={tampungan} onClose={() => setTampungan(null)} />}
     </AppShell>
   );
 }
