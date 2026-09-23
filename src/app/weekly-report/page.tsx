@@ -506,7 +506,7 @@ export default function WeeklyReportPage() {
       <div className="no-print mt-6">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-bold">Laporan Tersimpan</h2>
-          {reports.length > 1 && (
+          {reports.length > 0 && (
             <label className="flex items-center gap-2 text-sm">
               <span className="text-muted">Urutkan:</span>
               <Select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className="h-9 w-auto">
