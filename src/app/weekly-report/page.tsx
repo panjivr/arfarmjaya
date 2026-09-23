@@ -35,6 +35,8 @@ import { useUiStore } from "@/lib/store";
 import { compressImage, currency, exportCsv, formatDate, formatDateTime, printDocument } from "@/lib/utils";
 import type { ReportProfile, WeeklyActivity, WeeklyReport } from "@/lib/types";
 
+type SortMode = "" | "date-asc" | "date-desc" | "alpha" | "amount-desc" | "amount-asc";
+
 const today = () => new Date().toISOString().slice(0, 10);
 const uid = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
 
@@ -126,6 +128,26 @@ export default function WeeklyReportPage() {
   const [printedAt, setPrintedAt] = useState<string | undefined>(undefined);
   const [numberSeed, setNumberSeed] = useState("");
   const [sortBy, setSortBy] = useState<"updated" | "date" | "executor" | "amount-desc" | "amount-asc">("updated");
+
+  // Mengurutkan daftar kegiatan. Urutannya benar-benar diubah (bukan tampilan
+  // saja) supaya penomoran & pratinjau cetak ikut mengikuti. Tekan Simpan untuk
+  // menyimpan urutan baru; tombol panah tetap bisa dipakai menata manual.
+  function sortActivities(mode: SortMode) {
+    if (!mode) return;
+    setActivities((prev) => {
+      const next = [...prev];
+      const amount = (a: WeeklyActivity) => Number(a.amount) || 0;
+      switch (mode) {
+        case "date-asc": next.sort((a, b) => (a.date || "").localeCompare(b.date || "")); break;
+        case "date-desc": next.sort((a, b) => (b.date || "").localeCompare(a.date || "")); break;
+        case "alpha": next.sort((a, b) => a.activity.localeCompare(b.activity, "id", { sensitivity: "base" })); break;
+        case "amount-desc": next.sort((a, b) => amount(b) - amount(a)); break;
+        case "amount-asc": next.sort((a, b) => amount(a) - amount(b)); break;
+      }
+      return next;
+    });
+    toast.success("Kegiatan diurutkan. Tekan Simpan untuk menyimpan urutannya.");
+  }
 
   const sortedReports = useMemo(() => {
     const arr = [...reports];
@@ -398,7 +420,22 @@ export default function WeeklyReportPage() {
           <Card>
             <CardHeader className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-semibold">Kegiatan ({activities.length})</h2>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {activities.length > 1 && (
+                  <Select
+                    aria-label="Urutkan kegiatan"
+                    className="h-8 w-auto text-xs"
+                    value=""
+                    onChange={(e) => { sortActivities(e.target.value as SortMode); e.currentTarget.selectedIndex = 0; }}
+                  >
+                    <option value="">Urutkan…</option>
+                    <option value="date-asc">Tanggal (terlama dulu)</option>
+                    <option value="date-desc">Tanggal (terbaru dulu)</option>
+                    <option value="alpha">Abjad kegiatan (A–Z)</option>
+                    <option value="amount-desc">Nominal tertinggi</option>
+                    <option value="amount-asc">Nominal terendah</option>
+                  </Select>
+                )}
                 {activities.length === 0 && (
                   <Button variant="ghost" className="h-8" onClick={() => setActivities([sampleActivity()])}>
                     Isi Contoh
