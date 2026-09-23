@@ -118,6 +118,43 @@ export const useSyncStatus = create<SyncStatusState>((set) => ({
   setStatus: (patch) => set(patch),
 }));
 
+/**
+ * Dorong seluruh data ke server SEKARANG dan laporkan hasilnya. Dipakai setelah
+ * memulihkan cadangan agar data langsung tersimpan di server — bukan menunggu
+ * sinkron otomatis — dan pengguna tahu pasti berhasil atau tidak.
+ */
+export async function syncNow(): Promise<{ ok: boolean; message?: string }> {
+  const data = snapshot(useUiStore.getState() as unknown as Record<string, unknown>);
+  const serialized = JSON.stringify(data);
+  const sizeMb = (serialized.length / 1_048_576).toFixed(1);
+  const setStatus = useSyncStatus.getState().setStatus;
+  setStatus({ status: "saving", message: undefined });
+  try {
+    const res = await fetch("/api/state", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: serialized,
+    });
+    const json = await res.json().catch(() => ({}));
+    if (json?.ok) {
+      writeMeta({ syncedAt: json?.updatedAt ?? undefined, sig: sig(serialized) });
+      setStatus({ status: "saved", at: new Date().toISOString(), serverUpdatedAt: json?.updatedAt ?? undefined, message: undefined });
+      return { ok: true };
+    }
+    const message = res.status === 401
+      ? "Sesi login berakhir — masuk ulang lalu ulangi."
+      : json?.db === false
+        ? "Database server tidak aktif."
+        : `Server menolak simpan (HTTP ${res.status}, ukuran ${sizeMb} MB).`;
+    setStatus({ status: "error", at: new Date().toISOString(), message });
+    return { ok: false, message };
+  } catch {
+    const message = `Tidak terhubung ke server (ukuran data ${sizeMb} MB).`;
+    setStatus({ status: "error", at: new Date().toISOString(), message });
+    return { ok: false, message };
+  }
+}
+
 export function SyncProvider() {
   const hasHydrated = useUiStore((s) => s.hasHydrated);
   // Sinkronisasi hanya berjalan untuk pengguna yang sudah login — /api/state

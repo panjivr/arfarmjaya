@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { toast } from "@/components/ui/toast";
 import { useUiStore } from "@/lib/store";
-import { useSyncStatus, readLocalBackup } from "@/components/sync-provider";
+import { useSyncStatus, readLocalBackup, syncNow } from "@/components/sync-provider";
 import { formatDateTime } from "@/lib/utils";
 import { APP_BUILD } from "@/lib/build-info";
 import type { AppSettings } from "@/lib/types";
@@ -24,7 +24,7 @@ export default function SettingsPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const sync = useSyncStatus();
 
-  function restoreLocalBackup() {
+  async function restoreLocalBackup() {
     const backup = readLocalBackup();
     if (!backup) return toast.error("Tidak ada cadangan lokal di perangkat ini.");
     if (!confirm(`Pulihkan data lokal dari ${formatDateTime(backup.at)}? Data saat ini akan diganti.`)) return;
@@ -32,6 +32,9 @@ export default function SettingsPage() {
     if (!res.ok) return toast.error(res.message ?? "Gagal memulihkan.");
     setForm(useUiStore.getState().settings);
     toast.success("Data lokal dipulihkan.");
+    const sent = await syncNow();
+    if (sent.ok) toast.success("Data tersimpan ke server.");
+    else toast.error(`Dipulihkan di perangkat ini, TAPI gagal simpan ke server: ${sent.message}`);
   }
 
   const [form, setForm] = useState<AppSettings>(settings);
@@ -52,11 +55,15 @@ export default function SettingsPage() {
     if (!file) return;
     if (!confirm("Pulihkan data dari berkas ini? Data saat ini akan diganti.")) return;
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const res = importBackup(String(reader.result));
       if (!res.ok) return toast.error(res.message ?? "Gagal memulihkan.");
       setForm(useUiStore.getState().settings);
       toast.success(res.message ?? "Data dipulihkan.");
+      // Langsung simpan ke server supaya tidak hilang.
+      const sent = await syncNow();
+      if (sent.ok) toast.success("Data tersimpan ke server.");
+      else toast.error(`Dipulihkan di perangkat ini, TAPI gagal simpan ke server: ${sent.message}`);
     };
     reader.readAsText(file);
   }
