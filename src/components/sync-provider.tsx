@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
+import { create } from "zustand";
 import { useUiStore } from "@/lib/store";
+import { decideSync } from "@/lib/sync-decide";
 
 // Keys that represent shared business data (synced to the server).
 // Per-device/session state (theme, user, sidebar, etc.) is intentionally excluded.
@@ -83,6 +85,39 @@ function writeMeta(meta: Meta) {
   try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch { /* ignore */ }
 }
 
+// Cadangan data lokal sebelum ditimpa data server — jaring pengaman agar tidak
+// ada perubahan yang hilang diam-diam. Bisa dipulihkan dari Pengaturan.
+const LOCAL_BACKUP_KEY = "arfarmjaya-local-backup";
+function stashLocalBackup(serialized: string) {
+  try {
+    localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify({ at: new Date().toISOString(), data: JSON.parse(serialized) }));
+  } catch { /* kuota penuh — abaikan */ }
+}
+export function readLocalBackup(): { at: string; data: Record<string, unknown> } | null {
+  try {
+    const raw = localStorage.getItem(LOCAL_BACKUP_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed?.data ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+// Status sinkronisasi yang bisa ditampilkan di UI, supaya kegagalan menyimpan
+// ke server terlihat jelas (bukan gagal diam-diam).
+export type SyncStatusValue = "idle" | "saving" | "saved" | "error";
+type SyncStatusState = {
+  status: SyncStatusValue;
+  at?: string;
+  message?: string;
+  serverUpdatedAt?: string;
+  setStatus: (patch: Partial<Omit<SyncStatusState, "setStatus">>) => void;
+};
+export const useSyncStatus = create<SyncStatusState>((set) => ({
+  status: "idle",
+  setStatus: (patch) => set(patch),
+}));
+
 export function SyncProvider() {
   const hasHydrated = useUiStore((s) => s.hasHydrated);
   // Sinkronisasi hanya berjalan untuk pengguna yang sudah login — /api/state
@@ -98,8 +133,12 @@ export function SyncProvider() {
     const snap = () => snapshot(useUiStore.getState() as unknown as Record<string, unknown>);
     const baseline = JSON.stringify(snap());
 
+    const setStatus = useSyncStatus.getState().setStatus;
+
     async function push(data: Snapshot) {
       const serialized = JSON.stringify(data);
+      const sizeMb = (serialized.length / 1_048_576).toFixed(1);
+      setStatus({ status: "saving", message: undefined });
       try {
         const res = await fetch("/api/state", {
           method: "PUT",
@@ -110,9 +149,18 @@ export function SyncProvider() {
         if (json?.ok) {
           lastSent = serialized;
           writeMeta({ syncedAt: json?.updatedAt ?? undefined, sig: sig(serialized) });
+          setStatus({ status: "saved", at: new Date().toISOString(), serverUpdatedAt: json?.updatedAt ?? undefined, message: undefined });
+          return;
         }
+        // Server menolak/gagal menulis — beri tahu, jangan gagal diam-diam.
+        const reason = res.status === 401
+          ? "Sesi login berakhir — masuk ulang agar data tersimpan."
+          : json?.db === false
+            ? "Database server tidak aktif."
+            : `Server menolak simpan (HTTP ${res.status}, ukuran ${sizeMb} MB).`;
+        setStatus({ status: "error", at: new Date().toISOString(), message: reason });
       } catch {
-        /* offline — browser cache keeps the data; retried on next change */
+        setStatus({ status: "error", at: new Date().toISOString(), message: `Tidak terhubung ke server (ukuran data ${sizeMb} MB).` });
       }
     }
 
@@ -151,44 +199,35 @@ export function SyncProvider() {
       if (cancelled) return;
 
       const localStr = JSON.stringify(snap());
-
-      // Perubahan lokal yang dibuat saat memuat → menang.
-      if (localStr !== baseline) {
-        await push(snap());
-        return;
-      }
-
-      // Belum ada data server → jadikan perangkat ini sumber awal.
-      if (!serverData) {
-        await push(snap());
-        return;
-      }
-
       const meta = readMeta();
-      const neverSynced = !meta.syncedAt;
-      if (neverSynced) {
-        // Sinkron pertama: perangkat dengan data lebih banyak yang menang.
-        if (weight(snap()) > weight(serverData)) { await push(snap()); return; }
-        useUiStore.setState(serverData as never);
-        lastSent = JSON.stringify(snap());
-        writeMeta({ syncedAt: serverUpdatedAt ?? undefined, sig: sig(lastSent) });
-        return;
-      }
 
-      // Sudah pernah sinkron. Bila isi lokal BERUBAH sejak sinkron terakhir
-      // (mis. baru simpan laporan/foto tapi belum sempat terkirim) → dorong
-      // lokal, JANGAN timpa dengan data server yang lebih lama. Inilah yang
-      // dulu membuat hasil edit "hilang" saat refresh.
-      if (meta.sig && sig(localStr) !== meta.sig) {
+      const decision = decideSync({
+        localStr,
+        baseline,
+        hasServerData: Boolean(serverData),
+        serverUpdatedAt,
+        metaSyncedAt: meta.syncedAt,
+        metaSig: meta.sig,
+        localSig: sig(localStr),
+        localWeight: weight(snap()),
+        serverWeight: weight(serverData),
+      });
+
+      if (decision === "push-local") {
         await push(snap());
         return;
       }
 
-      // Lokal sama dengan yang terakhir tersinkron → adopsi server (mungkin ada
-      // perubahan dari perangkat lain).
+      // Server menang (sumber kebenaran bersama). Sebelum menimpa, simpan
+      // cadangan data lokal supaya tidak ada yang hilang diam-diam — bisa
+      // dipulihkan lewat Pengaturan → Pulihkan Data Lokal.
+      if (serverData && localStr !== JSON.stringify(serverData)) {
+        stashLocalBackup(localStr);
+      }
       useUiStore.setState(serverData as never);
       lastSent = JSON.stringify(snap());
       writeMeta({ syncedAt: serverUpdatedAt ?? undefined, sig: sig(lastSent) });
+      setStatus({ status: "saved", at: new Date().toISOString(), serverUpdatedAt: serverUpdatedAt ?? undefined });
     })();
 
     return () => {

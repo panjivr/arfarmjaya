@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { toast } from "@/components/ui/toast";
 import { useUiStore } from "@/lib/store";
+import { useSyncStatus, readLocalBackup } from "@/components/sync-provider";
+import { formatDateTime } from "@/lib/utils";
+import { APP_BUILD } from "@/lib/build-info";
 import type { AppSettings } from "@/lib/types";
 
 export default function SettingsPage() {
@@ -19,6 +22,17 @@ export default function SettingsPage() {
   const exportBackup = useUiStore((s) => s.exportBackup);
   const importBackup = useUiStore((s) => s.importBackup);
   const fileRef = useRef<HTMLInputElement>(null);
+  const sync = useSyncStatus();
+
+  function restoreLocalBackup() {
+    const backup = readLocalBackup();
+    if (!backup) return toast.error("Tidak ada cadangan lokal di perangkat ini.");
+    if (!confirm(`Pulihkan data lokal dari ${formatDateTime(backup.at)}? Data saat ini akan diganti.`)) return;
+    const res = importBackup(JSON.stringify(backup.data));
+    if (!res.ok) return toast.error(res.message ?? "Gagal memulihkan.");
+    setForm(useUiStore.getState().settings);
+    toast.success("Data lokal dipulihkan.");
+  }
 
   const [form, setForm] = useState<AppSettings>(settings);
 
@@ -161,7 +175,32 @@ export default function SettingsPage() {
               </div>
               <div className="flex justify-between gap-3">
                 <span className="text-muted">Penyimpanan</span>
-                <span className="font-medium">Lokal (browser)</span>
+                <span className="font-medium">Server + cache browser</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted">Versi build</span>
+                <span className="font-medium">{APP_BUILD}</span>
+              </div>
+              <div className="border-t border-border pt-2">
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted">Sinkronisasi</span>
+                  <span
+                    className={
+                      sync.status === "error" ? "font-semibold text-danger"
+                      : sync.status === "saved" ? "font-semibold text-primary"
+                      : "font-medium"
+                    }
+                  >
+                    {sync.status === "saving" ? "Menyimpan…"
+                      : sync.status === "saved" ? "Tersimpan ke server"
+                      : sync.status === "error" ? "GAGAL menyimpan"
+                      : "Menunggu perubahan"}
+                  </span>
+                </div>
+                {sync.at && <p className="mt-1 text-right text-xs text-muted">{formatDateTime(sync.at)}</p>}
+                {sync.message && (
+                  <p className="mt-1 rounded-lg bg-red-50 px-2 py-1.5 text-xs font-medium text-danger dark:bg-red-950/30">{sync.message}</p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -177,7 +216,8 @@ export default function SettingsPage() {
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button variant="secondary" onClick={downloadBackup}><Download className="h-4 w-4" /> Unduh Cadangan</Button>
-                <Button variant="secondary" onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4" /> Pulihkan</Button>
+                <Button variant="secondary" onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4" /> Pulihkan dari Berkas</Button>
+                <Button variant="secondary" onClick={restoreLocalBackup}><Upload className="h-4 w-4" /> Pulihkan Data Lokal</Button>
                 <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={onRestoreFile} />
               </div>
             </CardContent>
