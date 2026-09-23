@@ -114,12 +114,15 @@ export function fitPrintZoom(
   return zoom >= (options.min ?? 0.75) ? Number(zoom.toFixed(3)) : 1;
 }
 
-const IMAGE_MAX_SIDE = 900;
-const IMAGE_QUALITY = 0.72;
+const IMAGE_MAX_SIDE = 720;
+// Target ukuran data URL per foto (~70 KB biner). Foto disimpan di dalam data
+// yang tersinkron, jadi harus kecil agar tidak melebihi kuota localStorage /
+// batas kiriman server (penyebab data laporan "hilang" saat refresh).
+const IMAGE_TARGET_LEN = 96_000;
 
 /**
- * Kecilkan foto sebelum disimpan agar data laporan tetap muat di localStorage.
- * Mengembalikan data URL JPEG; gambar kecil dikembalikan apa adanya.
+ * Kecilkan foto sebelum disimpan agar data laporan tetap muat & tersimpan.
+ * Menurunkan resolusi lalu kualitas JPEG secara bertahap sampai di bawah target.
  */
 export function compressImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -130,17 +133,34 @@ export function compressImage(file: File): Promise<string> {
       const image = new window.Image();
       image.onerror = () => reject(new Error("Berkas bukan gambar yang valid."));
       image.onload = () => {
-        const scale = Math.min(1, IMAGE_MAX_SIDE / Math.max(image.width, image.height));
-        if (scale === 1 && source.length < 120_000) return resolve(source);
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.round(image.width * scale));
-        canvas.height = Math.max(1, Math.round(image.height * scale));
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return resolve(source);
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", IMAGE_QUALITY));
+        const baseScale = Math.min(1, IMAGE_MAX_SIDE / Math.max(image.width, image.height));
+        const encode = (extra: number, quality: number): string | null => {
+          const w = Math.max(1, Math.round(image.width * baseScale * extra));
+          const h = Math.max(1, Math.round(image.height * baseScale * extra));
+          const canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return null;
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(image, 0, 0, w, h);
+          return canvas.toDataURL("image/jpeg", quality);
+        };
+        // Sudah kecil → pakai apa adanya.
+        if (baseScale === 1 && source.length < IMAGE_TARGET_LEN) return resolve(source);
+        let out = encode(1, 0.62);
+        if (!out) return resolve(source);
+        // Turunkan kualitas lalu resolusi sampai muat target.
+        for (const q of [0.55, 0.48, 0.42]) {
+          if (out.length <= IMAGE_TARGET_LEN) break;
+          out = encode(1, q) ?? out;
+        }
+        for (const extra of [0.8, 0.65, 0.5]) {
+          if (out.length <= IMAGE_TARGET_LEN) break;
+          out = encode(extra, 0.5) ?? out;
+        }
+        resolve(out);
       };
       image.src = source;
     };

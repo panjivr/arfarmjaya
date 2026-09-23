@@ -60,20 +60,27 @@ function weight(data: Snapshot | null): number {
   return arrays.reduce((sum, k) => sum + (Array.isArray(data[k]) ? (data[k] as unknown[]).length : 0), 0);
 }
 
-const META_KEY = "arfarmjaya-sync-meta";
-function readSyncedAt(): string {
-  try {
-    return JSON.parse(localStorage.getItem(META_KEY) || "{}").syncedAt || "";
-  } catch {
-    return "";
+// Hash cepat (cyrb53) untuk menandai isi snapshot terakhir yang sudah sinkron.
+function sig(str: string): string {
+  let h1 = 0xdeadbeef ^ str.length;
+  let h2 = 0x41c6ce57 ^ str.length;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
   }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
 }
-function writeSyncedAt(value?: string | null) {
-  try {
-    if (value) localStorage.setItem(META_KEY, JSON.stringify({ syncedAt: value }));
-  } catch {
-    /* ignore */
-  }
+
+const META_KEY = "arfarmjaya-sync-meta";
+type Meta = { syncedAt?: string; sig?: string };
+function readMeta(): Meta {
+  try { return JSON.parse(localStorage.getItem(META_KEY) || "{}") as Meta; } catch { return {}; }
+}
+function writeMeta(meta: Meta) {
+  try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch { /* ignore */ }
 }
 
 export function SyncProvider() {
@@ -102,7 +109,7 @@ export function SyncProvider() {
         const json = await res.json().catch(() => ({}));
         if (json?.ok) {
           lastSent = serialized;
-          writeSyncedAt(json?.updatedAt);
+          writeMeta({ syncedAt: json?.updatedAt ?? undefined, sig: sig(serialized) });
         }
       } catch {
         /* offline — browser cache keeps the data; retried on next change */
@@ -116,8 +123,20 @@ export function SyncProvider() {
       const serialized = JSON.stringify(data);
       if (serialized === lastSent) return;
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => push(data), 800);
+      timer = setTimeout(() => push(data), 700);
     });
+
+    // Saat halaman disembunyikan/ditutup, kirim perubahan yang belum sempat
+    // tersinkron (best-effort) supaya tidak hilang saat refresh cepat.
+    const flush = () => {
+      const serialized = JSON.stringify(snap());
+      if (serialized === lastSent) return;
+      if (timer) { clearTimeout(timer); timer = null; }
+      push(snap());
+    };
+    const onHide = () => { if (document.visibilityState === "hidden") flush(); };
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", flush);
 
     (async () => {
       let serverData: Snapshot | null = null;
@@ -131,38 +150,53 @@ export function SyncProvider() {
       }
       if (cancelled) return;
 
-      // If the user already changed something while we were loading, their
-      // change wins — never overwrite it with server data.
-      if (JSON.stringify(snap()) !== baseline) {
+      const localStr = JSON.stringify(snap());
+
+      // Perubahan lokal yang dibuat saat memuat → menang.
+      if (localStr !== baseline) {
         await push(snap());
         return;
       }
 
-      // No shared data yet → seed the server from this device.
+      // Belum ada data server → jadikan perangkat ini sumber awal.
       if (!serverData) {
         await push(snap());
         return;
       }
 
-      // First time this device syncs AND it holds more records than the server
-      // → push local so an existing dataset is migrated up, not lost.
-      const neverSynced = !readSyncedAt();
-      if (neverSynced && weight(snap()) > weight(serverData)) {
+      const meta = readMeta();
+      const neverSynced = !meta.syncedAt;
+      if (neverSynced) {
+        // Sinkron pertama: perangkat dengan data lebih banyak yang menang.
+        if (weight(snap()) > weight(serverData)) { await push(snap()); return; }
+        useUiStore.setState(serverData as never);
+        lastSent = JSON.stringify(snap());
+        writeMeta({ syncedAt: serverUpdatedAt ?? undefined, sig: sig(lastSent) });
+        return;
+      }
+
+      // Sudah pernah sinkron. Bila isi lokal BERUBAH sejak sinkron terakhir
+      // (mis. baru simpan laporan/foto tapi belum sempat terkirim) → dorong
+      // lokal, JANGAN timpa dengan data server yang lebih lama. Inilah yang
+      // dulu membuat hasil edit "hilang" saat refresh.
+      if (meta.sig && sig(localStr) !== meta.sig) {
         await push(snap());
         return;
       }
 
-      // Otherwise the server is the shared source of truth: adopt it so every
-      // device shows the same data.
+      // Lokal sama dengan yang terakhir tersinkron → adopsi server (mungkin ada
+      // perubahan dari perangkat lain).
       useUiStore.setState(serverData as never);
       lastSent = JSON.stringify(snap());
-      writeSyncedAt(serverUpdatedAt);
+      writeMeta({ syncedAt: serverUpdatedAt ?? undefined, sig: sig(lastSent) });
     })();
 
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
       unsubscribe();
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", flush);
     };
   }, [hasHydrated, userId]);
 

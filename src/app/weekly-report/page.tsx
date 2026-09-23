@@ -125,6 +125,19 @@ export default function WeeklyReportPage() {
   const [printTarget, setPrintTarget] = useState<{ profile: ReportProfile; data: WeeklyReportData } | null>(null);
   const [printedAt, setPrintedAt] = useState<string | undefined>(undefined);
   const [numberSeed, setNumberSeed] = useState("");
+  const [sortBy, setSortBy] = useState<"updated" | "date" | "executor" | "amount-desc" | "amount-asc">("updated");
+
+  const sortedReports = useMemo(() => {
+    const arr = [...reports];
+    const dateKey = (r: WeeklyReport) => r.signDate || r.periodStart || r.createdAt.slice(0, 10);
+    switch (sortBy) {
+      case "date": return arr.sort((a, b) => dateKey(b).localeCompare(dateKey(a)));
+      case "executor": return arr.sort((a, b) => a.executor.localeCompare(b.executor, "id", { sensitivity: "base" }));
+      case "amount-desc": return arr.sort((a, b) => b.total - a.total);
+      case "amount-asc": return arr.sort((a, b) => a.total - b.total);
+      default: return arr.sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+    }
+  }, [reports, sortBy]);
   const [mounted, setMounted] = useState(false);
 
   // Tanggal dihitung setelah mount agar hasil render awal cocok dengan HTML statis.
@@ -491,12 +504,26 @@ export default function WeeklyReportPage() {
 
       {/* Laporan tersimpan */}
       <div className="no-print mt-6">
-        <h2 className="mb-3 text-lg font-bold">Laporan Tersimpan</h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-bold">Laporan Tersimpan</h2>
+          {reports.length > 1 && (
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-muted">Urutkan:</span>
+              <Select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className="h-9 w-auto">
+                <option value="updated">Waktu diperbarui (terbaru)</option>
+                <option value="date">Tanggal laporan (terbaru)</option>
+                <option value="executor">Abjad pelaksana (A–Z)</option>
+                <option value="amount-desc">Nominal tertinggi</option>
+                <option value="amount-asc">Nominal terendah</option>
+              </Select>
+            </label>
+          )}
+        </div>
         {reports.length === 0 ? (
           <EmptyState icon={Calendar} title="Belum ada laporan tersimpan" description="Laporan yang disimpan akan muncul di sini dan bisa dibuka ulang, diduplikasi, atau dicetak." />
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {reports.map((report) => {
+            {sortedReports.map((report) => {
               const reportProfile = profiles.find((p) => p.id === report.profileId) ?? profile;
               return (
                 <Card key={report.id}>

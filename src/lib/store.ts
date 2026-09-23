@@ -1,7 +1,21 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
+
+// Penyimpanan lokal yang tahan-error: bila kuota localStorage penuh (mis. foto
+// besar), penulisan dilewati tanpa melempar error — data tetap aman di server.
+const safeStorage = {
+  getItem: (name: string) => {
+    try { return localStorage.getItem(name); } catch { return null; }
+  },
+  setItem: (name: string, value: string) => {
+    try { localStorage.setItem(name, value); } catch { /* kuota penuh — abaikan, server yang menyimpan */ }
+  },
+  removeItem: (name: string) => {
+    try { localStorage.removeItem(name); } catch { /* abaikan */ }
+  },
+};
 import type { Product } from "@/lib/data";
 import { realStockProducts } from "@/lib/stock-products";
 import type {
@@ -1202,6 +1216,7 @@ export const useUiStore = create<State & Actions>()(
     {
       name: "arfarmjaya-wms",
       version: 3,
+      storage: createJSONStorage(() => safeStorage),
       // Backfill field baru pada profil laporan yang tersimpan dari versi lama
       // agar kolom "Bukti Pembayaran" langsung aktif tanpa menghapus data.
       migrate: (persisted) => {
