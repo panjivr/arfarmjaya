@@ -34,6 +34,7 @@ import { WeeklyReportDocument, type WeeklyReportData } from "@/components/report
 import { useUiStore } from "@/lib/store";
 import { compressImage, currency, exportCsv, formatDate, formatDateTime, printDocument } from "@/lib/utils";
 import type { ReportProfile, WeeklyActivity, WeeklyReport } from "@/lib/types";
+import { activityPhotos, setActivityPhotos } from "@/lib/activity-photos";
 
 type SortMode = "" | "date-asc" | "date-desc" | "alpha" | "amount-desc" | "amount-asc";
 
@@ -286,7 +287,7 @@ export default function WeeklyReportPage() {
         "Umur HST": a.hst,
         "Nominal (Rp)": a.amount,
         Output: a.output,
-        Foto: a.photo ? "Ada" : "-",
+        Foto: activityPhotos(a).length > 0 ? `${activityPhotos(a).length} foto` : "-",
         "Bukti Pembayaran": a.paymentProof ? "Ada" : "-",
       })),
     );
@@ -466,9 +467,16 @@ export default function WeeklyReportPage() {
                         {activity.purpose && <p className="mt-1 line-clamp-2 text-xs text-muted">{activity.purpose}</p>}
                       </div>
                       <div className="flex shrink-0 gap-1">
-                        {activity.photo && (
-                          <Image src={activity.photo} alt="Foto kegiatan" width={56} height={56} className="h-12 w-12 rounded object-cover" unoptimized />
-                        )}
+                        {activityPhotos(activity).slice(0, 3).map((src, i) => (
+                          <div key={i} className="relative">
+                            <Image src={src} alt={`Foto kegiatan ${i + 1}`} width={56} height={56} className="h-12 w-12 rounded object-cover" unoptimized />
+                            {i === 2 && activityPhotos(activity).length > 3 && (
+                              <span className="absolute inset-0 grid place-items-center rounded bg-slate-900/60 text-[10px] font-bold text-white">
+                                +{activityPhotos(activity).length - 2}
+                              </span>
+                            )}
+                          </div>
+                        ))}
                         {activity.paymentProof && (
                           <Image src={activity.paymentProof} alt="Bukti pembayaran" width={56} height={56} className="h-12 w-12 rounded object-cover ring-1 ring-primary/40" unoptimized />
                         )}
@@ -681,6 +689,28 @@ function ActivityModal({
   const paymentRef = useRef<HTMLInputElement>(null);
   const { draft } = state;
 
+  const photos = activityPhotos(draft);
+
+  function applyPhotos(list: string[]) {
+    const { photos: next, photo } = setActivityPhotos(draft, list);
+    onChange({ photos: next, photo });
+  }
+
+  // Unggah beberapa foto kegiatan sekaligus (mis. 2 foto potret berdampingan).
+  async function onUploadPhotos(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (files.length === 0) return;
+    try {
+      const added: string[] = [];
+      for (const file of files) added.push(await compressImage(file, { maxSide: 640, targetLen: 60_000 }));
+      applyPhotos([...photos, ...added]);
+      toast.success(`${added.length} foto kegiatan ditambahkan.`);
+    } catch {
+      toast.error("Gagal memproses foto kegiatan.");
+    }
+  }
+
   async function onUpload(event: React.ChangeEvent<HTMLInputElement>, key: "photo" | "paymentProof", label: string) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -746,24 +776,32 @@ function ActivityModal({
             placeholder="0"
           />
         </Field>
-        <Field label="Foto Kegiatan" hint="Otomatis dikecilkan agar hemat penyimpanan.">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-white">
-              {draft.photo ? (
-                <Image src={draft.photo} alt="Foto kegiatan" width={64} height={44} className="h-full w-full object-cover" unoptimized />
-              ) : (
-                <ImagePlus className="h-4 w-4 text-muted" />
-              )}
-            </div>
-            <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={(e) => onUpload(e, "photo", "Foto kegiatan")} />
-            <Button type="button" variant="secondary" className="h-11" onClick={() => photoRef.current?.click()}>
-              <ImagePlus className="h-4 w-4" /> Unggah
-            </Button>
-            {draft.photo && (
-              <Button type="button" variant="ghost" className="h-11 w-11 px-0 text-danger" aria-label="Hapus foto" onClick={() => onChange({ photo: undefined })}>
-                <X className="h-4 w-4" />
-              </Button>
+        <Field label="Foto Kegiatan" hint="Bisa lebih dari satu foto — mis. 2 foto potret berdampingan agar rapi. Otomatis dikecilkan.">
+          <div className="space-y-2">
+            {photos.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {photos.map((src, i) => (
+                  <div key={i} className="relative h-16 w-20 overflow-hidden rounded-lg border border-border bg-white">
+                    <Image src={src} alt={`Foto kegiatan ${i + 1}`} width={80} height={64} className="h-full w-full object-cover" unoptimized />
+                    <button
+                      type="button"
+                      aria-label={`Hapus foto ${i + 1}`}
+                      onClick={() => applyPhotos(photos.filter((_, idx) => idx !== i))}
+                      className="absolute right-0.5 top-0.5 grid h-5 w-5 place-items-center rounded-full bg-slate-900/70 text-white"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
+            <div className="flex items-center gap-2">
+              <input ref={photoRef} type="file" accept="image/*" multiple className="hidden" onChange={onUploadPhotos} />
+              <Button type="button" variant="secondary" className="h-11" onClick={() => photoRef.current?.click()}>
+                <ImagePlus className="h-4 w-4" /> {photos.length > 0 ? "Tambah Foto" : "Unggah Foto"}
+              </Button>
+              {photos.length > 0 && <span className="text-xs text-muted">{photos.length} foto</span>}
+            </div>
           </div>
         </Field>
         <Field label="Bukti Pembayaran" hint="Foto nota / kwitansi. Otomatis dikecilkan.">

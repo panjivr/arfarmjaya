@@ -275,7 +275,8 @@ export type WeeklyActivity = {
   hst: string; // umur tanaman, mis. "0 HST"
   amount: number;
   output: string;
-  photo?: string; // data URL — foto kegiatan
+  photo?: string; // data URL — foto kegiatan (foto pertama; dipertahankan agar data lama tetap terbaca)
+  photos?: string[]; // beberapa foto kegiatan; bila ada, ini yang dipakai
   paymentProof?: string; // data URL — foto nota/kwitansi/bukti pembayaran
 };
 

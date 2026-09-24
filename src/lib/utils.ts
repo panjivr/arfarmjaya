@@ -124,7 +124,9 @@ const IMAGE_TARGET_LEN = 96_000;
  * Kecilkan foto sebelum disimpan agar data laporan tetap muat & tersimpan.
  * Menurunkan resolusi lalu kualitas JPEG secara bertahap sampai di bawah target.
  */
-export function compressImage(file: File): Promise<string> {
+export function compressImage(file: File, opts?: { maxSide?: number; targetLen?: number }): Promise<string> {
+  const maxSide = opts?.maxSide ?? IMAGE_MAX_SIDE;
+  const targetLen = opts?.targetLen ?? IMAGE_TARGET_LEN;
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("Gagal membaca berkas gambar."));
@@ -133,7 +135,7 @@ export function compressImage(file: File): Promise<string> {
       const image = new window.Image();
       image.onerror = () => reject(new Error("Berkas bukan gambar yang valid."));
       image.onload = () => {
-        const baseScale = Math.min(1, IMAGE_MAX_SIDE / Math.max(image.width, image.height));
+        const baseScale = Math.min(1, maxSide / Math.max(image.width, image.height));
         const encode = (extra: number, quality: number): string | null => {
           const w = Math.max(1, Math.round(image.width * baseScale * extra));
           const h = Math.max(1, Math.round(image.height * baseScale * extra));
@@ -148,16 +150,16 @@ export function compressImage(file: File): Promise<string> {
           return canvas.toDataURL("image/jpeg", quality);
         };
         // Sudah kecil → pakai apa adanya.
-        if (baseScale === 1 && source.length < IMAGE_TARGET_LEN) return resolve(source);
+        if (baseScale === 1 && source.length < targetLen) return resolve(source);
         let out = encode(1, 0.62);
         if (!out) return resolve(source);
         // Turunkan kualitas lalu resolusi sampai muat target.
         for (const q of [0.55, 0.48, 0.42]) {
-          if (out.length <= IMAGE_TARGET_LEN) break;
+          if (out.length <= targetLen) break;
           out = encode(1, q) ?? out;
         }
         for (const extra of [0.8, 0.65, 0.5]) {
-          if (out.length <= IMAGE_TARGET_LEN) break;
+          if (out.length <= targetLen) break;
           out = encode(extra, 0.5) ?? out;
         }
         resolve(out);

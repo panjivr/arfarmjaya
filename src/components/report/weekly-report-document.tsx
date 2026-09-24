@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { activityPhotos } from "@/lib/activity-photos";
 import { Leaf } from "lucide-react";
 import type { ReportProfile, WeeklyActivity } from "@/lib/types";
 import { formatDate, formatLongDate, numberFmt } from "@/lib/utils";
@@ -253,24 +254,36 @@ export function WeeklyReportDocument({
             <tr key={activity.id} style={{ breakInside: "avoid", background: index % 2 === 1 ? zebra : "#ffffff" }}>
               {columns.map((column) => {
                 if (column.key === "photo" || column.key === "payment") {
-                  const src = column.key === "photo" ? activity.photo : activity.paymentProof;
+                  // Foto kegiatan bisa lebih dari satu (mis. dua foto potret
+                  // berdampingan agar rapi); bukti pembayaran tetap satu.
+                  const sources =
+                    column.key === "photo"
+                      ? activityPhotos(activity)
+                      : activity.paymentProof
+                        ? [activity.paymentProof]
+                        : [];
                   const placeholder = column.key === "photo" ? "(tempel foto di sini)" : "(tempel nota/kwitansi)";
-                  const alt =
+                  const altBase =
                     column.key === "photo"
                       ? `Foto ${activity.activity || `kegiatan ${index + 1}`}`
                       : `Bukti pembayaran ${activity.activity || `kegiatan ${index + 1}`}`;
                   return (
                     <td key={column.key} className={`${cellBase} text-center`} style={borderStyle}>
-                      {src ? (
-                        <Image
-                          src={src}
-                          alt={alt}
-                          width={320}
-                          height={220}
-                          className="mx-auto h-[70px] w-auto max-w-full rounded-sm object-contain"
-                          loading="eager"
-                          unoptimized
-                        />
+                      {sources.length > 0 ? (
+                        <div className="flex flex-wrap items-center justify-center gap-[2px]">
+                          {sources.map((src, i) => (
+                            <Image
+                              key={i}
+                              src={src}
+                              alt={sources.length > 1 ? `${altBase} (${i + 1})` : altBase}
+                              width={320}
+                              height={220}
+                              className="h-[70px] w-auto max-w-full rounded-sm object-contain"
+                              loading="eager"
+                              unoptimized
+                            />
+                          ))}
+                        </div>
                       ) : (
                         <span
                           className="flex h-[70px] items-center justify-center rounded-sm px-1 text-[8px]"
