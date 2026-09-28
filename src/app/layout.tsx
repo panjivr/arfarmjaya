@@ -5,6 +5,7 @@ import { ThemeApplier } from "@/components/theme-applier";
 import { SyncProvider } from "@/components/sync-provider";
 import { PwaRegister } from "@/components/pwa-register";
 import { AuthProvider } from "@/components/auth/auth-provider";
+import { MobileActionsProvider } from "@/components/shell/mobile-actions";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -57,7 +58,7 @@ export default function RootLayout({
         <AuthProvider />
         <SyncProvider />
         <PwaRegister />
-        {children}
+        <MobileActionsProvider>{children}</MobileActionsProvider>
       </body>
     </html>
   );

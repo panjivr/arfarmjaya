@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { FileText, Plus, Printer, Save, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
+import { useMobileActions } from "@/components/shell/mobile-actions";
 import { PageHeader, StatCard, EmptyState } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -72,6 +73,12 @@ export default function InvoicesPage() {
     setPrintTarget({ store: s, data });
     setTimeout(() => window.print(), 250);
   }
+
+  // Tombol aksi khusus halaman untuk bilah bawah di HP.
+  useMobileActions([
+    { key: "print", label: "Cetak", icon: Printer, variant: "secondary", onClick: () => printData(previewData, store), disabled: lines.length === 0 },
+    { key: "save", label: "Simpan", icon: Save, variant: "primary", onClick: save, disabled: lines.length === 0 },
+  ]);
 
   if (stores.length === 0) {
     return (

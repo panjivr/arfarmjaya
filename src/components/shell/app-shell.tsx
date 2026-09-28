@@ -31,6 +31,8 @@ import { buildNotifications } from "@/lib/selectors";
 import { Button } from "@/components/ui/button";
 import { LoginScreen } from "@/components/auth/login-screen";
 import { LoginNotice } from "@/components/shell/login-notice";
+import { MobileActionBar } from "@/components/shell/mobile-actions";
+import { MobileTabBar } from "@/components/shell/mobile-tab-bar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Toaster } from "@/components/ui/toast";
 
@@ -172,11 +174,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <UserMenu name={user.name} label={ROLE_META[user.role]?.workspace ?? user.label} isAdmin={isAdmin} theme={theme} onToggleTheme={toggleTheme} onLogout={handleLogout} />
           </div>
         </header>
-        <main className="min-w-0 px-4 py-5 sm:px-6 sm:py-6 lg:px-8">{isRestricted ? <RestrictedAccess /> : children}</main>
+        <main className="app-main min-w-0 px-4 py-5 sm:px-6 sm:py-6 lg:px-8">{isRestricted ? <RestrictedAccess /> : children}</main>
       </div>
 
       <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} navigationItems={visibleNavigation} />
       <LoginNotice />
+      <MobileActionBar />
+      <MobileTabBar />
       <Toaster />
     </div>
   );

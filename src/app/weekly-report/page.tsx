@@ -23,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
+import { useMobileActions } from "@/components/shell/mobile-actions";
 import { PageHeader, StatCard, EmptyState } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -328,6 +329,17 @@ export default function WeeklyReportPage() {
       return next;
     });
   }
+
+  // Tombol aksi khusus halaman untuk bilah bawah di HP (ala aplikasi).
+  useMobileActions(
+    profile
+      ? [
+          { key: "add", label: "Kegiatan", icon: Plus, variant: "secondary", onClick: openNewActivity },
+          { key: "print", label: "Cetak", icon: Printer, variant: "secondary", onClick: () => print(previewData, profile), disabled: activities.length === 0 },
+          { key: "save", label: editingId ? "Perbarui" : "Simpan", icon: Save, variant: "primary", onClick: save },
+        ]
+      : [],
+  );
 
   if (!profile) {
     return (

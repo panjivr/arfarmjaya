@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Download, Plus, Search, Trash2 } from "lucide-react";
 import type { Product } from "@/lib/data";
 import { useUiStore } from "@/lib/store";
+import { useMobileActions } from "@/components/shell/mobile-actions";
 import { toast } from "@/components/ui/toast";
 import { currency, exportCsv, formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,16 @@ export function ProductTable({ compact = false }: { compact?: boolean }) {
     );
     toast.success(`${filtered.length} baris diekspor ke CSV.`);
   }
+
+  // Bilah aksi bawah di HP — hanya untuk tabel penuh (bukan versi ringkas dasbor).
+  useMobileActions(
+    compact
+      ? []
+      : [
+          { key: "export", label: "Ekspor CSV", icon: Download, variant: "secondary", onClick: handleExport },
+          ...(isAdmin ? [{ key: "add", label: "Tambah Barang", icon: Plus, variant: "primary" as const, onClick: () => setAddOpen(true) }] : []),
+        ],
+  );
 
   return (
     <div className="rounded-lg border border-border bg-card shadow-sm">

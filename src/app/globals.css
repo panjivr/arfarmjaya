@@ -128,6 +128,17 @@ textarea {
   background: color-mix(in srgb, var(--muted) 65%, transparent);
 }
 
+/* Ruang bawah untuk bilah navigasi & aksi ala aplikasi di layar HP, supaya
+   konten terakhir tidak tertutup. Aman terhadap notch (safe-area). */
+@media (max-width: 1023px) {
+  .app-main {
+    padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  }
+  body.has-mobile-actions .app-main {
+    padding-bottom: calc(8.25rem + env(safe-area-inset-bottom));
+  }
+}
+
 /* Area cetak disembunyikan di LUAR LAYAR (bukan display:none) supaya logo kop &
    foto (termasuk data URL) tetap dimuat browser sebelum dialog cetak muncul —
    display:none membuat gambar tidak pernah di-fetch sehingga hilang di PDF. */

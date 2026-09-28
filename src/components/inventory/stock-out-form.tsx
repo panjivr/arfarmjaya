@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { MinusCircle, PackageMinus, Save } from "lucide-react";
 import { useUiStore } from "@/lib/store";
+import { useMobileActions } from "@/components/shell/mobile-actions";
 import { toast } from "@/components/ui/toast";
 import { formatDateTime } from "@/lib/utils";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -23,8 +24,7 @@ export function StockOutForm() {
   const available = selectedProduct?.currentStock ?? 0;
   const outMovements = movements.filter((m) => m.type === "out");
 
-  function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function runSubmit() {
     if (!selectedProduct) {
       toast.error("Barang tidak ditemukan.");
       return;
@@ -37,6 +37,15 @@ export function StockOutForm() {
     toast.success(`${quantity} ${selectedProduct.unit} ${selectedProduct.name} keluar.`);
     setQuantity(1);
   }
+
+  function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    runSubmit();
+  }
+
+  useMobileActions([
+    { key: "save", label: "Simpan Barang Keluar", icon: Save, variant: "primary", onClick: runSubmit, disabled: available <= 0 },
+  ]);
 
   return (
     <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
