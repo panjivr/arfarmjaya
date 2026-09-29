@@ -1090,6 +1090,27 @@ function ProfileModal({
           <Field label="Baris Kosong Minimum" hint="Baris bergaris untuk diisi manual saat dicetak; isi 0 bila tidak perlu.">
             <Input type="number" min={0} max={40} value={draft.minRows} onChange={(e) => set("minRows", Number(e.target.value) || 0)} />
           </Field>
+          <div className="sm:col-span-2">
+            <Field
+              label={`Tinggi Baris / Kotak Bukti — ${Math.max(32, Math.min(420, Math.round(draft.rowHeight || 70)))} px`}
+              hint="Perbesar agar kotak Foto/Bukti Pembayaran lebih tinggi dan gambar/tempat tempel nota terlihat jelas."
+            >
+              <input
+                type="range"
+                min={40}
+                max={320}
+                step={5}
+                value={Math.max(40, Math.min(320, Math.round(draft.rowHeight || 70)))}
+                onChange={(e) => set("rowHeight", Number(e.target.value) || 70)}
+                className="h-2 w-full cursor-pointer accent-[var(--primary)]"
+              />
+              <div className="mt-1 flex justify-between text-[10px] text-muted">
+                <span>Rendah (40)</span>
+                <span>Sedang</span>
+                <span>Tinggi (320)</span>
+              </div>
+            </Field>
+          </div>
         </div>
 
         <div>

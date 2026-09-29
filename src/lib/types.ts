@@ -284,6 +284,12 @@ export type ReportProfile = {
   autoFit: boolean; // perkecil otomatis agar muat satu halaman saat dicetak
   minRows: number; // baris kosong minimum agar form tetap rapi saat dicetak
   /**
+   * Tinggi tiap baris tabel & kotak foto/bukti pembayaran dalam px. Semakin
+   * besar, kotak "Bukti Pembayaran"/"Foto" makin tinggi sehingga gambar/tempat
+   * tempel nota terlihat jelas. Kosong = tinggi bawaan (70px).
+   */
+  rowHeight?: number;
+  /**
    * Pengaturan kolom tabel: urutan, tampil/sembunyi, dan lebar (%). Bila kosong
    * (profil lama), tampilan diturunkan dari flag show* di atas dengan lebar
    * bawaan. Ini yang membuat SEMUA kolom — termasuk No, Tanggal, Jenis Kegiatan,

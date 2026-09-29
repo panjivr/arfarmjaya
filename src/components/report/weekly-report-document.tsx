@@ -134,6 +134,9 @@ export function WeeklyReportDocument({
   const photoVisible = isVisible("photo") || isVisible("payment");
   const amountVisible = isVisible("amount");
   const amountIndex = columns.findIndex((c) => c.key === "amount");
+  // Tinggi baris & kotak foto/bukti (arah vertikal). Default 70px; dibatasi
+  // agar tetap masuk akal saat dicetak.
+  const rowH = Math.max(32, Math.min(420, Math.round(profile.rowHeight || 70)));
 
   const rows = report.activities;
   const blanks = Math.max(0, (profile.minRows || 0) - rows.length);
@@ -258,7 +261,8 @@ export function WeeklyReportDocument({
                               alt={sources.length > 1 ? `${altBase} (${i + 1})` : altBase}
                               width={320}
                               height={220}
-                              className="h-[70px] w-auto max-w-full rounded-sm object-contain"
+                              className="w-auto max-w-full rounded-sm object-contain"
+                              style={{ height: rowH }}
                               loading="eager"
                               unoptimized
                             />
@@ -266,8 +270,8 @@ export function WeeklyReportDocument({
                         </div>
                       ) : (
                         <span
-                          className="flex h-[70px] items-center justify-center rounded-sm px-1 text-[8px]"
-                          style={{ border: `1px dashed ${line}`, color: inkMuted }}
+                          className="flex items-center justify-center rounded-sm px-1 text-[8px]"
+                          style={{ height: rowH, border: `1px dashed ${line}`, color: inkMuted }}
                         >
                           {placeholder}
                         </span>
@@ -294,7 +298,7 @@ export function WeeklyReportDocument({
           {Array.from({ length: blanks }).map((_, index) => (
             <tr key={`blank-${index}`} style={{ breakInside: "avoid" }}>
               {columns.map((column) => (
-                <td key={column.key} className={`${cellBase} text-center`} style={{ ...borderStyle, height: photoVisible ? 28 : 22 }}>
+                <td key={column.key} className={`${cellBase} text-center`} style={{ ...borderStyle, height: photoVisible ? rowH : 22 }}>
                   {column.key === "no" ? <span style={{ color: inkMuted }}>{rows.length + index + 1}</span> : <span>&nbsp;</span>}
                 </td>
               ))}
