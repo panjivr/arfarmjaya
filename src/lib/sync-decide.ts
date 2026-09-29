@@ -31,6 +31,12 @@ export function decideSync(i: SyncInputs): SyncDecision {
   // Server belum punya data → perangkat ini jadi sumber awal.
   if (!i.hasServerData) return "push-local";
 
+  // PEMULIHAN OTOMATIS: server ada tapi kosong dari transaksi (mis. database
+  // gratis kedaluwarsa lalu dibuat ulang kosong) sedangkan perangkat ini masih
+  // menyimpan data nyata → dorong data lokal agar server pulih, jangan diganti
+  // menjadi kosong. Data lokal tetap dicadangkan sebelum keputusan apa pun.
+  if (i.serverWeight <= 0 && i.localWeight > 0) return "push-local";
+
   // Perangkat ini belum pernah sinkron → yang datanya lebih banyak menang.
   if (!i.metaSyncedAt) return i.localWeight > i.serverWeight ? "push-local" : "adopt-server";
 
