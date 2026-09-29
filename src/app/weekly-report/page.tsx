@@ -1092,9 +1092,34 @@ function ProfileModal({
           </Field>
           <div className="sm:col-span-2">
             <Field
-              label={`Tinggi Baris / Kotak Bukti — ${Math.max(32, Math.min(420, Math.round(draft.rowHeight || 70)))} px`}
-              hint="Perbesar agar kotak Foto/Bukti Pembayaran lebih tinggi dan gambar/tempat tempel nota terlihat jelas."
+              label={`Tinggi Baris / Kotak Bukti — ${Math.max(40, Math.min(320, Math.round(draft.rowHeight || 70)))} px`}
+              hint="Pilih lewat tombol, atau setel halus dengan penggeser. Makin tinggi, kotak Foto/Bukti Pembayaran makin besar dan jelas."
             >
+              <div className="mb-2 grid grid-cols-4 gap-2">
+                {[
+                  { label: "Rendah", value: 60 },
+                  { label: "Sedang", value: 110 },
+                  { label: "Tinggi", value: 180 },
+                  { label: "Maks", value: 260 },
+                ].map((preset) => {
+                  const active = Math.round(draft.rowHeight || 70) === preset.value;
+                  return (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onClick={() => set("rowHeight", preset.value)}
+                      className={
+                        active
+                          ? "rounded-lg border border-primary bg-primary/10 px-2 py-2 text-xs font-semibold text-primary"
+                          : "rounded-lg border border-border bg-background px-2 py-2 text-xs font-medium hover:border-primary/50"
+                      }
+                    >
+                      {preset.label}
+                      <span className="block text-[10px] font-normal text-muted">{preset.value}px</span>
+                    </button>
+                  );
+                })}
+              </div>
               <input
                 type="range"
                 min={40}
@@ -1104,11 +1129,6 @@ function ProfileModal({
                 onChange={(e) => set("rowHeight", Number(e.target.value) || 70)}
                 className="h-2 w-full cursor-pointer accent-[var(--primary)]"
               />
-              <div className="mt-1 flex justify-between text-[10px] text-muted">
-                <span>Rendah (40)</span>
-                <span>Sedang</span>
-                <span>Tinggi (320)</span>
-              </div>
             </Field>
           </div>
         </div>
