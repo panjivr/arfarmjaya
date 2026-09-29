@@ -29,7 +29,8 @@ function useInvoiceQr(payload: string | null): string | null {
       const qr = qrcode(0, "M");
       qr.addData(payload);
       qr.make();
-      return qr.createDataURL(4, 2);
+      // cellSize besar → raster tajam, tetap terpindai saat dicetak.
+      return qr.createDataURL(10, 4);
     } catch {
       return null;
     }
@@ -181,14 +182,7 @@ export function InvoiceDocument({ store, invoice, id }: { store?: Store; invoice
           </div>
           <div className="text-center">
             <p className="text-slate-600">Hormat kami,</p>
-            {sig && qr ? (
-              <div className="mx-auto flex h-[56px] items-center justify-center">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={qr} alt={`QR verifikasi ${sig.code}`} width={56} height={56} style={{ imageRendering: "pixelated" }} />
-              </div>
-            ) : (
-              <div className="h-12" />
-            )}
+            <div className="h-12" />
             <p className="border-t border-slate-400 px-6 pt-1 font-semibold text-slate-700">
               {sig?.signedBy ?? store?.signatureName ?? store?.name ?? ""}
             </p>
@@ -198,19 +192,22 @@ export function InvoiceDocument({ store, invoice, id }: { store?: Store; invoice
         {/* Panel tanda tangan elektronik (muncul bila invoice ditandatangani) */}
         {sig && (
           <div
-            className="mt-5 flex items-start gap-3 rounded-md border px-4 py-3"
+            className="mt-5 flex flex-col items-center gap-4 rounded-md border px-4 py-4 sm:flex-row sm:items-start"
             style={{ borderColor: accent, background: "rgba(0,122,75,0.05)" }}
           >
             {qr && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={qr}
-                alt={`QR verifikasi ${sig.code}`}
-                width={72}
-                height={72}
-                className="shrink-0 rounded bg-white p-1 ring-1 ring-slate-200"
-                style={{ imageRendering: "pixelated" }}
-              />
+              <div className="shrink-0 text-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={qr}
+                  alt={`QR verifikasi ${sig.code}`}
+                  width={160}
+                  height={160}
+                  className="rounded bg-white p-2 ring-1 ring-slate-200"
+                  style={{ imageRendering: "pixelated", width: 160, height: 160 }}
+                />
+                <p className="mt-1 text-[9px] font-medium text-slate-500">Pindai untuk verifikasi</p>
+              </div>
             )}
             <div className="min-w-0 flex-1 text-[10px] leading-relaxed">
               <p className="flex items-center gap-1 text-[11px] font-bold" style={{ color: accent }}>
