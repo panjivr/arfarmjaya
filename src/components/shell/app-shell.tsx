@@ -33,6 +33,7 @@ import { LoginScreen } from "@/components/auth/login-screen";
 import { LoginNotice } from "@/components/shell/login-notice";
 import { MobileActionBar } from "@/components/shell/mobile-actions";
 import { MobileTabBar } from "@/components/shell/mobile-tab-bar";
+import { SaveIndicator } from "@/components/shell/save-indicator";
 import { Card, CardContent } from "@/components/ui/card";
 import { Toaster } from "@/components/ui/toast";
 
@@ -170,6 +171,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Search className="h-5 w-5" />
             </Button>
 
+            <SaveIndicator />
             <NotificationBell isAdmin={isAdmin} />
             <UserMenu name={user.name} label={ROLE_META[user.role]?.workspace ?? user.label} isAdmin={isAdmin} theme={theme} onToggleTheme={toggleTheme} onLogout={handleLogout} />
           </div>
