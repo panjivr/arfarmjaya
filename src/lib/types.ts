@@ -233,6 +233,25 @@ export type Invoice = {
  * judul, kolom yang tampil, blok tanda tangan, dan catatan kaki) diatur lewat
  * profil ini sehingga template bisa dipakai ulang untuk program lain.
  */
+/** Kolom tabel laporan yang bisa diatur tampil/sembunyi dan lebarnya. */
+export type ReportColumnKey =
+  | "no"
+  | "date"
+  | "activity"
+  | "purpose"
+  | "hst"
+  | "amount"
+  | "output"
+  | "photo"
+  | "payment";
+
+export type ReportColumnSetting = {
+  key: ReportColumnKey;
+  visible: boolean;
+  /** Lebar kolom dalam persen (0–100). Kosong/0 = dibagi otomatis. */
+  width?: number;
+};
+
 export type ReportProfile = {
   id: string;
   name: string; // nama profil di daftar pilihan
@@ -264,6 +283,13 @@ export type ReportProfile = {
   showNotes: boolean;
   autoFit: boolean; // perkecil otomatis agar muat satu halaman saat dicetak
   minRows: number; // baris kosong minimum agar form tetap rapi saat dicetak
+  /**
+   * Pengaturan kolom tabel: urutan, tampil/sembunyi, dan lebar (%). Bila kosong
+   * (profil lama), tampilan diturunkan dari flag show* di atas dengan lebar
+   * bawaan. Ini yang membuat SEMUA kolom — termasuk No, Tanggal, Jenis Kegiatan,
+   * dan Tujuan — bisa dicentang dan diatur lebarnya.
+   */
+  columns?: ReportColumnSetting[];
   createdAt: string;
 };
 

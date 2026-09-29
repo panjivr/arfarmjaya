@@ -34,7 +34,8 @@ import { ScaledPreview } from "@/components/ui/scaled-preview";
 import { WeeklyReportDocument, type WeeklyReportData } from "@/components/report/weekly-report-document";
 import { useUiStore } from "@/lib/store";
 import { compressImage, currency, exportCsv, formatDate, formatDateTime, printDocument } from "@/lib/utils";
-import type { ReportProfile, WeeklyActivity, WeeklyReport } from "@/lib/types";
+import type { ReportColumnKey, ReportColumnSetting, ReportProfile, WeeklyActivity, WeeklyReport } from "@/lib/types";
+import { REPORT_COLUMN_META, ensureColumnSettings, resolveReportColumns } from "@/lib/report-columns";
 import { activityPhotos, setActivityPhotos } from "@/lib/activity-photos";
 
 type SortMode = "" | "date-asc" | "date-desc" | "alpha" | "amount-desc" | "amount-asc";
@@ -893,6 +894,36 @@ function ProfileModal({
     setDraft((d) => (d ? { ...d, [key]: value } : d));
   }
 
+  // Legacy flag yang harus ikut disamakan agar profil tetap konsisten bila
+  // dibaca komponen lama / diekspor. Kolom inti (no/date/activity/purpose)
+  // tidak punya flag lama, jadi cukup tersimpan di `columns`.
+  const LEGACY_FLAG: Partial<Record<ReportColumnKey, keyof ReportProfile>> = {
+    hst: "showHst",
+    amount: "showAmount",
+    output: "showOutput",
+    photo: "showPhoto",
+    payment: "showPayment",
+  };
+
+  function updateColumn(key: ReportColumnKey, patch: Partial<ReportColumnSetting>) {
+    setDraft((d) => {
+      if (!d) return d;
+      const columns = ensureColumnSettings(d).map((c) => (c.key === key ? { ...c, ...patch } : c));
+      const next: ReportProfile = { ...d, columns };
+      const flag = LEGACY_FLAG[key];
+      if (flag && patch.visible !== undefined) (next as Record<string, unknown>)[flag] = patch.visible;
+      return next;
+    });
+  }
+
+  function autoBalanceColumns() {
+    setDraft((d) => {
+      if (!d) return d;
+      const columns = ensureColumnSettings(d).map((c) => ({ ...c, width: undefined }));
+      return { ...d, columns };
+    });
+  }
+
   async function onImage(event: React.ChangeEvent<HTMLInputElement>, key: "logo" | "signatureImage") {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -908,6 +939,7 @@ function ProfileModal({
     event.preventDefault();
     if (!draft) return;
     if (!draft.organization.trim()) return toast.error("Nama lembaga wajib diisi.");
+    if (!ensureColumnSettings(draft).some((c) => c.visible)) return toast.error("Minimal satu kolom tabel harus tampil.");
     const notes = notesText
       .split("\n")
       .map((line) => line.replace(/^[•\-\s]+/, "").trim())
@@ -921,6 +953,10 @@ function ProfileModal({
     toast.success("Format laporan diperbarui.");
     onClose();
   }
+
+  const colSettings = ensureColumnSettings(draft);
+  const resolvedPct = new Map(resolveReportColumns(draft).map((c) => [c.key, c.widthPct]));
+  const visibleCount = colSettings.filter((c) => c.visible).length;
 
   return (
     <Modal open={open} onClose={onClose} title="Pengaturan Format Laporan" description="Kop surat, judul, kolom tabel, tanda tangan, dan catatan kaki." size="lg">
@@ -1057,13 +1093,68 @@ function ProfileModal({
         </div>
 
         <div>
-          <p className="mb-2 text-sm font-semibold">Kolom & Bagian yang Ditampilkan</p>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold">Kolom Tabel — Tampil & Lebar</p>
+            <button type="button" onClick={autoBalanceColumns} className="text-xs font-semibold text-primary hover:underline">
+              Bagi rata otomatis
+            </button>
+          </div>
+          <p className="mb-2 text-xs text-muted">
+            Centang kolom yang ingin ditampilkan, lalu atur lebarnya (%). Kosongkan lebar untuk otomatis. Lebar
+            dinormalkan agar total kolom yang tampil = 100%.
+          </p>
+          <div className="overflow-hidden rounded-lg border border-border">
+            <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2 bg-card-muted px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+              <span>Kolom</span>
+              <span className="w-24 text-center">Lebar (%)</span>
+              <span className="w-16 text-right">Hasil</span>
+            </div>
+            {colSettings.map((c) => {
+              const meta = REPORT_COLUMN_META.find((m) => m.key === c.key)!;
+              const label = meta.label.replace(/\n/g, " ");
+              const result = c.visible ? `${Math.round(resolvedPct.get(c.key) ?? 0)}%` : "—";
+              return (
+                <div
+                  key={c.key}
+                  className="grid grid-cols-[1fr_auto_auto] items-center gap-2 border-t border-border px-3 py-2 text-sm"
+                >
+                  <label className="flex min-w-0 items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={c.visible}
+                      onChange={(e) => updateColumn(c.key, { visible: e.target.checked })}
+                      className="h-4 w-4 shrink-0 accent-[var(--primary)]"
+                    />
+                    <span className="truncate">{label}</span>
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    inputMode="numeric"
+                    disabled={!c.visible}
+                    value={c.width ?? ""}
+                    placeholder={c.visible ? String(Math.round(resolvedPct.get(c.key) ?? 0)) : ""}
+                    onChange={(e) => {
+                      const v = e.target.value.trim();
+                      const n = v === "" ? undefined : Math.max(0, Math.min(100, Number(v) || 0));
+                      updateColumn(c.key, { width: n });
+                    }}
+                    className="h-9 w-24 rounded-lg border border-border bg-background px-2 text-center text-sm outline-none focus:border-primary disabled:opacity-40"
+                  />
+                  <span className="w-16 text-right text-xs font-semibold text-muted">{result}</span>
+                </div>
+              );
+            })}
+          </div>
+          {visibleCount === 0 && (
+            <p className="mt-2 text-xs font-semibold text-danger">Minimal satu kolom harus tampil.</p>
+          )}
+        </div>
+
+        <div>
+          <p className="mb-2 text-sm font-semibold">Bagian Lain</p>
           <div className="grid gap-2 sm:grid-cols-3">
-            <Toggle label="Kolom Umur HST" checked={draft.showHst} onChange={(v) => set("showHst", v)} />
-            <Toggle label="Kolom Nominal" checked={draft.showAmount} onChange={(v) => set("showAmount", v)} />
-            <Toggle label="Kolom Output" checked={draft.showOutput} onChange={(v) => set("showOutput", v)} />
-            <Toggle label="Kolom Foto" checked={draft.showPhoto} onChange={(v) => set("showPhoto", v)} />
-            <Toggle label="Kolom Bukti Pembayaran" checked={draft.showPayment !== false} onChange={(v) => set("showPayment", v)} />
             <Toggle label="Ringkasan" checked={draft.showSummary} onChange={(v) => set("showSummary", v)} />
             <Toggle label="Keterangan Pengisian" checked={draft.showNotes} onChange={(v) => set("showNotes", v)} />
             <Toggle label="Muat Otomatis 1 Halaman" checked={draft.autoFit} onChange={(v) => set("autoFit", v)} />

@@ -3,7 +3,8 @@
 import Image from "next/image";
 import { activityPhotos } from "@/lib/activity-photos";
 import { Leaf } from "lucide-react";
-import type { ReportProfile, WeeklyActivity } from "@/lib/types";
+import type { ReportColumnKey, ReportProfile, WeeklyActivity } from "@/lib/types";
+import { resolveReportColumns, type ResolvedColumn } from "@/lib/report-columns";
 import { formatDate, formatLongDate, numberFmt } from "@/lib/utils";
 
 export type WeeklyReportData = {
@@ -20,35 +21,11 @@ export type WeeklyReportData = {
   total: number;
 };
 
-type Column = {
-  key: "no" | "date" | "activity" | "purpose" | "hst" | "amount" | "output" | "photo" | "payment";
-  label: string;
-  weight: number;
-  align: "left" | "center" | "right";
-};
-
 const ink = "#1f2937";
 const inkMuted = "#5b6472";
 const line = "#cbd0d8";
 const zebra = "#fafbfc";
 const totalBg = "#f3f4f6";
-
-function buildColumns(profile: ReportProfile): Column[] {
-  const columns: Column[] = [
-    { key: "no", label: "No.", weight: 4, align: "center" },
-    { key: "date", label: "Tanggal", weight: 10, align: "center" },
-    { key: "activity", label: "Jenis Kegiatan", weight: 16, align: "left" },
-    { key: "purpose", label: "Tujuan", weight: 21, align: "left" },
-  ];
-  if (profile.showHst) columns.push({ key: "hst", label: "Umur HST", weight: 9, align: "center" });
-  if (profile.showAmount) columns.push({ key: "amount", label: profile.currencyLabel || "Nominal (Rp)", weight: 11, align: "right" });
-  const showPayment = profile.showPayment !== false; // default aktif untuk profil lama dari server
-  const bothPhotos = profile.showPhoto && showPayment;
-  if (profile.showOutput) columns.push({ key: "output", label: "Output", weight: bothPhotos ? 17 : 21, align: "left" });
-  if (profile.showPhoto) columns.push({ key: "photo", label: "Foto Kegiatan", weight: bothPhotos ? 12 : 14, align: "center" });
-  if (showPayment) columns.push({ key: "payment", label: "Bukti Pembayaran\n(Nota / Kwitansi)", weight: bothPhotos ? 12 : 14, align: "center" });
-  return columns;
-}
 
 /** Ambil angka HST ("14 HST" → 14) untuk ringkasan rentang umur tanaman. */
 function hstValue(raw: string) {
@@ -67,7 +44,7 @@ function periodLabel(report: WeeklyReportData) {
 }
 
 /** Isi satu sel tabel sesuai kolomnya. */
-function cellValue(key: Column["key"], activity: WeeklyActivity, index: number) {
+function cellValue(key: ReportColumnKey, activity: WeeklyActivity, index: number) {
   switch (key) {
     case "no":
       return String(index + 1);
@@ -151,9 +128,12 @@ export function WeeklyReportDocument({
   printedAt?: string;
 }) {
   const accent = profile.accent || "#c0201c";
-  const columns = buildColumns(profile);
-  const weightTotal = columns.reduce((t, c) => t + c.weight, 0);
-  const width = (column: Column) => `${((column.weight / weightTotal) * 100).toFixed(3)}%`;
+  const columns: ResolvedColumn[] = resolveReportColumns(profile);
+  const width = (column: ResolvedColumn) => `${column.widthPct.toFixed(3)}%`;
+  const isVisible = (key: ReportColumnKey) => columns.some((c) => c.key === key);
+  const photoVisible = isVisible("photo") || isVisible("payment");
+  const amountVisible = isVisible("amount");
+  const amountIndex = columns.findIndex((c) => c.key === "amount");
 
   const rows = report.activities;
   const blanks = Math.max(0, (profile.minRows || 0) - rows.length);
@@ -167,8 +147,8 @@ export function WeeklyReportDocument({
   const summary = [
     { label: "Jumlah Kegiatan", value: `${rows.length} kegiatan` },
     { label: "Periode Kegiatan", value: periodLabel(report) },
-    ...(profile.showHst ? [{ label: "Rentang Umur Tanaman", value: hstRange }] : []),
-    ...(profile.showAmount ? [{ label: "Total Nominal", value: `Rp ${numberFmt.format(report.total)}` }] : []),
+    ...(isVisible("hst") ? [{ label: "Rentang Umur Tanaman", value: hstRange }] : []),
+    ...(amountVisible ? [{ label: "Total Nominal", value: `Rp ${numberFmt.format(report.total)}` }] : []),
   ];
 
   const cellBase = "align-top px-2 py-1";
@@ -314,26 +294,24 @@ export function WeeklyReportDocument({
           {Array.from({ length: blanks }).map((_, index) => (
             <tr key={`blank-${index}`} style={{ breakInside: "avoid" }}>
               {columns.map((column) => (
-                <td key={column.key} className={`${cellBase} text-center`} style={{ ...borderStyle, height: profile.showPhoto || profile.showPayment !== false ? 28 : 22 }}>
+                <td key={column.key} className={`${cellBase} text-center`} style={{ ...borderStyle, height: photoVisible ? 28 : 22 }}>
                   {column.key === "no" ? <span style={{ color: inkMuted }}>{rows.length + index + 1}</span> : <span>&nbsp;</span>}
                 </td>
               ))}
             </tr>
           ))}
 
-          {profile.showAmount && (
+          {amountVisible && amountIndex >= 0 && (
             <tr style={{ background: totalBg, breakInside: "avoid" }}>
-              <td
-                colSpan={columns.findIndex((c) => c.key === "amount")}
-                className="px-2 py-1 text-right text-[10px] font-bold"
-                style={borderStyle}
-              >
-                Total {profile.currencyLabel || "Nominal (Rp)"}
-              </td>
+              {amountIndex > 0 && (
+                <td colSpan={amountIndex} className="px-2 py-1 text-right text-[10px] font-bold" style={borderStyle}>
+                  Total {profile.currencyLabel || "Nominal (Rp)"}
+                </td>
+              )}
               <td className="px-2 py-1 text-right text-[11px] font-bold" style={borderStyle}>
-                {numberFmt.format(report.total)}
+                {amountIndex === 0 ? `Total: ${numberFmt.format(report.total)}` : numberFmt.format(report.total)}
               </td>
-              {columns.slice(columns.findIndex((c) => c.key === "amount") + 1).map((column) => (
+              {columns.slice(amountIndex + 1).map((column) => (
                 <td key={column.key} style={borderStyle} />
               ))}
             </tr>
