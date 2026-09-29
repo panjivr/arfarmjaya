@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Image from "next/image";
-import { Building2, ImagePlus, Pencil, Plus, Store as StoreIcon, Trash2 } from "lucide-react";
+import { Building2, ImagePlus, Pencil, Plus, ShieldCheck, Store as StoreIcon, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import { PageHeader, StatCard, EmptyState } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,6 +24,8 @@ const empty = {
   signatureName: "",
   note: "",
   accent: "#007a4b",
+  eSignEnabled: false,
+  eSignerName: "",
 };
 
 export default function StoresPage() {
@@ -60,6 +62,8 @@ export default function StoresPage() {
       signatureName: store.signatureName ?? "",
       note: store.note ?? "",
       accent: store.accent ?? "#007a4b",
+      eSignEnabled: Boolean(store.eSignEnabled),
+      eSignerName: store.eSignerName ?? "",
     });
     setOpen(true);
   }
@@ -90,6 +94,8 @@ export default function StoresPage() {
       signatureName: form.signatureName.trim() || form.name.trim(),
       note: form.note.trim() || undefined,
       accent: form.accent || "#007a4b",
+      eSignEnabled: form.eSignEnabled,
+      eSignerName: form.eSignerName.trim() || undefined,
     };
     if (editing) {
       updateStore(editing.id, payload);
@@ -196,6 +202,26 @@ export default function StoresPage() {
           </Field>
           <div className="sm:col-span-2"><Field label="Info Pembayaran" hint="Muncul di bagian catatan invoice."><Input value={form.bankInfo} onChange={(e) => set("bankInfo", e.target.value)} placeholder="BNI 2024501132 a.n. ALIF LOLITA" /></Field></div>
           <div className="sm:col-span-2"><Field label="Nama pada Tanda Tangan"><Input value={form.signatureName} onChange={(e) => set("signatureName", e.target.value)} placeholder="ALIP FRESH FOOD" /></Field></div>
+          <div className="sm:col-span-2">
+            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-sm">
+              <input
+                type="checkbox"
+                checked={form.eSignEnabled}
+                onChange={(e) => setForm((f) => ({ ...f, eSignEnabled: e.target.checked }))}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--primary)]"
+              />
+              <span>
+                <span className="flex items-center gap-1.5 font-semibold">
+                  <ShieldCheck className="h-4 w-4 text-primary" /> Aktifkan Tanda Tangan Elektronik
+                </span>
+                <span className="mt-0.5 block text-xs text-muted">
+                  Bila aktif, invoice toko ini otomatis diberi opsi tanda tangan elektronik (QR + hash SHA-256). Tetap
+                  bisa dimatikan per invoice.
+                </span>
+              </span>
+            </label>
+          </div>
+          <div className="sm:col-span-2"><Field label="Nama Penanda Tangan Elektronik" hint="Kosongkan untuk memakai Nama pada Tanda Tangan / nama toko."><Input value={form.eSignerName} onChange={(e) => set("eSignerName", e.target.value)} placeholder="Direktur AR FARM JAYA" /></Field></div>
           <div className="sm:col-span-2"><Field label="Catatan Default"><Textarea value={form.note} onChange={(e) => set("note", e.target.value)} placeholder="Barang yang sudah dibeli tidak bisa ditukar." /></Field></div>
           <div className="sm:col-span-2 flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>Batal</Button>

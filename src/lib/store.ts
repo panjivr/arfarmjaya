@@ -25,6 +25,7 @@ import type {
   Distribution,
   Invoice,
   InvoiceLine,
+  InvoiceSignature,
   ItemRequest,
   ManagedUser,
   OpnameSession,
@@ -296,7 +297,22 @@ type Actions = {
     lines: InvoiceLine[];
     shipping: number;
     note?: string;
+    signature?: InvoiceSignature;
   }) => { ok: boolean; message?: string; invoice?: Invoice };
+  updateInvoice: (
+    id: string,
+    data: {
+      storeId: string;
+      buyer: string;
+      buyerPhone?: string;
+      date: string;
+      number?: string;
+      lines: InvoiceLine[];
+      shipping: number;
+      note?: string;
+      signature?: InvoiceSignature;
+    },
+  ) => { ok: boolean; message?: string; invoice?: Invoice };
   deleteInvoice: (id: string) => void;
 
   // laporan pelaksanaan mingguan
@@ -763,7 +779,7 @@ export const useUiStore = create<State & Actions>()(
         set((s) => ({ stores: s.stores.filter((x) => x.id !== id) }));
         get().audit("Hapus", "Toko", name);
       },
-      createInvoice: ({ storeId, buyer, buyerPhone, date, number, lines, shipping, note }) => {
+      createInvoice: ({ storeId, buyer, buyerPhone, date, number, lines, shipping, note, signature }) => {
         const store = get().stores.find((x) => x.id === storeId);
         if (!store) return { ok: false, message: "Toko tidak ditemukan." };
         if (!buyer.trim()) return { ok: false, message: "Nama pembeli wajib diisi." };
@@ -784,10 +800,43 @@ export const useUiStore = create<State & Actions>()(
           shipping: shipping || 0,
           total,
           note: note ?? store.note,
+          signature,
           createdAt: now(),
         };
         set((s) => ({ invoices: [invoice, ...s.invoices] }));
         get().audit("Buat", "Invoice", `${invNumber} · ${buyer}`);
+        return { ok: true, invoice };
+      },
+      updateInvoice: (id, { storeId, buyer, buyerPhone, date, number, lines, shipping, note, signature }) => {
+        const existing = get().invoices.find((x) => x.id === id);
+        if (!existing) return { ok: false, message: "Invoice tidak ditemukan." };
+        const store = get().stores.find((x) => x.id === storeId);
+        if (!store) return { ok: false, message: "Toko tidak ditemukan." };
+        if (!buyer.trim()) return { ok: false, message: "Nama pembeli wajib diisi." };
+        if (lines.length === 0) return { ok: false, message: "Tambahkan minimal satu barang." };
+        const subtotal = lines.reduce((t, l) => t + l.price * l.quantity, 0);
+        const total = subtotal + (shipping || 0);
+        const invNumber = number?.trim() || existing.number;
+        const invoice: Invoice = {
+          ...existing,
+          number: invNumber,
+          storeId,
+          storeName: store.name,
+          buyer: buyer.trim(),
+          buyerPhone,
+          date,
+          lines,
+          subtotal,
+          shipping: shipping || 0,
+          total,
+          note,
+          // Tanda tangan selalu mengikuti isi terbaru: bila diedit, tanda tangan
+          // lama (atas isi lama) tidak boleh dipertahankan — pakai yang baru,
+          // atau kosong bila e-sign dimatikan. Menjaga integritas tetap jujur.
+          signature,
+        };
+        set((s) => ({ invoices: s.invoices.map((x) => (x.id === id ? invoice : x)) }));
+        get().audit("Ubah", "Invoice", `${invNumber} · ${buyer.trim()}`);
         return { ok: true, invoice };
       },
       deleteInvoice: (id) => {

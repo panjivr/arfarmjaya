@@ -1,9 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { Store as StoreIcon } from "lucide-react";
-import type { InvoiceLine, Store } from "@/lib/types";
-import { currency, numberFmt, formatDate } from "@/lib/utils";
+import { useMemo } from "react";
+import qrcode from "qrcode-generator";
+import { ShieldCheck, Store as StoreIcon } from "lucide-react";
+import type { InvoiceLine, InvoiceSignature, Store } from "@/lib/types";
+import { invoiceQrPayload } from "@/lib/invoice-sign";
+import { currency, numberFmt, formatDate, formatDateTime } from "@/lib/utils";
 
 export type InvoiceData = {
   number: string;
@@ -15,7 +18,23 @@ export type InvoiceData = {
   shipping: number;
   total: number;
   note?: string;
+  signature?: InvoiceSignature;
 };
+
+/** QR verifikasi sebagai data URL (GIF) — dibuat sinkron, aman untuk cetak. */
+function useInvoiceQr(payload: string | null): string | null {
+  return useMemo(() => {
+    if (!payload) return null;
+    try {
+      const qr = qrcode(0, "M");
+      qr.addData(payload);
+      qr.make();
+      return qr.createDataURL(4, 2);
+    } catch {
+      return null;
+    }
+  }, [payload]);
+}
 
 /** Ubah angka menjadi kalimat "terbilang" bahasa Indonesia. */
 function terbilang(value: number): string {
@@ -40,6 +59,24 @@ function terbilang(value: number): string {
 export function InvoiceDocument({ store, invoice, id }: { store?: Store; invoice: InvoiceData; id?: string }) {
   const accent = store?.accent ?? "#007a4b";
   const contact = [store?.phone && `HP/WA: ${store.phone}`, store?.email].filter(Boolean).join("  ·  ");
+
+  const sig = invoice.signature;
+  const qrPayload = sig
+    ? invoiceQrPayload(
+        {
+          number: invoice.number,
+          storeName: store?.name ?? "",
+          buyer: invoice.buyer,
+          date: invoice.date,
+          lines: invoice.lines,
+          subtotal: invoice.subtotal,
+          shipping: invoice.shipping,
+          total: invoice.total,
+        },
+        sig,
+      )
+    : null;
+  const qr = useInvoiceQr(qrPayload);
 
   return (
     <div
@@ -144,12 +181,57 @@ export function InvoiceDocument({ store, invoice, id }: { store?: Store; invoice
           </div>
           <div className="text-center">
             <p className="text-slate-600">Hormat kami,</p>
-            <div className="h-12" />
+            {sig && qr ? (
+              <div className="mx-auto flex h-[56px] items-center justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={qr} alt={`QR verifikasi ${sig.code}`} width={56} height={56} style={{ imageRendering: "pixelated" }} />
+              </div>
+            ) : (
+              <div className="h-12" />
+            )}
             <p className="border-t border-slate-400 px-6 pt-1 font-semibold text-slate-700">
-              {store?.signatureName ?? store?.name ?? ""}
+              {sig?.signedBy ?? store?.signatureName ?? store?.name ?? ""}
             </p>
           </div>
         </div>
+
+        {/* Panel tanda tangan elektronik (muncul bila invoice ditandatangani) */}
+        {sig && (
+          <div
+            className="mt-5 flex items-start gap-3 rounded-md border px-4 py-3"
+            style={{ borderColor: accent, background: "rgba(0,122,75,0.05)" }}
+          >
+            {qr && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={qr}
+                alt={`QR verifikasi ${sig.code}`}
+                width={72}
+                height={72}
+                className="shrink-0 rounded bg-white p-1 ring-1 ring-slate-200"
+                style={{ imageRendering: "pixelated" }}
+              />
+            )}
+            <div className="min-w-0 flex-1 text-[10px] leading-relaxed">
+              <p className="flex items-center gap-1 text-[11px] font-bold" style={{ color: accent }}>
+                <ShieldCheck className="h-3.5 w-3.5" /> Ditandatangani secara elektronik
+              </p>
+              <p className="mt-0.5 text-slate-700">
+                Oleh <span className="font-semibold">{sig.signedBy}</span> · {formatDateTime(sig.signedAt)}
+              </p>
+              <p className="text-slate-600">
+                Kode dokumen: <span className="font-mono font-semibold">{sig.code}</span> · Algoritma: {sig.algo}
+              </p>
+              <p className="break-all text-slate-500">
+                Hash: <span className="font-mono">{sig.hash}</span>
+              </p>
+              <p className="mt-0.5 text-slate-500">
+                Keaslian & keutuhan invoice dapat diperiksa dengan memindai QR. Perubahan sekecil apa pun pada isi
+                invoice akan mengubah hash sehingga tanda tangan tidak lagi cocok.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

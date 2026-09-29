@@ -200,6 +200,10 @@ export type Store = {
   signatureName?: string; // name shown above seller signature line
   note?: string; // default catatan / perhatian
   accent?: string; // hex accent color for the invoice header
+  /** Aktifkan tanda tangan elektronik sebagai default saat membuat invoice toko ini. */
+  eSignEnabled?: boolean;
+  /** Nama penanda tangan elektronik (fallback: signatureName lalu name). */
+  eSignerName?: string;
   createdAt: string;
 };
 
@@ -208,6 +212,20 @@ export type InvoiceLine = {
   unit: string;
   quantity: number;
   price: number;
+};
+
+/**
+ * Tanda tangan elektronik invoice. Bukan PSrE bersertifikat negara, melainkan
+ * tanda tangan kriptografis internal: `hash` adalah SHA-256 atas isi invoice
+ * (integritas — berubah bila invoice diubah), `code` kode dokumen yang
+ * diturunkan dari hash, dipakai di QR verifikasi pada cetakan.
+ */
+export type InvoiceSignature = {
+  signedBy: string; // nama penanda tangan
+  signedAt: string; // ISO timestamp
+  hash: string; // SHA-256 hex atas isi invoice
+  code: string; // kode dokumen (turunan hash), mis. AFJ-9F2A-77C1-1B0E
+  algo: string; // "SHA-256"
 };
 
 export type Invoice = {
@@ -223,6 +241,7 @@ export type Invoice = {
   shipping: number;
   total: number;
   note?: string;
+  signature?: InvoiceSignature; // ada bila ditandatangani elektronik
   createdAt: string;
 };
 
