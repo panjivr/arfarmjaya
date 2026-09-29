@@ -315,6 +315,17 @@ export type ReportProfile = {
    * dan Tujuan — bisa dicentang dan diatur lebarnya.
    */
   columns?: ReportColumnSetting[];
+  /** Kartu ringkasan eksekutif di atas tabel (serapan, jumlah kegiatan, periode). */
+  showExecutiveSummary?: boolean;
+  /** Blok tanda tangan "Dibuat oleh" (pelaksana). Default aktif. */
+  signExecutor?: boolean;
+  /** Blok tanda tangan "Mengetahui/Menyetujui" (manajer/yayasan). */
+  signApprover?: boolean;
+  /** Blok klaim reimbursement (instruksi pembayaran). Default nonaktif. */
+  showReimbursement?: boolean;
+  reimbursementBank?: string;
+  reimbursementAccount?: string;
+  reimbursementHolder?: string;
   createdAt: string;
 };
 

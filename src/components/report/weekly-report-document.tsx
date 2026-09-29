@@ -83,31 +83,41 @@ function IdentityRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SignatureColumn({
+/**
+ * Kolom tanda tangan/pengesahan. Menyediakan ruang kosong (untuk TTE/QR atau
+ * tanda tangan basah) di antara lead & nama, sehingga bisa diisi visual nanti.
+ */
+function ApprovalColumn({
+  lead,
+  place,
   role,
   name,
   signatureImage,
-  place,
 }: {
-  role: string;
+  lead: string;
+  place?: string;
+  role?: string;
   name?: string;
   signatureImage?: string;
-  place?: string;
 }) {
   return (
-    <div className="w-[230px] text-center" style={{ breakInside: "avoid" }}>
-      <p style={{ color: ink }}>{place?.trim() ? place : "\u00A0"}</p>
-      <p className="mt-0.5 whitespace-pre-line" style={{ color: ink }}>
-        {role}
-      </p>
-      <div className="relative mx-auto flex h-[52px] w-full items-center justify-center">
+    <div className="w-[240px] text-center" style={{ breakInside: "avoid" }}>
+      <p className="font-semibold" style={{ color: ink }}>{lead}</p>
+      {place?.trim() && (
+        <p className="text-[9px]" style={{ color: inkMuted }}>{place}</p>
+      )}
+      {/* Ruang kosong untuk TTE / QR / tanda tangan basah */}
+      <div className="relative mx-auto flex h-[58px] w-full items-center justify-center">
         {signatureImage && (
-          <Image src={signatureImage} alt={`Tanda tangan ${name ?? role}`} width={180} height={64} className="max-h-[52px] w-auto object-contain" loading="eager" unoptimized />
+          <Image src={signatureImage} alt={`Tanda tangan ${name ?? role ?? ""}`} width={180} height={64} className="max-h-[56px] w-auto object-contain" loading="eager" unoptimized />
         )}
       </div>
       <p className="font-bold underline" style={{ color: ink }}>
         {name?.trim() ? `( ${name} )` : "(  ..............................................  )"}
       </p>
+      {role?.trim() && (
+        <p className="mt-0.5 whitespace-pre-line text-[9px]" style={{ color: inkMuted }}>{role}</p>
+      )}
     </div>
   );
 }
@@ -137,6 +147,14 @@ export function WeeklyReportDocument({
   // Tinggi baris & kotak foto/bukti (arah vertikal). Default 70px; dibatasi
   // agar tetap masuk akal saat dicetak.
   const rowH = Math.max(32, Math.min(420, Math.round(profile.rowHeight || 70)));
+
+  // Bagian LPJ yang dapat diatur (checklist). Default menjaga kompatibilitas
+  // profil lama: ringkasan eksekutif & blok "Dibuat oleh" aktif; blok
+  // "Mengetahui" aktif bila jabatan pengesah diisi; reimbursement nonaktif.
+  const execSummaryOn = profile.showExecutiveSummary !== false;
+  const signExecutorOn = profile.signExecutor !== false;
+  const signApproverOn = profile.signApprover ?? Boolean(profile.approverRole?.trim());
+  const reimbursementOn = Boolean(profile.showReimbursement);
 
   const rows = report.activities;
   const blanks = Math.max(0, (profile.minRows || 0) - rows.length);
@@ -211,6 +229,22 @@ export function WeeklyReportDocument({
           <IdentityRow label="Minggu Ke- / Periode" value={report.week} />
         </div>
       </section>
+
+      {/* Ringkasan Eksekutif — kartu ringkas di atas tabel (gaya LPJ korporat) */}
+      {execSummaryOn && (
+        <section className="mt-3 grid grid-cols-3 gap-2" style={{ breakInside: "avoid" }}>
+          {[
+            { label: "Total Serapan Anggaran", value: `Rp ${numberFmt.format(report.total)}` },
+            { label: "Kegiatan Terlaksana", value: `${rows.length} kegiatan` },
+            { label: "Periode Laporan", value: periodLabel(report) },
+          ].map((c) => (
+            <div key={c.label} className="rounded px-3 py-1.5" style={{ border: `1px solid ${line}`, borderLeft: `3px solid ${accent}`, background: "#ffffff" }}>
+              <p className="text-[8px] font-semibold uppercase tracking-wide" style={{ color: inkMuted }}>{c.label}</p>
+              <p className="text-[12px] font-bold" style={{ color: ink }}>{c.value}</p>
+            </div>
+          ))}
+        </section>
+      )}
 
       {/* Tabel kegiatan */}
       <table className="mt-3 w-full border-collapse" style={{ tableLayout: "fixed" }}>
@@ -323,37 +357,57 @@ export function WeeklyReportDocument({
         </tbody>
       </table>
 
-      {/* Ringkasan + tanda tangan */}
-      <section className="mt-3 flex flex-wrap items-start justify-between gap-6" style={{ breakInside: "avoid" }}>
-        <div className="min-w-[280px] flex-1">
-          {profile.showSummary && summary.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {summary.map((item) => (
-                <div key={item.label} className="rounded px-3 py-1.5" style={{ border: `1px solid ${line}`, background: "#ffffff" }}>
-                  <p className="text-[8px] uppercase tracking-wide" style={{ color: inkMuted }}>
-                    {item.label}
-                  </p>
-                  <p className="text-[10.5px] font-bold" style={{ color: ink }}>
-                    {item.value}
-                  </p>
-                </div>
-              ))}
+      {/* Ringkasan bawah (opsional) */}
+      {profile.showSummary && summary.length > 0 && (
+        <section className="mt-4 flex flex-wrap gap-2" style={{ breakInside: "avoid" }}>
+          {summary.map((item) => (
+            <div key={item.label} className="rounded px-3 py-1.5" style={{ border: `1px solid ${line}`, background: "#ffffff" }}>
+              <p className="text-[8px] uppercase tracking-wide" style={{ color: inkMuted }}>
+                {item.label}
+              </p>
+              <p className="text-[10.5px] font-bold" style={{ color: ink }}>
+                {item.value}
+              </p>
             </div>
-          )}
-        </div>
+          ))}
+        </section>
+      )}
 
-        <div className="flex gap-8">
-          {profile.approverRole?.trim() && (
-            <SignatureColumn role={`Mengetahui,\n${profile.approverRole}`} name={profile.approverName} />
-          )}
-          <SignatureColumn
-            role={profile.signatureRole}
-            name={profile.signatureName || report.executor}
-            signatureImage={profile.signatureImage}
-            place={`${report.signPlace || profile.signaturePlace || "................................"}, ${formatLongDate(report.signDate)}`}
-          />
+      {/* Blok Klaim Reimbursement (opsional) — instruksi pembayaran korporat */}
+      {reimbursementOn && (
+        <div className="my-6 rounded-md p-4" style={{ border: "1px solid #e5e7eb", background: "#f9fafb", breakInside: "avoid" }}>
+          <p className="text-[11px] leading-relaxed" style={{ color: "#374151" }}>
+            Berdasarkan rincian pelaksanaan program di atas, kami mengajukan permohonan penggantian dana operasional
+            (reimbursement) sebesar <span className="font-bold" style={{ color: "#111827" }}>Rp {numberFmt.format(report.total)}</span>.
+            Pembayaran dapat ditransfer ke rekening vendor pelaksana/agregator berikut:
+          </p>
+          <div className="mt-2 space-y-0.5 text-[11px] font-semibold" style={{ color: "#111827" }}>
+            <div className="flex gap-2"><span className="w-[130px] shrink-0">Nama Bank</span><span>:</span><span>{profile.reimbursementBank?.trim() || "-"}</span></div>
+            <div className="flex gap-2"><span className="w-[130px] shrink-0">Nomor Rekening</span><span>:</span><span>{profile.reimbursementAccount?.trim() || "-"}</span></div>
+            <div className="flex gap-2"><span className="w-[130px] shrink-0">Atas Nama</span><span>:</span><span>{profile.reimbursementHolder?.trim() || "-"}</span></div>
+          </div>
         </div>
-      </section>
+      )}
+
+      {/* Blok pengesahan — "Dibuat oleh" (kiri) & "Mengetahui/Menyetujui" (kanan) */}
+      {(signExecutorOn || signApproverOn) && (
+        <section className="mt-6 flex items-start justify-between gap-8" style={{ breakInside: "avoid" }}>
+          {signExecutorOn ? (
+            <ApprovalColumn
+              lead="Dibuat oleh,"
+              place={`${report.signPlace || profile.signaturePlace || "................................"}, ${formatLongDate(report.signDate)}`}
+              role={profile.signatureRole}
+              name={profile.signatureName || report.executor}
+              signatureImage={profile.signatureImage}
+            />
+          ) : (
+            <div />
+          )}
+          {signApproverOn && (
+            <ApprovalColumn lead="Mengetahui/Menyetujui," role={profile.approverRole} name={profile.approverName} />
+          )}
+        </section>
+      )}
 
       {/* Kaki halaman */}
       <footer

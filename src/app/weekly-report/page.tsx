@@ -107,6 +107,13 @@ const blankProfile: Omit<ReportProfile, "id" | "createdAt"> = {
   showNotes: true,
   autoFit: true,
   minRows: 8,
+  showExecutiveSummary: true,
+  signExecutor: true,
+  signApprover: false,
+  showReimbursement: false,
+  reimbursementBank: "",
+  reimbursementAccount: "",
+  reimbursementHolder: "",
 };
 
 export default function WeeklyReportPage() {
@@ -272,7 +279,7 @@ export default function WeeklyReportPage() {
       if (area) area.style.setProperty("--report-print-zoom", "1");
       // size: landscape (bukan "A4 landscape") mengikuti ukuran kertas apa pun
       // yang dipilih di dialog cetak; margin memberi jarak rapi di semua sisi.
-      printDocument({ landscape: true, margin: "12mm", bodyClass: "printing-report" });
+      printDocument({ landscape: true, margin: "12mm", bodyClass: "printing-report", pageNumbers: true });
       window.setTimeout(restoreTitle, 8000);
     }, 350);
   }
@@ -1196,10 +1203,31 @@ function ProfileModal({
         <div>
           <p className="mb-2 text-sm font-semibold">Bagian Lain</p>
           <div className="grid gap-2 sm:grid-cols-3">
-            <Toggle label="Ringkasan" checked={draft.showSummary} onChange={(v) => set("showSummary", v)} />
+            <Toggle label="Ringkasan Eksekutif (atas)" checked={draft.showExecutiveSummary !== false} onChange={(v) => set("showExecutiveSummary", v)} />
+            <Toggle label="Ringkasan (bawah)" checked={draft.showSummary} onChange={(v) => set("showSummary", v)} />
             <Toggle label="Keterangan Pengisian" checked={draft.showNotes} onChange={(v) => set("showNotes", v)} />
             <Toggle label="Muat Otomatis 1 Halaman" checked={draft.autoFit} onChange={(v) => set("autoFit", v)} />
           </div>
+        </div>
+
+        <div>
+          <p className="mb-2 text-sm font-semibold">Blok Tanda Tangan / Pengesahan</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Toggle label="Tampilkan “Dibuat oleh” (Pelaksana)" checked={draft.signExecutor !== false} onChange={(v) => set("signExecutor", v)} />
+            <Toggle label="Tampilkan “Mengetahui/Menyetujui”" checked={draft.signApprover ?? Boolean(draft.approverRole?.trim())} onChange={(v) => set("signApprover", v)} />
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-2 text-sm font-semibold">Blok Klaim Reimbursement</p>
+          <Toggle label="Tampilkan blok instruksi pembayaran (reimbursement)" checked={Boolean(draft.showReimbursement)} onChange={(v) => set("showReimbursement", v)} />
+          {draft.showReimbursement && (
+            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+              <Field label="Nama Bank"><Input value={draft.reimbursementBank ?? ""} onChange={(e) => set("reimbursementBank", e.target.value)} placeholder="Bank BRI" /></Field>
+              <Field label="Nomor Rekening"><Input value={draft.reimbursementAccount ?? ""} onChange={(e) => set("reimbursementAccount", e.target.value)} placeholder="007001004352561" /></Field>
+              <div className="sm:col-span-2"><Field label="Atas Nama (Vendor/CV)"><Input value={draft.reimbursementHolder ?? ""} onChange={(e) => set("reimbursementHolder", e.target.value)} placeholder="CV. PRAKARSA MANUNGGAL JAYANANDA" /></Field></div>
+            </div>
+          )}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
