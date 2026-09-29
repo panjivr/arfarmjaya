@@ -50,29 +50,37 @@ function codeFromHash(hash: string): string {
   return `AFJ-${up.slice(0, 4)}-${up.slice(4, 8)}-${up.slice(8, 12)}`;
 }
 
-/** Bangun tanda tangan elektronik untuk sebuah invoice. */
-export async function buildInvoiceSignature(inv: SignableInvoice, signerName: string): Promise<InvoiceSignature> {
+/**
+ * Bangun tanda tangan elektronik untuk sebuah invoice.
+ * `signedAt` (ISO) boleh diisi agar tanggal/waktu tanda tangan dapat dipilih;
+ * bila kosong memakai waktu sekarang.
+ */
+export async function buildInvoiceSignature(
+  inv: SignableInvoice,
+  signerName: string,
+  signedAt?: string,
+): Promise<InvoiceSignature> {
   const hash = await sha256Hex(canonical(inv));
+  const when = signedAt && !Number.isNaN(Date.parse(signedAt)) ? new Date(signedAt).toISOString() : new Date().toISOString();
   return {
     signedBy: signerName.trim() || inv.storeName.trim() || "Penjual",
-    signedAt: new Date().toISOString(),
+    signedAt: when,
     hash,
     code: codeFromHash(hash),
     algo: "SHA-256",
   };
 }
 
-/** Isi QR verifikasi — memuat fakta utama + hash agar bisa dicek saat dipindai. */
+/**
+ * Isi QR verifikasi — SENGAJA ringkas agar kotak QR besar & mudah dipindai.
+ * Hash lengkap tetap tercetak sebagai teks; QR memuat kode dokumen (turunan
+ * hash) + fakta utama, cukup untuk merujuk & mengecek keaslian invoice.
+ */
 export function invoiceQrPayload(inv: SignableInvoice, sig: InvoiceSignature): string {
   return [
-    "AR FARM JAYA - Tanda Tangan Elektronik",
-    `No: ${inv.number}`,
-    `Tanggal: ${inv.date}`,
-    `Pembeli: ${inv.buyer}`,
-    `Total: Rp${inv.total.toLocaleString("id-ID")}`,
-    `Penandatangan: ${sig.signedBy}`,
-    `Kode: ${sig.code}`,
-    `Algoritma: ${sig.algo}`,
-    `Hash: ${sig.hash}`,
+    "AR FARM JAYA e-TTD",
+    `No:${inv.number}`,
+    `Rp${inv.total.toLocaleString("id-ID")}`,
+    `Kode:${sig.code}`,
   ].join("\n");
 }

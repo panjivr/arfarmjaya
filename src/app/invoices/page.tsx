@@ -18,6 +18,25 @@ import type { Invoice, InvoiceLine, InvoiceSignature, Store } from "@/lib/types"
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+/** Waktu lokal untuk <input type="datetime-local"> (YYYY-MM-DDTHH:mm). */
+function nowLocalInput(): string {
+  const d = new Date();
+  const off = d.getTimezoneOffset();
+  return new Date(d.getTime() - off * 60_000).toISOString().slice(0, 16);
+}
+/** ISO → nilai datetime-local (lokal). */
+function isoToLocalInput(iso?: string): string {
+  if (!iso || Number.isNaN(Date.parse(iso))) return nowLocalInput();
+  const d = new Date(iso);
+  const off = d.getTimezoneOffset();
+  return new Date(d.getTime() - off * 60_000).toISOString().slice(0, 16);
+}
+/** datetime-local (lokal) → ISO. */
+function localInputToIso(local: string): string {
+  const t = Date.parse(local);
+  return Number.isNaN(t) ? new Date().toISOString() : new Date(local).toISOString();
+}
+
 export default function InvoicesPage() {
   const stores = useUiStore((s) => s.stores);
   const invoices = useUiStore((s) => s.invoices);
@@ -36,6 +55,7 @@ export default function InvoicesPage() {
   // Mode edit invoice tersimpan + tanda tangan elektronik.
   const [editingId, setEditingId] = useState<string | null>(null);
   const [eSign, setESign] = useState(false);
+  const [signAt, setSignAt] = useState(nowLocalInput()); // waktu TTD yang dapat dipilih
   const [previewSig, setPreviewSig] = useState<InvoiceSignature | undefined>(undefined);
 
   // After store hydration/sync the store ids can change; keep the selected
@@ -72,13 +92,14 @@ export default function InvoicesPage() {
     buildInvoiceSignature(
       { number: invoiceNumber, storeName: store?.name ?? "", buyer, date, lines, subtotal, shipping: shipping || 0, total },
       signerName,
+      localInputToIso(signAt),
     ).then((s) => {
       if (alive) setPreviewSig(s);
     });
     return () => {
       alive = false;
     };
-  }, [eSign, lines, invoiceNumber, buyer, date, subtotal, shipping, total, store?.name, signerName]);
+  }, [eSign, lines, invoiceNumber, buyer, date, subtotal, shipping, total, store?.name, signerName, signAt]);
 
   const previewData: InvoiceData = { number: invoiceNumber, buyer, buyerPhone, date, lines, subtotal, shipping: shipping || 0, total, note: store?.note, signature: eSign ? previewSig : undefined };
 
@@ -98,6 +119,7 @@ export default function InvoicesPage() {
     setNumberOverride("");
     setShipping(0);
     setESign(Boolean(store?.eSignEnabled));
+    setSignAt(nowLocalInput());
     setPreviewSig(undefined);
   }
 
@@ -110,6 +132,7 @@ export default function InvoicesPage() {
         signature = await buildInvoiceSignature(
           { number: invoiceNumber, storeName: store?.name ?? "", buyer, date, lines, subtotal, shipping: shipping || 0, total },
           signerName,
+          localInputToIso(signAt),
         );
       } catch {
         return toast.error("Gagal membuat tanda tangan elektronik.");
@@ -132,6 +155,7 @@ export default function InvoicesPage() {
     setLines(inv.lines.map((l) => ({ ...l })));
     setShipping(inv.shipping || 0);
     setESign(Boolean(inv.signature));
+    setSignAt(isoToLocalInput(inv.signature?.signedAt));
     setPreviewSig(undefined);
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
     toast.info(`Mengedit invoice ${inv.number}.`);
@@ -218,6 +242,17 @@ export default function InvoicesPage() {
                   </span>
                 </span>
               </label>
+
+              {eSign && (
+                <Field label="Tanggal & Waktu Tanda Tangan" hint="Bisa diatur — kapan invoice ini dianggap ditandatangani.">
+                  <div className="flex items-center gap-2">
+                    <Input type="datetime-local" value={signAt} onChange={(e) => setSignAt(e.target.value || nowLocalInput())} />
+                    <Button type="button" variant="secondary" className="h-11 shrink-0 whitespace-nowrap px-3" onClick={() => setSignAt(nowLocalInput())}>
+                      Sekarang
+                    </Button>
+                  </div>
+                </Field>
+              )}
             </CardContent>
           </Card>
 
