@@ -49,6 +49,17 @@ export default function SettingsPage() {
     URL.revokeObjectURL(url);
     toast.success("Cadangan diunduh.");
   }
+
+  // Unduh seluruh data langsung dari server (bukan cache perangkat ini).
+  function downloadFromServer() {
+    const a = document.createElement("a");
+    a.href = "/api/backup";
+    a.download = "";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    toast.info("Mengunduh cadangan dari server…");
+  }
   function onRestoreFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -219,9 +230,10 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted">
-                Unduh seluruh data sebagai berkas cadangan (JSON), atau pulihkan dari berkas cadangan. Berguna sebelum perubahan besar.
+                Unduh seluruh data sebagai berkas cadangan (JSON), atau pulihkan dari berkas cadangan. Berguna sebelum perubahan besar atau pindah server.
               </p>
               <div className="flex flex-wrap gap-2">
+                <Button onClick={downloadFromServer}><Download className="h-4 w-4" /> Unduh dari Server</Button>
                 <Button variant="secondary" onClick={downloadBackup}><Download className="h-4 w-4" /> Unduh Cadangan</Button>
                 <Button variant="secondary" onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4" /> Pulihkan dari Berkas</Button>
                 <Button variant="secondary" onClick={restoreLocalBackup}><Upload className="h-4 w-4" /> Pulihkan Data Lokal</Button>
