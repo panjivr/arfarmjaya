@@ -79,6 +79,10 @@ export function InvoiceDocument({ store, invoice, id }: { store?: Store; invoice
     : null;
   const qr = useInvoiceQr(qrPayload);
 
+  // Empty-state kontak: sembunyikan bila kosong atau hanya tanda hubung.
+  const phone = invoice.buyerPhone?.trim() ?? "";
+  const hasPhone = phone.length > 0 && phone !== "-";
+
   return (
     <div
       id={id}
@@ -116,7 +120,7 @@ export function InvoiceDocument({ store, invoice, id }: { store?: Store; invoice
         <div className="mt-5 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Ditujukan kepada</p>
           <p className="text-sm font-bold text-slate-800">{invoice.buyer || "-"}</p>
-          {invoice.buyerPhone && <p className="text-[11px] text-slate-600">Telp: {invoice.buyerPhone}</p>}
+          {hasPhone && <p className="text-[11px] text-slate-600">Telp: {invoice.buyerPhone!.trim()}</p>}
         </div>
 
         {/* Rincian barang */}
@@ -127,8 +131,8 @@ export function InvoiceDocument({ store, invoice, id }: { store?: Store; invoice
               <th className="px-3 py-2 text-left font-semibold">Nama Barang</th>
               <th className="px-2 py-2 text-center font-semibold" style={{ width: "10%" }}>Satuan</th>
               <th className="px-2 py-2 text-right font-semibold" style={{ width: "12%" }}>Jumlah</th>
-              <th className="px-3 py-2 text-right font-semibold" style={{ width: "18%" }}>Harga</th>
-              <th className="px-3 py-2 text-right font-semibold" style={{ width: "20%" }}>Total</th>
+              <th className="px-3 py-2 text-right font-semibold" style={{ width: "18%" }}>Harga (Rp)</th>
+              <th className="px-3 py-2 text-right font-semibold" style={{ width: "20%" }}>Total (Rp)</th>
             </tr>
           </thead>
           <tbody>
@@ -169,8 +173,8 @@ export function InvoiceDocument({ store, invoice, id }: { store?: Store; invoice
           </div>
         </div>
 
-        {/* Pembayaran + tanda tangan */}
-        <div className="mt-6 flex items-end justify-between gap-6 text-xs">
+        {/* Pembayaran + tanda tangan (TTE menyatu di kolom "Hormat kami") */}
+        <div className="mt-6 flex items-end justify-between gap-6 text-xs" style={{ breakInside: "avoid" }}>
           <div className="max-w-[55%]">
             <p className="font-semibold text-slate-700">Informasi Pembayaran</p>
             {store?.bankInfo ? (
@@ -180,56 +184,54 @@ export function InvoiceDocument({ store, invoice, id }: { store?: Store; invoice
             )}
             {invoice.note && <p className="mt-2 text-slate-600">{invoice.note}</p>}
           </div>
-          <div className="text-center">
+
+          <div className="min-w-[180px] max-w-[240px] text-center">
             <p className="text-slate-600">Hormat kami,</p>
-            <div className="h-12" />
-            <p className="border-t border-slate-400 px-6 pt-1 font-semibold text-slate-700">
-              {sig?.signedBy ?? store?.signatureName ?? store?.name ?? ""}
-            </p>
+            {sig ? (
+              <>
+                <p className="mt-1 flex items-center justify-center gap-1 text-xs font-medium text-green-700">
+                  <ShieldCheck className="h-3 w-3" /> Ditandatangani secara elektronik
+                </p>
+                {qr && (
+                  // QR sebagai pengganti tanda tangan basah.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={qr}
+                    alt={`QR verifikasi ${sig.code}`}
+                    width={80}
+                    height={80}
+                    className="mx-auto my-1 rounded bg-white p-1 ring-1 ring-slate-200"
+                    style={{ imageRendering: "pixelated", width: 80, height: 80 }}
+                  />
+                )}
+                <p className="font-bold text-slate-800">{sig.signedBy || store?.signatureName || store?.name || ""}</p>
+                <p className="text-xs text-gray-500">{formatDateTime(sig.signedAt)}</p>
+              </>
+            ) : (
+              <>
+                <div className="h-12" />
+                <p className="border-t border-slate-400 px-6 pt-1 font-semibold text-slate-700">
+                  {store?.signatureName ?? store?.name ?? ""}
+                </p>
+              </>
+            )}
           </div>
         </div>
-
-        {/* Panel tanda tangan elektronik (muncul bila invoice ditandatangani) */}
-        {sig && (
-          <div
-            className="mt-5 flex flex-col items-center gap-4 rounded-md border px-4 py-4 sm:flex-row sm:items-start"
-            style={{ borderColor: accent, background: "rgba(0,122,75,0.05)" }}
-          >
-            {qr && (
-              <div className="shrink-0 text-center">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={qr}
-                  alt={`QR verifikasi ${sig.code}`}
-                  width={160}
-                  height={160}
-                  className="rounded bg-white p-2 ring-1 ring-slate-200"
-                  style={{ imageRendering: "pixelated", width: 160, height: 160 }}
-                />
-                <p className="mt-1 text-[9px] font-medium text-slate-500">Pindai untuk verifikasi</p>
-              </div>
-            )}
-            <div className="min-w-0 flex-1 text-[10px] leading-relaxed">
-              <p className="flex items-center gap-1 text-[11px] font-bold" style={{ color: accent }}>
-                <ShieldCheck className="h-3.5 w-3.5" /> Ditandatangani secara elektronik
-              </p>
-              <p className="mt-0.5 text-slate-700">
-                Oleh <span className="font-semibold">{sig.signedBy}</span> · {formatDateTime(sig.signedAt)}
-              </p>
-              <p className="text-slate-600">
-                Kode dokumen: <span className="font-mono font-semibold">{sig.code}</span> · Algoritma: {sig.algo}
-              </p>
-              <p className="break-all text-slate-500">
-                Hash: <span className="font-mono">{sig.hash}</span>
-              </p>
-              <p className="mt-0.5 text-slate-500">
-                Keaslian & keutuhan invoice dapat diperiksa dengan memindai QR. Perubahan sekecil apa pun pada isi
-                invoice akan mengubah hash sehingga tanda tangan tidak lagi cocok.
-              </p>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Footer detail teknis TTE — kecil & muted, ringkas maksimal 2 baris */}
+      {sig && (
+        <div
+          className="border-t border-slate-100 px-6 py-2 text-[9px] leading-relaxed text-gray-400 sm:px-8"
+          style={{ breakInside: "avoid" }}
+        >
+          <p>
+            Verifikasi TTE · Kode: <span className="font-mono">{sig.code}</span> · Algoritma: {sig.algo} · Hash:{" "}
+            <span className="break-all font-mono">{sig.hash}</span>
+          </p>
+          <p>Keaslian &amp; keutuhan dapat diperiksa dengan memindai QR; perubahan isi invoice akan mengubah hash.</p>
+        </div>
+      )}
     </div>
   );
 }
