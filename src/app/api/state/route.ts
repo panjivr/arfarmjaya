@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { gunzipSync } from "node:zlib";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { currentSession } from "@/lib/session-server";
@@ -28,7 +29,10 @@ export async function PUT(request: Request) {
   if (!(await currentSession())) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   if (!prisma) return NextResponse.json({ ok: false, db: false });
   try {
-    const body = await request.json();
+    // Body bisa gzip (header x-encoding) agar muat di bawah batas request server.
+    const buf = Buffer.from(await request.arrayBuffer());
+    const raw = request.headers.get("x-encoding") === "gzip" ? gunzipSync(buf).toString("utf8") : buf.toString("utf8");
+    const body = JSON.parse(raw);
     const data = body as Prisma.InputJsonValue;
     const row = await prisma.workspace.upsert({
       where: { id: WORKSPACE_ID },

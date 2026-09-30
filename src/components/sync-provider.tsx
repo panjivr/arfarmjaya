@@ -43,6 +43,24 @@ const SYNC_KEYS = [
 
 type Snapshot = Record<string, unknown>;
 
+/**
+ * Kompres body dengan gzip bila didukung browser, agar ukuran kiriman jauh lebih
+ * kecil dan tidak menabrak batas request server (Vercel ~4.5 MB). Server mengenal
+ * header "x-encoding: gzip" lalu mendekompresi. Bila tak didukung, kirim polos.
+ */
+async function encodeBody(serialized: string): Promise<{ body: BodyInit; headers: Record<string, string> }> {
+  try {
+    if (typeof CompressionStream !== "undefined") {
+      const stream = new Blob([serialized]).stream().pipeThrough(new CompressionStream("gzip"));
+      const blob = await new Response(stream).blob();
+      return { body: blob, headers: { "Content-Type": "application/json", "x-encoding": "gzip" } };
+    }
+  } catch {
+    /* fallback ke kiriman polos */
+  }
+  return { body: serialized, headers: { "Content-Type": "application/json" } };
+}
+
 function snapshot(state: Record<string, unknown>): Snapshot {
   const out: Snapshot = {};
   for (const key of SYNC_KEYS) out[key] = state[key];
@@ -130,11 +148,8 @@ export async function syncNow(): Promise<{ ok: boolean; message?: string }> {
   const setStatus = useSyncStatus.getState().setStatus;
   setStatus({ status: "saving", message: undefined });
   try {
-    const res = await fetch("/api/state", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: serialized,
-    });
+    const { body, headers } = await encodeBody(serialized);
+    const res = await fetch("/api/state", { method: "PUT", headers, body });
     const json = await res.json().catch(() => ({}));
     if (json?.ok) {
       writeMeta({ syncedAt: json?.updatedAt ?? undefined, sig: sig(serialized) });
@@ -177,11 +192,8 @@ export function SyncProvider() {
       const sizeMb = (serialized.length / 1_048_576).toFixed(1);
       setStatus({ status: "saving", message: undefined });
       try {
-        const res = await fetch("/api/state", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: serialized,
-        });
+        const { body, headers } = await encodeBody(serialized);
+        const res = await fetch("/api/state", { method: "PUT", headers, body });
         const json = await res.json().catch(() => ({}));
         if (json?.ok) {
           lastSent = serialized;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Save, RotateCcw, Palette, Info, Download, Upload } from "lucide-react";
+import { Save, RotateCcw, Palette, Info, Download, Upload, Images } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { Field, Input } from "@/components/ui/field";
 import { toast } from "@/components/ui/toast";
 import { useUiStore } from "@/lib/store";
 import { useSyncStatus, readLocalBackup, syncNow } from "@/components/sync-provider";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, compressDataUrl } from "@/lib/utils";
 import { APP_BUILD } from "@/lib/build-info";
 import type { AppSettings } from "@/lib/types";
 
@@ -38,6 +38,60 @@ export default function SettingsPage() {
   }
 
   const [form, setForm] = useState<AppSettings>(settings);
+  const [optimizing, setOptimizing] = useState(false);
+
+  // Perkecil ulang semua foto tersimpan (kegiatan, bukti, logo, tanda tangan,
+  // jurnal) agar total data turun di bawah batas kiriman server (penyebab
+  // "Gagal menyimpan / HTTP 413"). Lalu langsung sinkron ke server.
+  async function optimizeImages() {
+    if (optimizing) return;
+    if (!confirm("Optimalkan (perkecil) semua foto tersimpan agar bisa disimpan ke server? Kualitas foto sedikit menurun, tapi data jadi jauh lebih ringan.")) return;
+    setOptimizing(true);
+    try {
+      const s = useUiStore.getState();
+      const sizeOf = (st: ReturnType<typeof useUiStore.getState>) =>
+        (JSON.stringify(st.weeklyReports).length + JSON.stringify(st.reportProfiles).length + JSON.stringify(st.stores).length + JSON.stringify(st.pondJournals).length) / 1_048_576;
+      const before = sizeOf(s);
+
+      const weeklyReports = await Promise.all(
+        s.weeklyReports.map(async (r) => ({
+          ...r,
+          activities: await Promise.all(
+            r.activities.map(async (a) => ({
+              ...a,
+              photo: a.photo ? await compressDataUrl(a.photo) : a.photo,
+              photos: Array.isArray(a.photos) ? await Promise.all(a.photos.map((p) => compressDataUrl(p))) : a.photos,
+              paymentProof: a.paymentProof ? await compressDataUrl(a.paymentProof) : a.paymentProof,
+            })),
+          ),
+        })),
+      );
+      const reportProfiles = await Promise.all(
+        s.reportProfiles.map(async (p) => ({
+          ...p,
+          logo: p.logo ? await compressDataUrl(p.logo) : p.logo,
+          signatureImage: p.signatureImage ? await compressDataUrl(p.signatureImage) : p.signatureImage,
+        })),
+      );
+      const stores = await Promise.all(
+        s.stores.map(async (st) => ({ ...st, logo: st.logo ? await compressDataUrl(st.logo) : st.logo })),
+      );
+      const pondJournals = await Promise.all(
+        s.pondJournals.map(async (j) => ({ ...j, photo: j.photo ? await compressDataUrl(j.photo) : j.photo })),
+      );
+
+      useUiStore.setState({ weeklyReports, reportProfiles, stores, pondJournals } as never);
+      const after = sizeOf(useUiStore.getState());
+      const sent = await syncNow();
+      const delta = `${before.toFixed(1)} MB → ${after.toFixed(1)} MB`;
+      if (sent.ok) toast.success(`Foto dioptimalkan (${delta}) & tersimpan ke server.`);
+      else toast.error(`Foto dioptimalkan (${delta}), tapi gagal simpan: ${sent.message}`);
+    } catch {
+      toast.error("Gagal mengoptimalkan gambar.");
+    } finally {
+      setOptimizing(false);
+    }
+  }
 
   function downloadBackup() {
     const blob = new Blob([exportBackup()], { type: "application/json" });
@@ -230,13 +284,14 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted">
-                Unduh seluruh data sebagai berkas cadangan (JSON), atau pulihkan dari berkas cadangan. Berguna sebelum perubahan besar atau pindah server.
+                Unduh seluruh data sebagai berkas cadangan (JSON), atau pulihkan dari berkas cadangan. Berguna sebelum perubahan besar atau pindah server. Jika muncul &quot;Gagal menyimpan (HTTP 413)&quot;, klik <strong>Optimalkan Gambar</strong> untuk memperkecil foto agar data kembali bisa tersimpan.
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button onClick={downloadFromServer}><Download className="h-4 w-4" /> Unduh dari Server</Button>
                 <Button variant="secondary" onClick={downloadBackup}><Download className="h-4 w-4" /> Unduh Cadangan</Button>
                 <Button variant="secondary" onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4" /> Pulihkan dari Berkas</Button>
                 <Button variant="secondary" onClick={restoreLocalBackup}><Upload className="h-4 w-4" /> Pulihkan Data Lokal</Button>
+                <Button variant="secondary" onClick={optimizeImages} disabled={optimizing}><Images className="h-4 w-4" /> {optimizing ? "Mengoptimalkan…" : "Optimalkan Gambar"}</Button>
                 <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={onRestoreFile} />
               </div>
             </CardContent>

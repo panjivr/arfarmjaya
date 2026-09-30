@@ -118,11 +118,11 @@ export function fitPrintZoom(
   return zoom >= (options.min ?? 0.75) ? Number(zoom.toFixed(3)) : 1;
 }
 
-const IMAGE_MAX_SIDE = 720;
-// Target ukuran data URL per foto (~70 KB biner). Foto disimpan di dalam data
-// yang tersinkron, jadi harus kecil agar tidak melebihi kuota localStorage /
-// batas kiriman server (penyebab data laporan "hilang" saat refresh).
-const IMAGE_TARGET_LEN = 96_000;
+const IMAGE_MAX_SIDE = 640;
+// Target ukuran data URL per foto (~45 KB biner). Foto disimpan di dalam data
+// yang tersinkron, jadi harus kecil agar total kiriman tidak melebihi batas
+// server (Vercel ~4.5 MB) — penyebab "Gagal menyimpan (HTTP 413)".
+const IMAGE_TARGET_LEN = 60_000;
 
 /**
  * Kecilkan foto sebelum disimpan agar data laporan tetap muat & tersimpan.
@@ -171,5 +171,50 @@ export function compressImage(file: File, opts?: { maxSide?: number; targetLen?:
       image.src = source;
     };
     reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Kompres ulang sebuah gambar yang SUDAH tersimpan sebagai data URL (mis. foto
+ * lama yang terlanjur besar). Mengembalikan data URL lebih kecil, atau nilai asli
+ * bila bukan data URL gambar / sudah cukup kecil / gagal diproses. Dipakai untuk
+ * "Optimalkan Gambar" agar total data turun di bawah batas kiriman server.
+ */
+export function compressDataUrl(dataUrl: string, opts?: { maxSide?: number; targetLen?: number }): Promise<string> {
+  const maxSide = opts?.maxSide ?? IMAGE_MAX_SIDE;
+  const targetLen = opts?.targetLen ?? IMAGE_TARGET_LEN;
+  return new Promise((resolve) => {
+    if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) return resolve(dataUrl);
+    if (dataUrl.length <= targetLen) return resolve(dataUrl);
+    if (typeof window === "undefined") return resolve(dataUrl);
+    const image = new window.Image();
+    image.onerror = () => resolve(dataUrl);
+    image.onload = () => {
+      const baseScale = Math.min(1, maxSide / Math.max(image.width, image.height));
+      const encode = (extra: number, quality: number): string | null => {
+        const w = Math.max(1, Math.round(image.width * baseScale * extra));
+        const h = Math.max(1, Math.round(image.height * baseScale * extra));
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return null;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(image, 0, 0, w, h);
+        return canvas.toDataURL("image/jpeg", quality);
+      };
+      let out = encode(1, 0.6) ?? dataUrl;
+      for (const q of [0.5, 0.42]) {
+        if (out.length <= targetLen) break;
+        out = encode(1, q) ?? out;
+      }
+      for (const extra of [0.8, 0.6, 0.45]) {
+        if (out.length <= targetLen) break;
+        out = encode(extra, 0.45) ?? out;
+      }
+      resolve(out.length < dataUrl.length ? out : dataUrl);
+    };
+    image.src = dataUrl;
   });
 }
