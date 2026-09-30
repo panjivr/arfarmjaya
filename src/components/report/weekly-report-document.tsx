@@ -1,10 +1,13 @@
 "use client";
 
 import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
+import qrcode from "qrcode-generator";
 import { activityPhotos } from "@/lib/activity-photos";
-import { Leaf } from "lucide-react";
+import { Leaf, ShieldCheck } from "lucide-react";
 import type { ReportColumnKey, ReportProfile, WeeklyActivity } from "@/lib/types";
 import { resolveReportColumns, type ResolvedColumn } from "@/lib/report-columns";
+import { buildReportSignature, reportQrPayload, type ReportSignature } from "@/lib/report-sign";
 import { formatDate, formatLongDate, numberFmt } from "@/lib/utils";
 
 export type WeeklyReportData = {
@@ -93,24 +96,34 @@ function ApprovalColumn({
   role,
   name,
   signatureImage,
+  qr,
 }: {
   lead: string;
   place?: string;
   role?: string;
   name?: string;
   signatureImage?: string;
+  qr?: string | null; // data URL QR TTE (bila tanda tangan elektronik aktif)
 }) {
   return (
     <div className="w-[240px] text-center" style={{ breakInside: "avoid" }}>
       <p className="font-semibold" style={{ color: ink }}>{lead}</p>
+      {qr && (
+        <p className="mt-0.5 flex items-center justify-center gap-1 text-[9px] font-medium text-green-700">
+          <ShieldCheck className="h-3 w-3" /> Ditandatangani secara elektronik
+        </p>
+      )}
       {place?.trim() && (
         <p className="text-[9px]" style={{ color: inkMuted }}>{place}</p>
       )}
-      {/* Ruang kosong untuk TTE / QR / tanda tangan basah */}
-      <div className="relative mx-auto flex h-[58px] w-full items-center justify-center">
-        {signatureImage && (
+      {/* Ruang tanda tangan: QR TTE > gambar TTD basah > kosong untuk diisi manual */}
+      <div className="relative mx-auto flex h-[62px] w-full items-center justify-center">
+        {qr ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={qr} alt="QR tanda tangan elektronik" width={60} height={60} className="rounded bg-white p-0.5 ring-1 ring-slate-200" style={{ imageRendering: "pixelated", width: 60, height: 60 }} />
+        ) : signatureImage ? (
           <Image src={signatureImage} alt={`Tanda tangan ${name ?? role ?? ""}`} width={180} height={64} className="max-h-[56px] w-auto object-contain" loading="eager" unoptimized />
-        )}
+        ) : null}
       </div>
       <p className="font-bold underline" style={{ color: ink }}>
         {name?.trim() ? `( ${name} )` : "(  ..............................................  )"}
@@ -155,6 +168,7 @@ export function WeeklyReportDocument({
   const signExecutorOn = profile.signExecutor !== false;
   const signApproverOn = profile.signApprover ?? Boolean(profile.approverRole?.trim());
   const reimbursementOn = Boolean(profile.showReimbursement);
+  const eSignOn = Boolean(profile.showESign);
 
   const rows = report.activities;
   const blanks = Math.max(0, (profile.minRows || 0) - rows.length);
@@ -171,6 +185,47 @@ export function WeeklyReportDocument({
     ...(isVisible("hst") ? [{ label: "Rentang Umur Tanaman", value: hstRange }] : []),
     ...(amountVisible ? [{ label: "Total Nominal", value: `Rp ${numberFmt.format(report.total)}` }] : []),
   ];
+
+  // Tanda tangan elektronik laporan (opsional): hash SHA-256 atas isi laporan
+  // → kode dokumen + QR. Dihitung di klien; siap sebelum cetak (jeda 350ms).
+  const eSignCanonical = useMemo(
+    () =>
+      [
+        report.number,
+        report.executor,
+        report.group,
+        report.location,
+        report.week,
+        report.total,
+        ...rows.map((a) => `${a.date}|${a.activity}|${a.amount}`),
+      ].join("\n"),
+    [report.number, report.executor, report.group, report.location, report.week, report.total, rows],
+  );
+  const [reportSig, setReportSig] = useState<ReportSignature | null>(null);
+  useEffect(() => {
+    if (!eSignOn) {
+      setReportSig(null);
+      return;
+    }
+    let alive = true;
+    buildReportSignature(eSignCanonical).then((s) => {
+      if (alive) setReportSig(s);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [eSignOn, eSignCanonical]);
+  const eSignQr = useMemo(() => {
+    if (!eSignOn || !reportSig) return null;
+    try {
+      const qr = qrcode(0, "M");
+      qr.addData(reportQrPayload({ number: report.number, total: report.total, code: reportSig.code }));
+      qr.make();
+      return qr.createDataURL(10, 4);
+    } catch {
+      return null;
+    }
+  }, [eSignOn, reportSig, report.number, report.total]);
 
   const cellBase = "align-top px-2 py-1";
   const borderStyle = { border: `1px solid ${line}` };
@@ -399,6 +454,7 @@ export function WeeklyReportDocument({
               role={profile.signatureRole}
               name={profile.signatureName || report.executor}
               signatureImage={profile.signatureImage}
+              qr={eSignQr}
             />
           ) : (
             <div />
@@ -411,14 +467,22 @@ export function WeeklyReportDocument({
 
       {/* Kaki halaman */}
       <footer
-        className="mt-3 flex flex-wrap items-center justify-between gap-2 pt-1.5 text-[8px]"
+        className="mt-3 pt-1.5 text-[8px]"
         style={{ borderTop: `1px solid ${line}`, color: inkMuted }}
       >
-        <span>
-          No. Dokumen: <span className="font-semibold">{report.number || "-"}</span>
-        </span>
-        <span>{profile.organization}</span>
-        <span>Dicetak: {printedAt ?? "-"}</span>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span>
+            No. Dokumen: <span className="font-semibold">{report.number || "-"}</span>
+          </span>
+          <span>{profile.organization}</span>
+          <span>Dicetak: {printedAt ?? "-"}</span>
+        </div>
+        {reportSig && (
+          <p className="mt-1 break-all" style={{ color: "#9ca3af" }}>
+            Verifikasi TTE · Kode: <span className="font-mono">{reportSig.code}</span> · Algoritma: {reportSig.algo} · Hash:{" "}
+            <span className="font-mono">{reportSig.hash}</span>
+          </p>
+        )}
       </footer>
     </div>
   );

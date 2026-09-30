@@ -110,6 +110,7 @@ const blankProfile: Omit<ReportProfile, "id" | "createdAt"> = {
   showExecutiveSummary: true,
   signExecutor: true,
   signApprover: false,
+  showESign: false,
   showReimbursement: false,
   reimbursementBank: "",
   reimbursementAccount: "",
@@ -1215,6 +1216,7 @@ function ProfileModal({
           <div className="grid gap-2 sm:grid-cols-2">
             <Toggle label="Tampilkan “Dibuat oleh” (Pelaksana)" checked={draft.signExecutor !== false} onChange={(v) => set("signExecutor", v)} />
             <Toggle label="Tampilkan “Mengetahui/Menyetujui”" checked={draft.signApprover ?? Boolean(draft.approverRole?.trim())} onChange={(v) => set("signApprover", v)} />
+            <Toggle label="Tanda Tangan Elektronik (QR) di blok Pelaksana" checked={Boolean(draft.showESign)} onChange={(v) => set("showESign", v)} />
           </div>
         </div>
 

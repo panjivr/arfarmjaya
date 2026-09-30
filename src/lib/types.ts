@@ -321,6 +321,8 @@ export type ReportProfile = {
   signExecutor?: boolean;
   /** Blok tanda tangan "Mengetahui/Menyetujui" (manajer/yayasan). */
   signApprover?: boolean;
+  /** Tanda tangan elektronik (QR + hash SHA-256) pada blok "Dibuat oleh". */
+  showESign?: boolean;
   /** Blok klaim reimbursement (instruksi pembayaran). Default nonaktif. */
   showReimbursement?: boolean;
   reimbursementBank?: string;
