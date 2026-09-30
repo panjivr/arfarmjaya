@@ -156,6 +156,7 @@ export default function WeeklyReportPage() {
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [printTarget, setPrintTarget] = useState<{ profile: ReportProfile; data: WeeklyReportData } | null>(null);
   const [printedAt, setPrintedAt] = useState<string | undefined>(undefined);
+  const [orientation, setOrientation] = useState<"landscape" | "portrait">("landscape");
   const [numberSeed, setNumberSeed] = useState("");
   const [sortBy, setSortBy] = useState<"updated" | "date" | "executor" | "amount-desc" | "amount-asc">("updated");
 
@@ -283,7 +284,7 @@ export default function WeeklyReportPage() {
     return (base || "Laporan Mingguan").replace(/[\\/:*?"<>|\n]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 120);
   }
 
-  function print(data: WeeklyReportData, target: ReportProfile, asPdf = false) {
+  function print(data: WeeklyReportData, target: ReportProfile, asPdf = false, landscape = orientation === "landscape") {
     setPrintedAt(formatDateTime(new Date().toISOString()));
     setPrintTarget({ profile: target, data });
     if (asPdf) toast.info("Pada dialog cetak, pilih tujuan “Simpan sebagai PDF”.");
@@ -302,7 +303,7 @@ export default function WeeklyReportPage() {
       if (area) area.style.setProperty("--report-print-zoom", "1");
       // size: landscape (bukan "A4 landscape") mengikuti ukuran kertas apa pun
       // yang dipilih di dialog cetak; margin memberi jarak rapi di semua sisi.
-      printDocument({ landscape: true, margin: "12mm", bodyClass: "printing-report", pageNumbers: true });
+      printDocument({ landscape, margin: "12mm", bodyClass: "printing-report", pageNumbers: true });
       window.setTimeout(restoreTitle, 8000);
     }, 350);
   }
@@ -569,6 +570,26 @@ export default function WeeklyReportPage() {
                 <span className="text-lg font-bold">{currency.format(total)}</span>
               </div>
 
+              <div className="pt-1">
+                <p className="mb-1 text-xs font-medium text-muted">Orientasi kertas cetak / PDF</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["landscape", "portrait"] as const).map((o) => (
+                    <button
+                      key={o}
+                      type="button"
+                      onClick={() => setOrientation(o)}
+                      className={
+                        orientation === o
+                          ? "rounded-lg border border-primary bg-primary/10 px-3 py-2 text-sm font-semibold text-primary"
+                          : "rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium hover:border-primary/50"
+                      }
+                    >
+                      {o === "landscape" ? "Landscape (lebar)" : "Potrait (tegak)"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <Button variant="secondary" onClick={() => print(previewData, profile)} disabled={activities.length === 0}>
                   <Printer className="h-4 w-4" /> Cetak
@@ -590,7 +611,7 @@ export default function WeeklyReportPage() {
         {/* Pratinjau */}
         <div className="no-print min-w-0">
           <Card className="bg-slate-100 p-3 sm:p-4 lg:sticky lg:top-20 dark:bg-slate-900">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted sm:mb-3">Pratinjau cetak — A4 landscape</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted sm:mb-3">Pratinjau cetak — {orientation === "landscape" ? "Landscape" : "Potrait"}</p>
             <ScaledPreview>
               <div className="shadow-lg">
                 <WeeklyReportDocument profile={profile} report={previewData} printedAt={printedAt} />
