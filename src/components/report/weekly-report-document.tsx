@@ -165,7 +165,7 @@ export function WeeklyReportDocument({
   const amountIndex = columns.findIndex((c) => c.key === "amount");
   // Tinggi baris & kotak foto/bukti (arah vertikal). Default 70px; dibatasi
   // agar tetap masuk akal saat dicetak.
-  const rowH = Math.max(32, Math.min(420, Math.round(profile.rowHeight || 70)));
+  const rowH = Math.max(32, Math.min(1000, Math.round(profile.rowHeight || 70)));
 
   // Bagian LPJ yang dapat diatur (checklist). Default menjaga kompatibilitas
   // profil lama: ringkasan eksekutif & blok "Dibuat oleh" aktif; blok
@@ -357,18 +357,24 @@ export function WeeklyReportDocument({
                       ? `Foto ${activity.activity || `kegiatan ${index + 1}`}`
                       : `Bukti pembayaran ${activity.activity || `kegiatan ${index + 1}`}`;
                   return (
-                    <td key={column.key} className={`${cellBase} text-center`} style={borderStyle}>
+                    <td key={column.key} className="align-middle p-1 text-center" style={borderStyle}>
                       {sources.length > 0 ? (
-                        <div className="flex flex-wrap items-center justify-center gap-[2px]">
+                        <div className="flex flex-wrap items-center justify-center gap-1">
                           {sources.map((src, i) => (
                             <Image
                               key={i}
                               src={src}
                               alt={sources.length > 1 ? `${altBase} (${i + 1})` : altBase}
-                              width={320}
-                              height={220}
-                              className="w-auto max-w-full rounded-sm object-contain"
-                              style={{ height: rowH }}
+                              width={640}
+                              height={440}
+                              className="rounded-sm object-contain"
+                              // Satu bukti → mempet memenuhi lebar kotak, tinggi mengikuti
+                              // gambar sampai batas tinggi baris. Banyak foto → berdampingan.
+                              style={
+                                sources.length === 1
+                                  ? { width: "100%", height: "auto", maxHeight: rowH }
+                                  : { height: rowH, width: "auto", maxWidth: "100%" }
+                              }
                               loading="eager"
                               unoptimized
                             />

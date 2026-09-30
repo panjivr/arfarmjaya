@@ -1154,15 +1154,15 @@ function ProfileModal({
           </Field>
           <div className="sm:col-span-2">
             <Field
-              label={`Tinggi Baris / Kotak Bukti — ${Math.max(40, Math.min(320, Math.round(draft.rowHeight || 70)))} px`}
-              hint="Pilih lewat tombol, atau setel halus dengan penggeser. Makin tinggi, kotak Foto/Bukti Pembayaran makin besar dan jelas."
+              label={`Tinggi Baris / Kotak Bukti — ${Math.max(40, Math.min(1000, Math.round(draft.rowHeight || 70)))} px`}
+              hint="Pilih lewat tombol, atau setel halus dengan penggeser (hingga 1000px). Makin tinggi, kotak Foto/Bukti Pembayaran makin besar dan jelas."
             >
               <div className="mb-2 grid grid-cols-4 gap-2">
                 {[
-                  { label: "Rendah", value: 60 },
-                  { label: "Sedang", value: 110 },
-                  { label: "Tinggi", value: 180 },
-                  { label: "Maks", value: 260 },
+                  { label: "Rendah", value: 80 },
+                  { label: "Sedang", value: 250 },
+                  { label: "Besar", value: 500 },
+                  { label: "Maks", value: 1000 },
                 ].map((preset) => {
                   const active = Math.round(draft.rowHeight || 70) === preset.value;
                   return (
@@ -1185,9 +1185,9 @@ function ProfileModal({
               <input
                 type="range"
                 min={40}
-                max={320}
-                step={5}
-                value={Math.max(40, Math.min(320, Math.round(draft.rowHeight || 70)))}
+                max={1000}
+                step={10}
+                value={Math.max(40, Math.min(1000, Math.round(draft.rowHeight || 70)))}
                 onChange={(e) => set("rowHeight", Number(e.target.value) || 70)}
                 className="h-2 w-full cursor-pointer accent-[var(--primary)]"
               />
