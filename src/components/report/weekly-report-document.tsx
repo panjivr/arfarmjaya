@@ -8,7 +8,7 @@ import { Leaf, ShieldCheck } from "lucide-react";
 import type { ReportColumnKey, ReportProfile, WeeklyActivity } from "@/lib/types";
 import { resolveReportColumns, type ResolvedColumn } from "@/lib/report-columns";
 import { buildReportSignature, reportQrPayload, type ReportSignature } from "@/lib/report-sign";
-import { formatDate, formatLongDate, numberFmt } from "@/lib/utils";
+import { formatDate, formatDateTime, formatLongDate, numberFmt } from "@/lib/utils";
 
 export type WeeklyReportData = {
   number: string;
@@ -97,6 +97,7 @@ function ApprovalColumn({
   name,
   signatureImage,
   qr,
+  signedLabel,
 }: {
   lead: string;
   place?: string;
@@ -104,6 +105,7 @@ function ApprovalColumn({
   name?: string;
   signatureImage?: string;
   qr?: string | null; // data URL QR TTE (bila tanda tangan elektronik aktif)
+  signedLabel?: string; // "nama · waktu" tanda tangan elektronik
 }) {
   return (
     <div className="w-[240px] text-center" style={{ breakInside: "avoid" }}>
@@ -130,6 +132,9 @@ function ApprovalColumn({
       </p>
       {role?.trim() && (
         <p className="mt-0.5 whitespace-pre-line text-[9px]" style={{ color: inkMuted }}>{role}</p>
+      )}
+      {signedLabel && (
+        <p className="mt-0.5 text-[8px] text-green-700">Ditandatangani elektronik: {signedLabel}</p>
       )}
     </div>
   );
@@ -215,17 +220,28 @@ export function WeeklyReportDocument({
       alive = false;
     };
   }, [eSignOn, eSignCanonical]);
+  // Nama terang penanda tangan (otomatis: nama pada TTD, atau nama pelaksana).
+  const eSignerName = (profile.signatureName?.trim() || report.executor?.trim() || "Pelaksana");
+  const eSignAtLabel = reportSig ? formatDateTime(reportSig.signedAt) : "";
   const eSignQr = useMemo(() => {
     if (!eSignOn || !reportSig) return null;
     try {
       const qr = qrcode(0, "M");
-      qr.addData(reportQrPayload({ number: report.number, total: report.total, code: reportSig.code }));
+      qr.addData(
+        reportQrPayload({
+          number: report.number,
+          total: report.total,
+          code: reportSig.code,
+          signer: eSignerName,
+          signedAt: formatDateTime(reportSig.signedAt),
+        }),
+      );
       qr.make();
       return qr.createDataURL(10, 4);
     } catch {
       return null;
     }
-  }, [eSignOn, reportSig, report.number, report.total]);
+  }, [eSignOn, reportSig, report.number, report.total, eSignerName]);
 
   const cellBase = "align-top px-2 py-1";
   const borderStyle = { border: `1px solid ${line}` };
@@ -455,6 +471,7 @@ export function WeeklyReportDocument({
               name={profile.signatureName || report.executor}
               signatureImage={profile.signatureImage}
               qr={eSignQr}
+              signedLabel={eSignQr ? `${eSignerName} · ${eSignAtLabel}` : undefined}
             />
           ) : (
             <div />
@@ -479,7 +496,8 @@ export function WeeklyReportDocument({
         </div>
         {reportSig && (
           <p className="mt-1 break-all" style={{ color: "#9ca3af" }}>
-            Verifikasi TTE · Kode: <span className="font-mono">{reportSig.code}</span> · Algoritma: {reportSig.algo} · Hash:{" "}
+            TTE oleh <span className="font-semibold">{eSignerName}</span> · {eSignAtLabel} · Kode:{" "}
+            <span className="font-mono">{reportSig.code}</span> · {reportSig.algo} · Hash:{" "}
             <span className="font-mono">{reportSig.hash}</span>
           </p>
         )}
