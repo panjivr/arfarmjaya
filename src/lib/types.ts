@@ -357,6 +357,7 @@ export type WeeklyReport = {
   periodEnd?: string;
   signPlace: string;
   signDate: string; // yyyy-mm-dd
+  eSignAt?: string; // ISO — waktu tanda tangan elektronik yang dapat dipilih manual
   activities: WeeklyActivity[];
   total: number;
   actor: string;

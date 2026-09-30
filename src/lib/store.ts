@@ -331,6 +331,7 @@ type Actions = {
     periodEnd?: string;
     signPlace: string;
     signDate: string;
+    eSignAt?: string;
     activities: WeeklyActivity[];
   }) => { ok: boolean; message?: string; report?: WeeklyReport };
   duplicateWeeklyReport: (id: string) => { ok: boolean; report?: WeeklyReport };
@@ -889,6 +890,7 @@ export const useUiStore = create<State & Actions>()(
           periodEnd: data.periodEnd || undefined,
           signPlace: data.signPlace.trim(),
           signDate: data.signDate,
+          eSignAt: data.eSignAt || existing?.eSignAt,
           activities,
           total,
           actor: existing?.actor ?? get().user?.name ?? "Pengguna",

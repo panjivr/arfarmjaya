@@ -43,6 +43,24 @@ type SortMode = "" | "date-asc" | "date-desc" | "alpha" | "amount-desc" | "amoun
 const today = () => new Date().toISOString().slice(0, 10);
 const uid = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
 
+/** Waktu lokal untuk <input type="datetime-local"> (YYYY-MM-DDTHH:mm). */
+function nowLocalInput(): string {
+  const d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+/** ISO → nilai datetime-local (lokal). */
+function isoToLocalInput(iso?: string): string {
+  if (!iso || Number.isNaN(Date.parse(iso))) return nowLocalInput();
+  const d = new Date(iso);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+/** datetime-local (lokal) → ISO. Kosong = undefined (pakai waktu saat cetak). */
+function localInputToIso(local: string): string | undefined {
+  if (!local) return undefined;
+  const t = Date.parse(local);
+  return Number.isNaN(t) ? undefined : new Date(local).toISOString();
+}
+
 const emptyActivity = (): WeeklyActivity => ({
   id: uid(),
   date: today(),
@@ -75,6 +93,7 @@ const emptyForm = {
   periodEnd: "",
   signPlace: "",
   signDate: "",
+  eSignAt: "",
 };
 
 const blankProfile: Omit<ReportProfile, "id" | "createdAt"> = {
@@ -199,6 +218,7 @@ export default function WeeklyReportPage() {
     periodEnd: form.periodEnd || undefined,
     signPlace: form.signPlace,
     signDate: form.signDate,
+    eSignAt: localInputToIso(form.eSignAt),
     activities,
     total,
   };
@@ -225,6 +245,7 @@ export default function WeeklyReportPage() {
       periodEnd: report.periodEnd ?? "",
       signPlace: report.signPlace,
       signDate: report.signDate,
+      eSignAt: report.eSignAt ? isoToLocalInput(report.eSignAt) : "",
     });
     setActivities(report.activities.map((a) => ({ ...a })));
     setEditingId(report.id);
@@ -245,6 +266,7 @@ export default function WeeklyReportPage() {
       periodEnd: form.periodEnd || undefined,
       signPlace: form.signPlace,
       signDate: form.signDate,
+      eSignAt: localInputToIso(form.eSignAt),
       activities,
     });
     const saved = result.report;
@@ -436,6 +458,16 @@ export default function WeeklyReportPage() {
                   <Input type="date" value={form.signDate} onChange={(e) => set("signDate", e.target.value)} />
                 </Field>
               </div>
+              {profile?.showESign && (
+                <Field label="Waktu Tanda Tangan Elektronik" hint="Tanggal & jam TTE yang tampil di QR/dokumen. Kosongkan untuk memakai waktu saat cetak.">
+                  <div className="flex items-center gap-2">
+                    <Input type="datetime-local" value={form.eSignAt} onChange={(e) => set("eSignAt", e.target.value)} />
+                    <Button type="button" variant="secondary" className="h-11 shrink-0 whitespace-nowrap px-3" onClick={() => set("eSignAt", nowLocalInput())}>
+                      Sekarang
+                    </Button>
+                  </div>
+                </Field>
+              )}
             </CardContent>
           </Card>
 
@@ -627,6 +659,7 @@ export default function WeeklyReportPage() {
                               periodEnd: report.periodEnd,
                               signPlace: report.signPlace,
                               signDate: report.signDate,
+                              eSignAt: report.eSignAt,
                               activities: report.activities,
                               total: report.total,
                             },

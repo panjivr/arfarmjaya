@@ -5,7 +5,7 @@
 
 export type ReportSignature = { hash: string; code: string; algo: string; signedAt: string };
 
-export async function buildReportSignature(canonical: string): Promise<ReportSignature> {
+export async function buildReportSignature(canonical: string, signedAt?: string): Promise<ReportSignature> {
   const data = new TextEncoder().encode(canonical);
   const buf = await crypto.subtle.digest("SHA-256", data);
   const hash = Array.from(new Uint8Array(buf))
@@ -13,7 +13,8 @@ export async function buildReportSignature(canonical: string): Promise<ReportSig
     .join("");
   const up = hash.toUpperCase();
   const code = `AFJ-${up.slice(0, 4)}-${up.slice(4, 8)}-${up.slice(8, 12)}`;
-  return { hash, code, algo: "SHA-256", signedAt: new Date().toISOString() };
+  const when = signedAt && !Number.isNaN(Date.parse(signedAt)) ? new Date(signedAt).toISOString() : new Date().toISOString();
+  return { hash, code, algo: "SHA-256", signedAt: when };
 }
 
 /**

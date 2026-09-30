@@ -20,6 +20,7 @@ export type WeeklyReportData = {
   periodEnd?: string;
   signPlace: string;
   signDate: string;
+  eSignAt?: string; // ISO — waktu tanda tangan elektronik (dipilih manual)
   activities: WeeklyActivity[];
   total: number;
 };
@@ -213,13 +214,13 @@ export function WeeklyReportDocument({
       return;
     }
     let alive = true;
-    buildReportSignature(eSignCanonical).then((s) => {
+    buildReportSignature(eSignCanonical, report.eSignAt).then((s) => {
       if (alive) setReportSig(s);
     });
     return () => {
       alive = false;
     };
-  }, [eSignOn, eSignCanonical]);
+  }, [eSignOn, eSignCanonical, report.eSignAt]);
   // Nama terang penanda tangan (otomatis: nama pada TTD, atau nama pelaksana).
   const eSignerName = (profile.signatureName?.trim() || report.executor?.trim() || "Pelaksana");
   const eSignAtLabel = reportSig ? formatDateTime(reportSig.signedAt) : "";
