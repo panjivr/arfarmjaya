@@ -44,10 +44,20 @@ async function sha256Hex(text: string): Promise<string> {
     .join("");
 }
 
-/** Kode dokumen singkat & mudah dibaca dari hash: AFJ-XXXX-XXXX-XXXX. */
-function codeFromHash(hash: string): string {
+/** Inisial organisasi/toko untuk prefix kode dokumen (mis. "CV Prakarsa Manunggal" → PMJ). */
+function orgInitials(name?: string): string {
+  const skip = new Set(["PT", "CV", "UD", "PD", "YAYASAN", "KOPERASI"]);
+  const words = (name ?? "")
+    .replace(/[^A-Za-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w && !skip.has(w.toUpperCase()));
+  return words.slice(0, 3).map((w) => w[0]).join("").toUpperCase() || "TTE";
+}
+
+/** Kode dokumen singkat dari hash, prefix mengikuti nama toko: XXX-XXXX-XXXX-XXXX. */
+function codeFromHash(hash: string, storeName?: string): string {
   const up = hash.toUpperCase();
-  return `AFJ-${up.slice(0, 4)}-${up.slice(4, 8)}-${up.slice(8, 12)}`;
+  return `${orgInitials(storeName)}-${up.slice(0, 4)}-${up.slice(4, 8)}-${up.slice(8, 12)}`;
 }
 
 /**
@@ -66,7 +76,7 @@ export async function buildInvoiceSignature(
     signedBy: signerName.trim() || inv.storeName.trim() || "Penjual",
     signedAt: when,
     hash,
-    code: codeFromHash(hash),
+    code: codeFromHash(hash, inv.storeName),
     algo: "SHA-256",
   };
 }
@@ -78,7 +88,7 @@ export async function buildInvoiceSignature(
  */
 export function invoiceQrPayload(inv: SignableInvoice, sig: InvoiceSignature): string {
   return [
-    "AR FARM JAYA e-TTD",
+    `${inv.storeName || "Dokumen"} e-TTD`,
     `No:${inv.number}`,
     `Rp${inv.total.toLocaleString("id-ID")}`,
     `Kode:${sig.code}`,

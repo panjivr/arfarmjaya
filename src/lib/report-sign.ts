@@ -5,14 +5,25 @@
 
 export type ReportSignature = { hash: string; code: string; algo: string; signedAt: string };
 
-export async function buildReportSignature(canonical: string, signedAt?: string): Promise<ReportSignature> {
+/** Inisial organisasi untuk prefix kode dokumen (mis. "Sinergi Titian Harapan" → STH). */
+export function orgInitials(org?: string): string {
+  const skip = new Set(["PT", "CV", "UD", "PD", "YAYASAN", "KOPERASI"]);
+  const words = (org ?? "")
+    .replace(/[^A-Za-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w && !skip.has(w.toUpperCase()));
+  const initials = words.slice(0, 3).map((w) => w[0]).join("").toUpperCase();
+  return initials || "TTE";
+}
+
+export async function buildReportSignature(canonical: string, signedAt?: string, org?: string): Promise<ReportSignature> {
   const data = new TextEncoder().encode(canonical);
   const buf = await crypto.subtle.digest("SHA-256", data);
   const hash = Array.from(new Uint8Array(buf))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
   const up = hash.toUpperCase();
-  const code = `AFJ-${up.slice(0, 4)}-${up.slice(4, 8)}-${up.slice(8, 12)}`;
+  const code = `${orgInitials(org)}-${up.slice(0, 4)}-${up.slice(4, 8)}-${up.slice(8, 12)}`;
   const when = signedAt && !Number.isNaN(Date.parse(signedAt)) ? new Date(signedAt).toISOString() : new Date().toISOString();
   return { hash, code, algo: "SHA-256", signedAt: when };
 }
@@ -22,6 +33,7 @@ export async function buildReportSignature(canonical: string, signedAt?: string)
  * agar terlihat saat dipindai, tetap ringkas supaya kotak besar & mudah dibaca.
  */
 export function reportQrPayload(input: {
+  org: string;
   number: string;
   total: number;
   code: string;
@@ -29,7 +41,7 @@ export function reportQrPayload(input: {
   signedAt: string; // sudah diformat untuk ditampilkan
 }): string {
   return [
-    "AR FARM JAYA e-TTD",
+    `${input.org || "Dokumen"} e-TTD`,
     `No:${input.number}`,
     `Rp${input.total.toLocaleString("id-ID")}`,
     `Penandatangan:${input.signer}`,

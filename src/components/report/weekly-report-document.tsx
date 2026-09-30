@@ -214,13 +214,13 @@ export function WeeklyReportDocument({
       return;
     }
     let alive = true;
-    buildReportSignature(eSignCanonical, report.eSignAt).then((s) => {
+    buildReportSignature(eSignCanonical, report.eSignAt, profile.organization).then((s) => {
       if (alive) setReportSig(s);
     });
     return () => {
       alive = false;
     };
-  }, [eSignOn, eSignCanonical, report.eSignAt]);
+  }, [eSignOn, eSignCanonical, report.eSignAt, profile.organization]);
   // Nama terang penanda tangan (otomatis: nama pada TTD, atau nama pelaksana).
   const eSignerName = (profile.signatureName?.trim() || report.executor?.trim() || "Pelaksana");
   const eSignAtLabel = reportSig ? formatDateTime(reportSig.signedAt) : "";
@@ -230,6 +230,7 @@ export function WeeklyReportDocument({
       const qr = qrcode(0, "M");
       qr.addData(
         reportQrPayload({
+          org: profile.organization,
           number: report.number,
           total: report.total,
           code: reportSig.code,
@@ -242,7 +243,7 @@ export function WeeklyReportDocument({
     } catch {
       return null;
     }
-  }, [eSignOn, reportSig, report.number, report.total, eSignerName]);
+  }, [eSignOn, reportSig, report.number, report.total, eSignerName, profile.organization]);
 
   const cellBase = "align-top px-2 py-1";
   const borderStyle = { border: `1px solid ${line}` };
