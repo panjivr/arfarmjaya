@@ -43,22 +43,53 @@ const SYNC_KEYS = [
 
 type Snapshot = Record<string, unknown>;
 
-/**
- * Kompres body dengan gzip bila didukung browser, agar ukuran kiriman jauh lebih
- * kecil dan tidak menabrak batas request server (Vercel ~4.5 MB). Server mengenal
- * header "x-encoding: gzip" lalu mendekompresi. Bila tak didukung, kirim polos.
- */
-async function encodeBody(serialized: string): Promise<{ body: BodyInit; headers: Record<string, string> }> {
+/** Serialisasi → byte, di-gzip bila browser mendukung (mengecilkan kiriman). */
+async function toBytes(serialized: string): Promise<{ bytes: Uint8Array; gzip: boolean }> {
   try {
     if (typeof CompressionStream !== "undefined") {
       const stream = new Blob([serialized]).stream().pipeThrough(new CompressionStream("gzip"));
-      const blob = await new Response(stream).blob();
-      return { body: blob, headers: { "Content-Type": "application/json", "x-encoding": "gzip" } };
+      const ab = await new Response(stream).arrayBuffer();
+      return { bytes: new Uint8Array(ab), gzip: true };
     }
   } catch {
-    /* fallback ke kiriman polos */
+    /* fallback tanpa gzip */
   }
-  return { body: serialized, headers: { "Content-Type": "application/json" } };
+  return { bytes: new TextEncoder().encode(serialized), gzip: false };
+}
+
+// Batas aman per request di bawah limit server (Vercel ~4.5 MB). Data yang lebih
+// besar dikirim bertahap (chunk) & disusun ulang di server → tanpa batas total.
+const CHUNK_LIMIT = 3_500_000;
+
+/**
+ * Kirim seluruh state ke server. Otomatis gzip; bila masih lebih besar dari
+ * batas request, dipecah menjadi beberapa potongan (chunk). Mengembalikan
+ * status HTTP terakhir + JSON balasan, agar pemanggil menangani sukses/gagal.
+ */
+async function sendStateRequest(serialized: string): Promise<{ status: number; json: Record<string, unknown> }> {
+  const { bytes, gzip } = await toBytes(serialized);
+  const enc: Record<string, string> = gzip ? { "x-encoding": "gzip" } : {};
+  const base: Record<string, string> = { "Content-Type": "application/octet-stream", ...enc };
+
+  if (bytes.length <= CHUNK_LIMIT) {
+    const res = await fetch("/api/state", { method: "PUT", headers: base, body: bytes as unknown as BodyInit });
+    return { status: res.status, json: (await res.json().catch(() => ({}))) as Record<string, unknown> };
+  }
+
+  const uploadId = (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)).replace(/-/g, "");
+  const total = Math.ceil(bytes.length / CHUNK_LIMIT);
+  let last: { status: number; json: Record<string, unknown> } = { status: 0, json: {} };
+  for (let i = 0; i < total; i++) {
+    const chunk = bytes.subarray(i * CHUNK_LIMIT, Math.min((i + 1) * CHUNK_LIMIT, bytes.length));
+    const res = await fetch("/api/state", {
+      method: "PUT",
+      headers: { ...base, "x-upload-id": uploadId, "x-chunk-index": String(i), "x-chunk-total": String(total) },
+      body: chunk as unknown as BodyInit,
+    });
+    last = { status: res.status, json: (await res.json().catch(() => ({}))) as Record<string, unknown> };
+    if (!res.ok || last.json?.ok === false) return last; // batalkan bila ada potongan gagal
+  }
+  return last;
 }
 
 function snapshot(state: Record<string, unknown>): Snapshot {
@@ -148,19 +179,17 @@ export async function syncNow(): Promise<{ ok: boolean; message?: string }> {
   const setStatus = useSyncStatus.getState().setStatus;
   setStatus({ status: "saving", message: undefined });
   try {
-    const { body, headers } = await encodeBody(serialized);
-    const res = await fetch("/api/state", { method: "PUT", headers, body });
-    const json = await res.json().catch(() => ({}));
+    const { status, json } = await sendStateRequest(serialized);
     if (json?.ok) {
-      writeMeta({ syncedAt: json?.updatedAt ?? undefined, sig: sig(serialized) });
-      setStatus({ status: "saved", at: new Date().toISOString(), serverUpdatedAt: json?.updatedAt ?? undefined, message: undefined });
+      writeMeta({ syncedAt: (json?.updatedAt as string) ?? undefined, sig: sig(serialized) });
+      setStatus({ status: "saved", at: new Date().toISOString(), serverUpdatedAt: (json?.updatedAt as string) ?? undefined, message: undefined });
       return { ok: true };
     }
-    const message = res.status === 401
+    const message = status === 401
       ? "Sesi login berakhir — masuk ulang lalu ulangi."
       : json?.db === false
         ? "Database server tidak aktif."
-        : `Server menolak simpan (HTTP ${res.status}, ukuran ${sizeMb} MB).`;
+        : `Server menolak simpan (HTTP ${status}, ukuran ${sizeMb} MB).`;
     setStatus({ status: "error", at: new Date().toISOString(), message });
     return { ok: false, message };
   } catch {
@@ -192,21 +221,19 @@ export function SyncProvider() {
       const sizeMb = (serialized.length / 1_048_576).toFixed(1);
       setStatus({ status: "saving", message: undefined });
       try {
-        const { body, headers } = await encodeBody(serialized);
-        const res = await fetch("/api/state", { method: "PUT", headers, body });
-        const json = await res.json().catch(() => ({}));
+        const { status, json } = await sendStateRequest(serialized);
         if (json?.ok) {
           lastSent = serialized;
-          writeMeta({ syncedAt: json?.updatedAt ?? undefined, sig: sig(serialized) });
-          setStatus({ status: "saved", at: new Date().toISOString(), serverUpdatedAt: json?.updatedAt ?? undefined, message: undefined });
+          writeMeta({ syncedAt: (json?.updatedAt as string) ?? undefined, sig: sig(serialized) });
+          setStatus({ status: "saved", at: new Date().toISOString(), serverUpdatedAt: (json?.updatedAt as string) ?? undefined, message: undefined });
           return;
         }
         // Server menolak/gagal menulis — beri tahu, jangan gagal diam-diam.
-        const reason = res.status === 401
+        const reason = status === 401
           ? "Sesi login berakhir — masuk ulang agar data tersimpan."
           : json?.db === false
             ? "Database server tidak aktif."
-            : `Server menolak simpan (HTTP ${res.status}, ukuran ${sizeMb} MB).`;
+            : `Server menolak simpan (HTTP ${status}, ukuran ${sizeMb} MB).`;
         setStatus({ status: "error", at: new Date().toISOString(), message: reason });
       } catch {
         setStatus({ status: "error", at: new Date().toISOString(), message: `Tidak terhubung ke server (ukuran data ${sizeMb} MB).` });
