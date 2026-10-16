@@ -1,6 +1,8 @@
 "use client";
 
 import { create } from "zustand";
+import { records } from "@/lib/workspace-protocol";
+import { validateBusinessRecord } from "@/lib/workspace-validation";
 import { persist, createJSONStorage } from "zustand/middleware";
 
 // Penyimpanan lokal yang tahan-error: bila kuota localStorage penuh (mis. foto
@@ -180,6 +182,20 @@ const defaultSettings: AppSettings = {
   expiryWarningDays: 30,
   currency: "IDR",
 };
+
+function stockLinesError(products: Product[], lines: OrderLine[]): string | null {
+  if (!lines.length) return "Daftar barang kosong.";
+  const totals = new Map<string, number>();
+  for (const line of lines) {
+    if (!Number.isFinite(line.quantity) || line.quantity <= 0 || !Number.isFinite(line.price) || line.price < 0) return "Jumlah atau harga tidak valid.";
+    totals.set(line.sku, (totals.get(line.sku) ?? 0) + line.quantity);
+  }
+  for (const [sku, quantity] of totals) {
+    const p = products.find(item => item.sku === sku);
+    if (!p || quantity > p.currentStock) return `Stok ${p?.name ?? sku} tidak cukup.`;
+  }
+  return null;
+}
 
 function statusFor(product: Product, threshold: number): Product["status"] {
   if (product.currentStock <= 0) return "Habis";
@@ -574,7 +590,7 @@ export const useUiStore = create<State & Actions>()(
         const state = get();
         const product = state.products.find((p) => p.sku === sku);
         if (!product) return { ok: false, message: "Barang tidak ditemukan." };
-        if (quantity <= 0) return { ok: false, message: "Jumlah harus lebih dari 0." };
+        if (!Number.isFinite(quantity) || quantity < 0 || (quantity === 0 && type !== "adjust")) return { ok: false, message: "Jumlah harus lebih dari 0." };
         const isOut = type === "out" || type === "sale" || type === "transfer";
         if (isOut && quantity > product.currentStock) {
           return { ok: false, message: `Stok tidak cukup. Sisa ${product.currentStock} ${product.unit}.` };
@@ -677,12 +693,8 @@ export const useUiStore = create<State & Actions>()(
 
       createDistribution: ({ destination, driver, lines }) => {
         const state = get();
-        for (const line of lines) {
-          const product = state.products.find((p) => p.sku === line.sku);
-          if (!product || line.quantity > product.currentStock) {
-            return { ok: false, message: `Stok ${line.name} tidak cukup.` };
-          }
-        }
+        const error = stockLinesError(state.products, lines);
+        if (error) return { ok: false, message: error };
         const number = `DO-${stamp()}-${seq(state.distributions.length)}`;
         set((s) => ({
           distributions: [
@@ -713,6 +725,8 @@ export const useUiStore = create<State & Actions>()(
       },
       setRequestStatus: (id, status) => {
         const req = get().requests.find((r) => r.id === id);
+        if (!req || req.status === "Selesai") return;
+        if (status === "Selesai" && stockLinesError(get().products, req.lines)) return;
         set((s) => ({ requests: s.requests.map((r) => (r.id === id ? { ...r, status } : r)) }));
         if (status === "Selesai" && req) {
           req.lines.forEach((line) =>
@@ -746,12 +760,8 @@ export const useUiStore = create<State & Actions>()(
 
       createSale: ({ lines, discount, payment, paid }) => {
         const state = get();
-        for (const line of lines) {
-          const product = state.products.find((p) => p.sku === line.sku);
-          if (!product || line.quantity > product.currentStock) {
-            return { ok: false, message: `Stok ${line.name} tidak cukup.` };
-          }
-        }
+        const error = stockLinesError(state.products, lines);
+        if (error) return { ok: false, message: error };
         const subtotal = lines.reduce((t, l) => t + l.price * l.quantity, 0);
         const total = Math.max(subtotal - discount, 0);
         const number = `POS-${stamp()}-${seq(state.posSales.length)}`;
@@ -1244,7 +1254,11 @@ export const useUiStore = create<State & Actions>()(
         const patch: Record<string, unknown> = {};
         let found = 0;
         for (const k of BACKUP_KEYS) {
-          if (k in parsed) { patch[k] = parsed[k]; found++; }
+          if (k in parsed) {
+            try { for (const [id, value] of records(k, parsed[k])) validateBusinessRecord(k, id, value); }
+            catch { return { ok: false, message: `Struktur cadangan tidak valid pada bagian ${k}. Tidak ada data yang diubah.` }; }
+            patch[k] = parsed[k]; found++;
+          }
         }
         if (found === 0) return { ok: false, message: "Tidak ada data yang bisa dipulihkan dari berkas ini." };
         set(patch as never);

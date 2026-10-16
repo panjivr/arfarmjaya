@@ -15,10 +15,11 @@ export type AuthUser = {
   permissions: string[];
   lastLogin: string | null;
   createdAt: string;
+  sessionVersion?: number;
 };
 
 // Akun bawaan: menjadi sumber seed saat DB pertama kali kosong, sekaligus
-// cadangan darurat saat DB tak terjangkau agar pemilik tak pernah terkunci.
+// pengembangan lokal. Produksi tidak mengizinkan fallback ketika DB gagal.
 type Builtin = { username: string; name: string; role: AppRole; password: string };
 function builtins(): Builtin[] {
   return [
@@ -43,9 +44,10 @@ export async function verifyPassword(pw: string, stored: string): Promise<boolea
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-type Row = { id: string; name: string; username: string; passwordHash: string; role: string; active: boolean; permissions: string[]; lastLogin: Date | null; createdAt: Date };
+type Row = { id: string; name: string; username: string; passwordHash: string; role: string; active: boolean; permissions: string[]; lastLogin: Date | null; createdAt: Date; sessionVersion?: number };
 function toUser(r: Row): AuthUser {
   return {
+    sessionVersion: r.sessionVersion ?? 0,
     id: r.id, name: r.name, username: r.username,
     role: isAppRole(r.role) ? r.role : "STAFF_LELE",
     active: r.active, permissions: r.permissions ?? [],
@@ -56,18 +58,18 @@ function toUser(r: Row): AuthUser {
 
 // Seed akun bawaan HANYA jika tabel benar-benar kosong (idempoten, non-destruktif).
 export async function ensureSeeded(): Promise<void> {
-  if (!prisma) return;
-  const count = await (prisma as any).appUser.count();
+  const db = prisma;
+  if (!db) return;
+  const count = await db.appUser.count();
   if (count > 0) return;
-  for (const b of builtins()) {
-    await (prisma as any).appUser.create({
-      data: { name: b.name, username: b.username, role: b.role, active: true, permissions: [], passwordHash: await hashPassword(b.password) },
-    });
-  }
+  const accounts = builtins().filter(b => process.env.NODE_ENV !== "production" || Boolean(process.env[`${b.username.toUpperCase()}_PASSWORD`]));
+  if (!accounts.some(b => b.username === "admin")) throw new Error("ADMIN_PASSWORD is required to initialize production accounts");
+  const seeded = await Promise.all(accounts.map(async b => ({ name: b.name, username: b.username, role: b.role, active: true, permissions: [], passwordHash: await hashPassword(b.password) })));
+  await db.$transaction(seeded.map(data => db.appUser.upsert({ where: { username: data.username }, create: data, update: {} })));
 }
 
-// Autentikasi: utamakan DB; bila DB tak ada/gagal, pakai akun bawaan darurat.
-export async function authenticate(username: string, password: string): Promise<{ ok: boolean; user?: AuthUser; message?: string }> {
+// Produksi wajib memakai akun database; kegagalan DB tidak membuka akses darurat.
+export async function authenticate(username: string, password: string): Promise<{ ok: boolean; user?: AuthUser; message?: string; unavailable?: boolean }> {
   const uname = username.trim().toLowerCase();
   if (prisma) {
     try {
@@ -79,10 +81,11 @@ export async function authenticate(username: string, password: string): Promise<
       await (prisma as any).appUser.update({ where: { id: row.id }, data: { lastLogin: new Date() } });
       return { ok: true, user: toUser({ ...row, lastLogin: new Date() }) };
     } catch (e) {
-      console.error("DB auth failed, fallback to builtin", e);
-      // jatuh ke bawaan di bawah
+      console.error("DB auth failed", e);
+      return { ok: false, unavailable: true, message: "Database tidak tersedia. Coba lagi nanti." };
     }
   }
+  if (process.env.NODE_ENV === "production") return { ok: false, unavailable: true, message: "Database tidak tersedia." };
   const b = builtins().find((x) => x.username === uname);
   if (!b || b.password !== password) return { ok: false, message: "Username atau password salah." };
   return { ok: true, user: { id: `builtin:${b.username}`, name: b.name, username: b.username, role: b.role, active: true, permissions: [], lastLogin: new Date().toISOString(), createdAt: new Date().toISOString() } };
@@ -124,7 +127,7 @@ export async function updateUser(id: string, patch: { name?: string; role?: AppR
     if (patch.name != null) data.name = patch.name.trim();
     if (patch.role != null && isAppRole(patch.role)) data.role = patch.role;
     if (patch.active != null) data.active = patch.active;
-    if (patch.password) data.passwordHash = await hashPassword(patch.password);
+    if (patch.password) { data.passwordHash = await hashPassword(patch.password); data.sessionVersion = { increment: 1 }; }
     const row = (await (prisma as any).appUser.update({ where: { id }, data })) as Row;
     return { ok: true, user: toUser(row) };
   } catch (e) {
@@ -140,7 +143,7 @@ export async function changePassword(id: string, oldPw: string, newPw: string): 
     const row = (await (prisma as any).appUser.findUnique({ where: { id } })) as Row | null;
     if (!row) return { ok: false, message: "Akun tidak ditemukan." };
     if (!(await verifyPassword(oldPw, row.passwordHash))) return { ok: false, message: "Password lama salah." };
-    await (prisma as any).appUser.update({ where: { id }, data: { passwordHash: await hashPassword(newPw) } });
+    await (prisma as any).appUser.update({ where: { id }, data: { passwordHash: await hashPassword(newPw), sessionVersion: { increment: 1 } } });
     return { ok: true };
   } catch (e) {
     console.error("changePassword failed", e);

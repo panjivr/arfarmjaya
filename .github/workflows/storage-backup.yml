@@ -1,0 +1,30 @@
+name: Encrypted database and attachment backup
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 18 * * *' # 01:17 Asia/Jakarta
+permissions:
+  contents: read
+concurrency:
+  group: storage-backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    if: vars.STORAGE_BACKUPS_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      DATABASE_BACKUP_URL: ${{ secrets.DATABASE_BACKUP_URL }}
+      BACKUP_ENCRYPTION_PASSWORD: ${{ secrets.BACKUP_ENCRYPTION_PASSWORD }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      R2_BACKUP_BUCKET: ${{ secrets.R2_BACKUP_BUCKET }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_BACKUP_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BACKUP_SECRET_ACCESS_KEY }}
+      BACKUP_POSTGRES_IMAGE: ${{ vars.BACKUP_POSTGRES_IMAGE }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install S3 CLI
+        run: python3 -m pip install --user awscli
+      - name: Encrypt database dump and mirror private attachments
+        run: bash scripts/backup-storage.sh

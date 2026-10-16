@@ -2,7 +2,7 @@
 
 import { Check, Cloud, CloudOff, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useSyncStatus } from "@/components/sync-provider";
+import { useSyncStatus, retryWorkspace, downloadWorkspaceDraft, discardWorkspaceDraft } from "@/components/sync-provider";
 
 /**
  * Indikator simpan-otomatis yang selalu terlihat di header. Semua perubahan
@@ -16,6 +16,7 @@ import { useSyncStatus } from "@/components/sync-provider";
  */
 export function SaveIndicator() {
   const status = useSyncStatus((s) => s.status);
+  const message = useSyncStatus((s) => s.message);
 
   const view = {
     saving: {
@@ -38,15 +39,16 @@ export function SaveIndicator() {
     },
     idle: {
       icon: <Cloud className="h-4 w-4" />,
-      label: "Tersimpan otomatis",
-      short: "Otomatis",
+      label: "Menunggu server",
+      short: "Menunggu",
       cls: "border-border bg-card text-muted",
     },
   }[status];
 
   return (
+    <span className="flex flex-wrap items-center gap-2">
     <span
-      title="Semua perubahan tersimpan otomatis ke server — tidak perlu menekan simpan."
+      title={message ?? "Status penyimpanan berdasarkan konfirmasi server."}
       aria-live="polite"
       className={cn(
         "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold",
@@ -56,6 +58,8 @@ export function SaveIndicator() {
       {view.icon}
       <span className="hidden sm:inline">{view.label}</span>
       <span className="sr-only sm:hidden">{view.short}</span>
+    </span>
+    {status === "error" && <details className="relative text-xs"><summary className="cursor-pointer text-red-700">Belum tersimpan</summary><div className="absolute right-0 z-50 w-72 rounded-lg border bg-white p-3 text-slate-900 shadow-xl"><p>{message}</p><button className="mt-2 block underline" onClick={() => void retryWorkspace()}>Coba simpan lagi</button><button className="mt-2 block underline" onClick={() => void downloadWorkspaceDraft()}>Unduh draf</button><button className="mt-2 block underline" onClick={() => { if (window.confirm("Unduh draf lalu ganti tampilan dengan data terbaru dari server? Perubahan lokal tidak akan dikirim.")) void discardWorkspaceDraft(); }}>Gunakan data server</button></div></details>}
     </span>
   );
 }

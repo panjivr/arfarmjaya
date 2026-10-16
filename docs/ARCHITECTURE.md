@@ -1,3 +1,5 @@
+> Penyimpanan aktual sekarang memakai WorkspaceRecord per catatan, kontrol versi, history batch dan adapter R2. Lihat [STORAGE_UPGRADE.md](STORAGE_UPGRADE.md). Bagian service/ERD di bawah adalah arah arsitektur, bukan seluruhnya model SQL yang sudah diterapkan.
+
 # AR FARM JAYA WMS Architecture
 
 AR FARM JAYA is structured as an enterprise Warehouse Management System using a feature-based Next.js architecture.

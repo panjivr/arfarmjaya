@@ -1,319 +1,220 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { create } from "zustand";
 import { useUiStore } from "@/lib/store";
-import { decideSync } from "@/lib/sync-decide";
+import { COLLECTIONS, makeOperations, type Collection, type Snapshot, type Versions } from "@/lib/workspace-protocol";
+import { readDraft, writeDraft, type Draft } from "@/lib/workspace-draft";
 
-// Keys that represent shared business data (synced to the server).
-// Per-device/session state (theme, user, sidebar, etc.) is intentionally excluded.
-const SYNC_KEYS = [
-  "products",
-  "movements",
-  "categories",
-  "suppliers",
-  "warehouses",
-  "racks",
-  "users",
-  "purchaseOrders",
-  "receipts",
-  "distributions",
-  "requests",
-  "opnameSessions",
-  "posSales",
-  "stores",
-  "invoices",
-  "reportProfiles",
-  "weeklyReports",
-  "ponds",
-  "fishCycles",
-  "pondLogs",
-  "pondHarvests",
-  "pondJournals",
-  "leleSales",
-  "receivables",
-  "payables",
-  "financeTx",
-  "financeCategories",
-  "leleMovements",
-  "auditLog",
-  "readNotifications",
-  "settings",
-] as const;
-
-type Snapshot = Record<string, unknown>;
-
-/** Serialisasi → byte, di-gzip bila browser mendukung (mengecilkan kiriman). */
-async function toBytes(serialized: string): Promise<{ bytes: Uint8Array; gzip: boolean }> {
-  try {
-    if (typeof CompressionStream !== "undefined") {
-      const stream = new Blob([serialized]).stream().pipeThrough(new CompressionStream("gzip"));
-      const ab = await new Response(stream).arrayBuffer();
-      return { bytes: new Uint8Array(ab), gzip: true };
-    }
-  } catch {
-    /* fallback tanpa gzip */
-  }
-  return { bytes: new TextEncoder().encode(serialized), gzip: false };
-}
-
-// Batas aman per request di bawah limit server (Vercel ~4.5 MB). Data yang lebih
-// besar dikirim bertahap (chunk) & disusun ulang di server → tanpa batas total.
-const CHUNK_LIMIT = 3_500_000;
-
-/**
- * Kirim seluruh state ke server. Otomatis gzip; bila masih lebih besar dari
- * batas request, dipecah menjadi beberapa potongan (chunk). Mengembalikan
- * status HTTP terakhir + JSON balasan, agar pemanggil menangani sukses/gagal.
- */
-async function sendStateRequest(serialized: string): Promise<{ status: number; json: Record<string, unknown> }> {
-  const { bytes, gzip } = await toBytes(serialized);
-  const enc: Record<string, string> = gzip ? { "x-encoding": "gzip" } : {};
-  const base: Record<string, string> = { "Content-Type": "application/octet-stream", ...enc };
-
-  if (bytes.length <= CHUNK_LIMIT) {
-    const res = await fetch("/api/state", { method: "PUT", headers: base, body: bytes as unknown as BodyInit });
-    return { status: res.status, json: (await res.json().catch(() => ({}))) as Record<string, unknown> };
-  }
-
-  const uploadId = (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)).replace(/-/g, "");
-  const total = Math.ceil(bytes.length / CHUNK_LIMIT);
-  let last: { status: number; json: Record<string, unknown> } = { status: 0, json: {} };
-  for (let i = 0; i < total; i++) {
-    const chunk = bytes.subarray(i * CHUNK_LIMIT, Math.min((i + 1) * CHUNK_LIMIT, bytes.length));
-    const res = await fetch("/api/state", {
-      method: "PUT",
-      headers: { ...base, "x-upload-id": uploadId, "x-chunk-index": String(i), "x-chunk-total": String(total) },
-      body: chunk as unknown as BodyInit,
-    });
-    last = { status: res.status, json: (await res.json().catch(() => ({}))) as Record<string, unknown> };
-    if (!res.ok || last.json?.ok === false) return last; // batalkan bila ada potongan gagal
-  }
-  return last;
-}
-
-function snapshot(state: Record<string, unknown>): Snapshot {
-  const out: Snapshot = {};
-  for (const key of SYNC_KEYS) out[key] = state[key];
-  return out;
-}
-
-// Rough "how much real activity" score, used only during first migration so a
-// data-rich browser is never overwritten by an empty/seed one.
-function weight(data: Snapshot | null): number {
-  if (!data) return -1;
-  const arrays = [
-    "movements", "invoices", "posSales", "purchaseOrders", "distributions",
-    "requests", "opnameSessions", "receipts", "auditLog", "stores", "weeklyReports",
-    "ponds", "fishCycles", "pondLogs", "pondHarvests", "pondJournals",
-    "leleSales", "receivables", "payables", "financeTx", "leleMovements",
-  ];
-  return arrays.reduce((sum, k) => sum + (Array.isArray(data[k]) ? (data[k] as unknown[]).length : 0), 0);
-}
-
-// Hash cepat (cyrb53) untuk menandai isi snapshot terakhir yang sudah sinkron.
-function sig(str: string): string {
-  let h1 = 0xdeadbeef ^ str.length;
-  let h2 = 0x41c6ce57 ^ str.length;
-  for (let i = 0; i < str.length; i++) {
-    const ch = str.charCodeAt(i);
-    h1 = Math.imul(h1 ^ ch, 2654435761);
-    h2 = Math.imul(h2 ^ ch, 1597334677);
-  }
-  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
-}
-
-const META_KEY = "arfarmjaya-sync-meta";
-type Meta = { syncedAt?: string; sig?: string };
-function readMeta(): Meta {
-  try { return JSON.parse(localStorage.getItem(META_KEY) || "{}") as Meta; } catch { return {}; }
-}
-function writeMeta(meta: Meta) {
-  try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch { /* ignore */ }
-}
-
-// Cadangan data lokal sebelum ditimpa data server — jaring pengaman agar tidak
-// ada perubahan yang hilang diam-diam. Bisa dipulihkan dari Pengaturan.
-const LOCAL_BACKUP_KEY = "arfarmjaya-local-backup";
-function stashLocalBackup(serialized: string) {
-  try {
-    localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify({ at: new Date().toISOString(), data: JSON.parse(serialized) }));
-  } catch { /* kuota penuh — abaikan */ }
-}
-export function readLocalBackup(): { at: string; data: Record<string, unknown> } | null {
-  try {
-    const raw = localStorage.getItem(LOCAL_BACKUP_KEY);
-    const parsed = raw ? JSON.parse(raw) : null;
-    return parsed?.data ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-// Status sinkronisasi yang bisa ditampilkan di UI, supaya kegagalan menyimpan
-// ke server terlihat jelas (bukan gagal diam-diam).
 export type SyncStatusValue = "idle" | "saving" | "saved" | "error";
-type SyncStatusState = {
-  status: SyncStatusValue;
-  at?: string;
-  message?: string;
-  serverUpdatedAt?: string;
-  setStatus: (patch: Partial<Omit<SyncStatusState, "setStatus">>) => void;
-};
-export const useSyncStatus = create<SyncStatusState>((set) => ({
-  status: "idle",
-  setStatus: (patch) => set(patch),
-}));
-
-/**
- * Dorong seluruh data ke server SEKARANG dan laporkan hasilnya. Dipakai setelah
- * memulihkan cadangan agar data langsung tersimpan di server — bukan menunggu
- * sinkron otomatis — dan pengguna tahu pasti berhasil atau tidak.
- */
+type SyncStatusState = { status: SyncStatusValue; at?: string; message?: string; serverUpdatedAt?: string; setStatus: (patch: Partial<Omit<SyncStatusState, "setStatus">>) => void };
+export const useSyncStatus = create<SyncStatusState>(set => ({ status: "idle", setStatus: patch => set(patch) }));
+let saveNow: (() => Promise<{ ok: boolean; message?: string }>) | undefined;
+let retryLoad: (() => Promise<void>) | undefined;
+let discardDraft: (() => Promise<void>) | undefined;
+const BACKUP_KEY = "arfarmjaya-local-backup";
+export function readLocalBackup(): { at: string; data: Record<string, unknown> } | null {
+  try { return JSON.parse(localStorage.getItem(BACKUP_KEY) || "null"); } catch { return null; }
+}
+function snapshot(): Snapshot {
+  const state = useUiStore.getState() as unknown as Record<string, unknown>;
+  return JSON.parse(JSON.stringify(Object.fromEntries(COLLECTIONS.map(key => [key, state[key]])))) as Snapshot;
+}
+function stash(data: Snapshot) {
+  try { if (localStorage.getItem(BACKUP_KEY)) return; localStorage.setItem(BACKUP_KEY, JSON.stringify({ at: new Date().toISOString(), data })); } catch { /* IndexedDB journal remains authoritative for new drafts. */ }
+}
 export async function syncNow(): Promise<{ ok: boolean; message?: string }> {
-  const data = snapshot(useUiStore.getState() as unknown as Record<string, unknown>);
-  const serialized = JSON.stringify(data);
-  const sizeMb = (serialized.length / 1_048_576).toFixed(1);
-  const setStatus = useSyncStatus.getState().setStatus;
-  setStatus({ status: "saving", message: undefined });
-  try {
-    const { status, json } = await sendStateRequest(serialized);
-    if (json?.ok) {
-      writeMeta({ syncedAt: (json?.updatedAt as string) ?? undefined, sig: sig(serialized) });
-      setStatus({ status: "saved", at: new Date().toISOString(), serverUpdatedAt: (json?.updatedAt as string) ?? undefined, message: undefined });
-      return { ok: true };
-    }
-    const message = status === 401
-      ? "Sesi login berakhir — masuk ulang lalu ulangi."
-      : json?.db === false
-        ? "Database server tidak aktif."
-        : `Server menolak simpan (HTTP ${status}, ukuran ${sizeMb} MB).`;
-    setStatus({ status: "error", at: new Date().toISOString(), message });
-    return { ok: false, message };
-  } catch {
-    const message = `Tidak terhubung ke server (ukuran data ${sizeMb} MB).`;
-    setStatus({ status: "error", at: new Date().toISOString(), message });
-    return { ok: false, message };
-  }
+  return saveNow ? saveNow() : { ok: false, message: "Data server belum dimuat. Jangan tutup halaman." };
+}
+export async function retryWorkspace() { await retryLoad?.(); }
+export async function discardWorkspaceDraft() { await discardDraft?.(); }
+export async function downloadWorkspaceDraft() {
+  const uid = useUiStore.getState().user?.id;
+  const draft = uid ? await readDraft(uid) : undefined;
+  const blob = new Blob([JSON.stringify(draft ?? { next: snapshot() }, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = `arfarmjaya-draf-${new Date().toISOString().slice(0, 10)}.json`; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+async function jsonRequest(url: string, init?: RequestInit) {
+  const res = await fetch(url, { ...init, cache: "no-store", signal: AbortSignal.timeout(30000) });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+  return body;
+}
+function message(error: unknown): string {
+  const code = error instanceof Error ? error.message : "";
+  if (code === "record_conflict") return "Catatan yang sama berubah di perangkat lain. Draf tetap disimpan; unduh draf sebelum memuat data server.";
+  if (code === "unauthorized") return "Sesi berakhir. Masuk ulang; draf tetap disimpan pada perangkat ini.";
+  if (code === "storage_upgrade_pending") return "Penyimpanan sedang disiapkan. Admin perlu menyelesaikan aktivasi database.";
+  if (code === "workspace_not_initialized") return "Database belum berisi workspace. Admin perlu memulihkan cadangan sebelum aplikasi digunakan.";
+  if (code === "payload_too_large") return "Perubahan terlalu besar. Kurangi lampiran; draf tetap tersimpan.";
+  return "Belum tersimpan ke server. Periksa koneksi lalu coba lagi; jangan hapus data browser.";
 }
 
 export function SyncProvider() {
-  const hasHydrated = useUiStore((s) => s.hasHydrated);
-  // Sinkronisasi hanya berjalan untuk pengguna yang sudah login — /api/state
-  // butuh sesi, jadi tanpa user kita tidak menyentuh server sama sekali.
-  const userId = useUiStore((s) => s.user?.id ?? null);
-
+  const pathname = usePathname();
+  const active = pathname !== "/" && pathname !== "/login";
+  const hydrated = useUiStore(s => s.hasHydrated);
+  const userId = useUiStore(s => s.user?.id ?? null);
+  const [blocked, setBlocked] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const status = useSyncStatus(s => s.status);
+  const errorMessage = useSyncStatus(s => s.message);
   useEffect(() => {
-    if (!hasHydrated || !userId) return;
-    let cancelled = false;
-    let lastSent = "";
-    let timer: ReturnType<typeof setTimeout> | null = null;
-
-    const snap = () => snapshot(useUiStore.getState() as unknown as Record<string, unknown>);
-    const baseline = JSON.stringify(snap());
-
+    if (!hydrated || !userId || !active) return;
+    const uid = userId;
+    let cancelled = false, initialized = false, applying = false;
+    let base: Snapshot = {}, versions: Versions = {}, allowed: Collection[] = [];
+    let pending: Draft | undefined;
+    let ownsLock = false;
+    let releaseLock: (() => void) | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let flight: Promise<{ ok: boolean; message?: string }> | undefined;
+    let journal = Promise.resolve();
     const setStatus = useSyncStatus.getState().setStatus;
-
-    async function push(data: Snapshot) {
-      const serialized = JSON.stringify(data);
-      const sizeMb = (serialized.length / 1_048_576).toFixed(1);
-      setStatus({ status: "saving", message: undefined });
-      try {
-        const { status, json } = await sendStateRequest(serialized);
-        if (json?.ok) {
-          lastSent = serialized;
-          writeMeta({ syncedAt: (json?.updatedAt as string) ?? undefined, sig: sig(serialized) });
-          setStatus({ status: "saved", at: new Date().toISOString(), serverUpdatedAt: (json?.updatedAt as string) ?? undefined, message: undefined });
-          return;
-        }
-        // Server menolak/gagal menulis — beri tahu, jangan gagal diam-diam.
-        const reason = status === 401
-          ? "Sesi login berakhir — masuk ulang agar data tersimpan."
-          : json?.db === false
-            ? "Database server tidak aktif."
-            : `Server menolak simpan (HTTP ${status}, ukuran ${sizeMb} MB).`;
-        setStatus({ status: "error", at: new Date().toISOString(), message: reason });
-      } catch {
-        setStatus({ status: "error", at: new Date().toISOString(), message: `Tidak terhubung ke server (ukuran data ${sizeMb} MB).` });
-      }
-    }
-
-    // Start watching immediately so no local change made during the initial
-    // load can be lost.
-    const unsubscribe = useUiStore.subscribe((state) => {
-      const data = snapshot(state as unknown as Record<string, unknown>);
-      const serialized = JSON.stringify(data);
-      if (serialized === lastSent) return;
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => push(data), 700);
-    });
-
-    // Saat halaman disembunyikan/ditutup, kirim perubahan yang belum sempat
-    // tersinkron (best-effort) supaya tidak hilang saat refresh cepat.
-    const flush = () => {
-      const serialized = JSON.stringify(snap());
-      if (serialized === lastSent) return;
-      if (timer) { clearTimeout(timer); timer = null; }
-      push(snap());
+    const fail = (error: unknown) => { const text = message(error); setStatus({ status: "error", message: text }); return { ok: false, message: text }; };
+    // All journal writes are ordered. A local durability error prevents network writes.
+    const persist = (draft?: Draft) => {
+      journal = journal.catch(() => {}).then(() => writeDraft(uid, draft));
+      return journal;
     };
-    const onHide = () => { if (document.visibilityState === "hidden") flush(); };
-    document.addEventListener("visibilitychange", onHide);
-    window.addEventListener("pagehide", flush);
-
-    (async () => {
-      let serverData: Snapshot | null = null;
-      let serverUpdatedAt: string | null = null;
+    function stage() {
+      pending = { base, versions, next: snapshot(), at: new Date().toISOString(), request: pending?.request };
+      setStatus({ status: "saving", message: "Menunggu konfirmasi server." });
+      return persist(pending);
+    }
+    async function push(): Promise<{ ok: boolean; message?: string }> {
+      if (!initialized || !ownsLock) return { ok: false, message: "Data server belum dimuat." };
+      if (flight) return flight;
+      flight = (async () => {
+        try {
+          while (!cancelled) {
+            const next = snapshot();
+            const operations = pending?.request?.operations ?? makeOperations(base, next, versions, allowed);
+            if (!operations.length) {
+              pending = undefined; await persist();
+              setStatus({ status: "saved", message: undefined });
+              return { ok: true };
+            }
+            if (operations.length > 5000) throw new Error("payload_too_large");
+            const request = pending?.request ?? { requestId: crypto.randomUUID(), operations };
+            // Retain exactly the sent state for an idempotent retry after a lost response.
+            const sent = pending?.request ? pending.base : base;
+            const sentNext = pending?.request ? applyOperations(sent, request.operations) : next;
+            pending = { base: sent, next, versions, request, at: new Date().toISOString() };
+            await persist(pending);
+            if (cancelled) return { ok: false, message: "Draf disimpan." };
+            const body = JSON.stringify(request);
+            if (new Blob([body]).size > 3_500_000) throw new Error("payload_too_large");
+            const result = await jsonRequest("/api/state", { method: "PATCH", headers: { "Content-Type": "application/json" }, body });
+            if (cancelled) return { ok: false, message: "Draf disimpan; konfirmasi dilanjutkan saat dibuka kembali." };
+            if (!result.ok || !result.versions) throw new Error("invalid_response");
+            base = sentNext;
+            versions = { ...versions, ...result.versions };
+            pending = { base, next: snapshot(), versions, at: new Date().toISOString() };
+            await persist(pending);
+            setStatus({ serverUpdatedAt: result.updatedAt, at: new Date().toISOString() });
+          }
+          return { ok: false, message: "Halaman ditutup; draf disimpan." };
+        } catch (error) { return fail(error); }
+      })().finally(() => { flight = undefined; });
+      return flight;
+    }
+    async function load() {
+      if (flight || cancelled || !ownsLock) return;
+      initialized = false; setBlocked(true); setLoading(true);
       try {
-        const json = await (await fetch("/api/state", { cache: "no-store" })).json();
-        serverData = (json?.data as Snapshot | null) ?? null;
-        serverUpdatedAt = json?.updatedAt ?? null;
-      } catch {
-        serverData = null;
-      }
-      if (cancelled) return;
-
-      const localStr = JSON.stringify(snap());
-      const meta = readMeta();
-
-      const decision = decideSync({
-        localStr,
-        baseline,
-        hasServerData: Boolean(serverData),
-        serverUpdatedAt,
-        metaSyncedAt: meta.syncedAt,
-        metaSig: meta.sig,
-        localSig: sig(localStr),
-        localWeight: weight(snap()),
-        serverWeight: weight(serverData),
-      });
-
-      if (decision === "push-local") {
-        await push(snap());
+        pending = await readDraft(uid);
+        const result = await jsonRequest("/api/state");
+        if (cancelled) return;
+        if (result.protocol !== 2 || !result.data || !result.versions || !Array.isArray(result.writable)) throw new Error("invalid_response");
+        allowed = result.writable;
+        if (pending) {
+          // Do not re-expose cached fields after an account's role was reduced.
+          const visible = Object.keys(result.data);
+          pending = { ...pending, next: Object.fromEntries(Object.entries(pending.next).filter(([key]) => visible.includes(key))) };
+        }
+        stash(snapshot()); // Preserve legacy browser data; never automatically upload it.
+        base = pending?.base ?? result.data;
+        versions = pending?.versions ?? result.versions;
+        // Clear hidden collections as well when changing users on the same device.
+        const cleared = Object.fromEntries(COLLECTIONS.map(k => [k, k === "settings" ? {} : []]));
+        applying = true;
+        useUiStore.setState({ ...cleared, ...result.data, ...(pending?.next ?? {}) } as never);
+        applying = false;
+        initialized = true;
+        setBlocked(false);
+        setStatus({ status: pending ? "saving" : "saved", message: undefined, serverUpdatedAt: result.updatedAt });
+        if (pending) await push();
+      } catch (error) { fail(error); } finally { if (!cancelled) setLoading(false); }
+    }
+    const unsub = useUiStore.subscribe((state, previous) => {
+      if (!initialized || applying || cancelled) return;
+      if (!allowed.some(k => state[k] !== previous[k])) return;
+      // Persist immediately, without waiting for the network debounce.
+      stage().catch(error => fail(error));
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { void push(); }, 700);
+    });
+    saveNow = push;
+    retryLoad = async () => { if (!ownsLock) await acquire(); else if (!initialized) await load(); else await push(); };
+    discardDraft = async () => {
+      if (flight) return;
+      // The user explicitly selects server data after downloading their draft.
+      await downloadWorkspaceDraft();
+      await persist(); pending = undefined;
+      await load();
+    };
+    const onOnline = () => { void retryLoad?.(); };
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (pending || flight) { event.preventDefault(); event.returnValue = ""; }
+    };
+    window.addEventListener("online", onOnline);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    // Read fresh server data on focus only when there are no unsaved edits.
+    const onFocus = () => { if (initialized && !pending && !flight) void load(); };
+    window.addEventListener("focus", onFocus);
+    async function acquire() {
+      setBlocked(true);
+      if (!navigator.locks) {
+        setStatus({ status: "error", message: "Browser ini belum mendukung perlindungan draf. Gunakan Chrome, Edge, atau Safari versi terbaru." });
         return;
       }
-
-      // Server menang (sumber kebenaran bersama). Sebelum menimpa, simpan
-      // cadangan data lokal supaya tidak ada yang hilang diam-diam — bisa
-      // dipulihkan lewat Pengaturan → Pulihkan Data Lokal.
-      if (serverData && localStr !== JSON.stringify(serverData)) {
-        stashLocalBackup(localStr);
-      }
-      useUiStore.setState(serverData as never);
-      lastSent = JSON.stringify(snap());
-      writeMeta({ syncedAt: serverUpdatedAt ?? undefined, sig: sig(lastSent) });
-      setStatus({ status: "saved", at: new Date().toISOString(), serverUpdatedAt: serverUpdatedAt ?? undefined });
-    })();
-
+      void navigator.locks.request(`arfarmjaya-editor:${uid}`, { ifAvailable: true }, async lock => {
+        if (cancelled) return;
+        if (!lock) {
+          setStatus({ status: "error", message: "Aplikasi sedang dibuka di tab lain. Tutup tab tersebut lalu coba lagi agar draf tidak saling menimpa." });
+          return;
+        }
+        ownsLock = true;
+        const released = new Promise<void>(resolve => { releaseLock = resolve; });
+        await load();
+        await released;
+      }).catch(error => { if (!cancelled) fail(error); });
+    }
+    void acquire();
     return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-      unsubscribe();
-      document.removeEventListener("visibilitychange", onHide);
-      window.removeEventListener("pagehide", flush);
+      cancelled = true; if (timer) clearTimeout(timer); unsub();
+      window.removeEventListener("online", onOnline); window.removeEventListener("beforeunload", onBeforeUnload); window.removeEventListener("focus", onFocus);
+      void journal.catch(() => {}).finally(() => releaseLock?.());
+      saveNow = undefined; retryLoad = undefined; discardDraft = undefined;
     };
-  }, [hasHydrated, userId]);
-
-  return null;
+  }, [hydrated, userId, active]);
+  if (!active || !blocked || !userId) return null;
+  return <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-6"><div className="max-w-lg rounded-xl bg-white p-6 text-slate-900" role="alert"><h2 className="mb-3 text-lg font-bold">{loading ? "Memuat data server…" : "Data server belum tersedia"}</h2><p>{status === "error" ? errorMessage : "Tunggu sampai data berhasil dimuat sebelum mengubah catatan."}</p><button className="mt-4 rounded bg-emerald-700 px-4 py-2 text-white" disabled={loading} onClick={() => void retryWorkspace()}>Coba lagi</button></div></div>;
+}
+function applyOperations(base: Snapshot, operations: import("@/lib/workspace-protocol").Operation[]): Snapshot {
+  const next = { ...base };
+  for (const op of operations) {
+    if (op.collection === "settings") { next.settings = op.data; continue; }
+    const values = [...(next[op.collection] as unknown[] ?? [])];
+    const identify = (v: unknown) => op.collection === "readNotifications" ? v : op.collection === "products" ? (v as { sku: string }).sku : (v as { id: string }).id;
+    const index = values.findIndex(v => identify(v) === op.id);
+    if (index >= 0) { if (op.data === null) values.splice(index, 1); else values[index] = op.data; }
+    else if (op.data !== null) values.push(op.data);
+    next[op.collection] = values;
+  }
+  return next;
 }

@@ -5,18 +5,25 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "vercel-build": "prisma generate && prisma db push --skip-generate && next build",
+    "vercel-build": "prisma generate && next build",
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:push": "prisma db push"
+    "prisma:push": "prisma db push",
+    "storage:prepare": "prisma db push --skip-generate",
+    "storage:schema": "node scripts/generate-workspace-schema.mjs",
+    "test:storage": "node --import tsx --test tests/workspace-protocol.test.ts tests/sync-provider.test.tsx && node scripts/test-storage.mjs",
+    "storage:import": "node --import tsx scripts/import-legacy-workspace.ts",
+    "test:storage:http": "node scripts/test-storage.mjs --http"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1152.0",
     "@hookform/resolvers": "^5.4.0",
     "@prisma/client": "^6.19.1",
     "@tanstack/react-table": "^8.21.3",
+    "ajv": "^8.20.0",
     "better-auth": "^1.6.23",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -33,15 +40,21 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10",
+    "@electric-sql/pglite-socket": "^0.2.13",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/react-test-renderer": "^19.3.0",
     "eslint": "^9",
     "eslint-config-next": "^15.5.9",
+    "fake-indexeddb": "^6.2.5",
     "prisma": "^6.19.1",
+    "react-test-renderer": "^19.2.4",
     "tailwindcss": "^4",
     "tsx": "^4.23.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "typescript-json-schema": "^0.68.0"
   }
 }

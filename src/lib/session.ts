@@ -12,11 +12,14 @@ export type SessionPayload = {
   username: string;
   name: string;
   role: AppRole;
+  sessionVersion?: number;
   exp: number; // epoch detik
 };
 
 function secret(): string {
-  return process.env.AUTH_SECRET || "arfarmjaya-dev-secret-change-me";
+  const value = process.env.AUTH_SECRET;
+  if (process.env.NODE_ENV === "production" && (!value || value.length < 32)) throw new Error("AUTH_SECRET must contain at least 32 characters");
+  return value || "arfarmjaya-dev-secret-change-me";
 }
 
 function b64urlEncode(bytes: Uint8Array): string {
