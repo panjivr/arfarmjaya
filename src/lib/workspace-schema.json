@@ -1,0 +1,2124 @@
+{
+  "products": {
+    "type": "object",
+    "properties": {
+      "sku": {
+        "type": "string"
+      },
+      "barcode": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "category": {
+        "type": "string"
+      },
+      "brand": {
+        "type": "string"
+      },
+      "unit": {
+        "type": "string"
+      },
+      "purchasePrice": {
+        "type": "number"
+      },
+      "retailPrice": {
+        "type": "number"
+      },
+      "minStock": {
+        "type": "number"
+      },
+      "maxStock": {
+        "type": "number"
+      },
+      "currentStock": {
+        "type": "number"
+      },
+      "initialStock": {
+        "type": "number"
+      },
+      "stockIn": {
+        "type": "number"
+      },
+      "stockOut": {
+        "type": "number"
+      },
+      "rack": {
+        "type": "string"
+      },
+      "warehouse": {
+        "type": "string"
+      },
+      "supplier": {
+        "type": "string"
+      },
+      "batch": {
+        "type": "string"
+      },
+      "expirationDate": {
+        "type": "string"
+      },
+      "status": {
+        "enum": [
+          "Habis",
+          "Hampir Kedaluwarsa",
+          "Karantina",
+          "Stok Rendah",
+          "Tersedia"
+        ],
+        "type": "string"
+      },
+      "lastUpdate": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "barcode",
+      "batch",
+      "brand",
+      "category",
+      "currentStock",
+      "expirationDate",
+      "maxStock",
+      "minStock",
+      "name",
+      "purchasePrice",
+      "rack",
+      "retailPrice",
+      "sku",
+      "status",
+      "supplier",
+      "unit",
+      "warehouse"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "movements": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "type": {
+        "$ref": "#/definitions/MovementType"
+      },
+      "sku": {
+        "type": "string"
+      },
+      "productName": {
+        "type": "string"
+      },
+      "quantity": {
+        "type": "number"
+      },
+      "unit": {
+        "type": "string"
+      },
+      "note": {
+        "type": "string"
+      },
+      "reference": {
+        "type": "string"
+      },
+      "actor": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "actor",
+      "createdAt",
+      "id",
+      "note",
+      "productName",
+      "quantity",
+      "sku",
+      "type",
+      "unit"
+    ],
+    "definitions": {
+      "MovementType": {
+        "enum": [
+          "adjust",
+          "in",
+          "out",
+          "sale",
+          "transfer"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "categories": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "note": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "createdAt",
+      "id",
+      "name"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "suppliers": {
+    "allOf": [
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "createdAt",
+          "id",
+          "name"
+        ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          }
+        }
+      }
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "warehouses": {
+    "allOf": [
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "createdAt",
+          "id",
+          "name"
+        ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string"
+          }
+        }
+      }
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "racks": {
+    "allOf": [
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "createdAt",
+          "id",
+          "name"
+        ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "warehouse": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "warehouse"
+        ]
+      }
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "users": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "username": {
+        "type": "string"
+      },
+      "role": {
+        "$ref": "#/definitions/Role"
+      },
+      "active": {
+        "type": "boolean"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "active",
+      "createdAt",
+      "id",
+      "name",
+      "role",
+      "username"
+    ],
+    "definitions": {
+      "Role": {
+        "enum": [
+          "admin",
+          "driver",
+          "gudang",
+          "karyawan",
+          "kasir",
+          "manajer",
+          "pembelian",
+          "viewer"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "purchaseOrders": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "number": {
+        "type": "string"
+      },
+      "supplier": {
+        "type": "string"
+      },
+      "status": {
+        "$ref": "#/definitions/OrderStatus"
+      },
+      "lines": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "sku": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "unit": {
+              "type": "string"
+            },
+            "quantity": {
+              "type": "number"
+            },
+            "price": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "name",
+            "price",
+            "quantity",
+            "sku",
+            "unit"
+          ]
+        }
+      },
+      "total": {
+        "type": "number"
+      },
+      "note": {
+        "type": "string"
+      },
+      "actor": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "actor",
+      "createdAt",
+      "id",
+      "lines",
+      "number",
+      "status",
+      "supplier",
+      "total"
+    ],
+    "definitions": {
+      "OrderStatus": {
+        "enum": [
+          "Dibatalkan",
+          "Dikirim",
+          "Diproses",
+          "Disetujui",
+          "Ditolak",
+          "Draft",
+          "Menunggu Persetujuan",
+          "Selesai"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "receipts": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "number": {
+        "type": "string"
+      },
+      "supplier": {
+        "type": "string"
+      },
+      "sku": {
+        "type": "string"
+      },
+      "productName": {
+        "type": "string"
+      },
+      "quantity": {
+        "type": "number"
+      },
+      "unit": {
+        "type": "string"
+      },
+      "batch": {
+        "type": "string"
+      },
+      "expirationDate": {
+        "type": "string"
+      },
+      "actor": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "actor",
+      "batch",
+      "createdAt",
+      "expirationDate",
+      "id",
+      "number",
+      "productName",
+      "quantity",
+      "sku",
+      "supplier",
+      "unit"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "distributions": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "number": {
+        "type": "string"
+      },
+      "destination": {
+        "type": "string"
+      },
+      "status": {
+        "$ref": "#/definitions/OrderStatus"
+      },
+      "lines": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "sku": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "unit": {
+              "type": "string"
+            },
+            "quantity": {
+              "type": "number"
+            },
+            "price": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "name",
+            "price",
+            "quantity",
+            "sku",
+            "unit"
+          ]
+        }
+      },
+      "driver": {
+        "type": "string"
+      },
+      "actor": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "actor",
+      "createdAt",
+      "destination",
+      "id",
+      "lines",
+      "number",
+      "status"
+    ],
+    "definitions": {
+      "OrderStatus": {
+        "enum": [
+          "Dibatalkan",
+          "Dikirim",
+          "Diproses",
+          "Disetujui",
+          "Ditolak",
+          "Draft",
+          "Menunggu Persetujuan",
+          "Selesai"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "requests": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "number": {
+        "type": "string"
+      },
+      "requester": {
+        "type": "string"
+      },
+      "status": {
+        "$ref": "#/definitions/OrderStatus"
+      },
+      "lines": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "sku": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "unit": {
+              "type": "string"
+            },
+            "quantity": {
+              "type": "number"
+            },
+            "price": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "name",
+            "price",
+            "quantity",
+            "sku",
+            "unit"
+          ]
+        }
+      },
+      "note": {
+        "type": "string"
+      },
+      "actor": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "actor",
+      "createdAt",
+      "id",
+      "lines",
+      "number",
+      "requester",
+      "status"
+    ],
+    "definitions": {
+      "OrderStatus": {
+        "enum": [
+          "Dibatalkan",
+          "Dikirim",
+          "Diproses",
+          "Disetujui",
+          "Ditolak",
+          "Draft",
+          "Menunggu Persetujuan",
+          "Selesai"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "opnameSessions": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "number": {
+        "type": "string"
+      },
+      "warehouse": {
+        "type": "string"
+      },
+      "status": {
+        "enum": [
+          "Diposting",
+          "Draft"
+        ],
+        "type": "string"
+      },
+      "lines": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "sku": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "unit": {
+              "type": "string"
+            },
+            "systemStock": {
+              "type": "number"
+            },
+            "actualStock": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "actualStock",
+            "name",
+            "sku",
+            "systemStock",
+            "unit"
+          ]
+        }
+      },
+      "reason": {
+        "type": "string"
+      },
+      "actor": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "actor",
+      "createdAt",
+      "id",
+      "lines",
+      "number",
+      "status",
+      "warehouse"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "posSales": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "number": {
+        "type": "string"
+      },
+      "lines": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "sku": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "unit": {
+              "type": "string"
+            },
+            "quantity": {
+              "type": "number"
+            },
+            "price": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "name",
+            "price",
+            "quantity",
+            "sku",
+            "unit"
+          ]
+        }
+      },
+      "subtotal": {
+        "type": "number"
+      },
+      "discount": {
+        "type": "number"
+      },
+      "total": {
+        "type": "number"
+      },
+      "payment": {
+        "$ref": "#/definitions/PaymentMethod"
+      },
+      "paid": {
+        "type": "number"
+      },
+      "change": {
+        "type": "number"
+      },
+      "actor": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "actor",
+      "change",
+      "createdAt",
+      "discount",
+      "id",
+      "lines",
+      "number",
+      "paid",
+      "payment",
+      "subtotal",
+      "total"
+    ],
+    "definitions": {
+      "PaymentMethod": {
+        "enum": [
+          "QRIS",
+          "Transfer",
+          "Tunai"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "stores": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "address": {
+        "type": "string"
+      },
+      "phone": {
+        "type": "string"
+      },
+      "email": {
+        "type": "string"
+      },
+      "logo": {
+        "type": "string"
+      },
+      "bankInfo": {
+        "type": "string"
+      },
+      "invoicePrefix": {
+        "type": "string"
+      },
+      "signatureName": {
+        "type": "string"
+      },
+      "note": {
+        "type": "string"
+      },
+      "accent": {
+        "type": "string"
+      },
+      "eSignEnabled": {
+        "description": "Aktifkan tanda tangan elektronik sebagai default saat membuat invoice toko ini.",
+        "type": "boolean"
+      },
+      "eSignerName": {
+        "description": "Nama penanda tangan elektronik (fallback: signatureName lalu name).",
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "address",
+      "createdAt",
+      "id",
+      "invoicePrefix",
+      "name",
+      "phone"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "invoices": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "number": {
+        "type": "string"
+      },
+      "storeId": {
+        "type": "string"
+      },
+      "storeName": {
+        "type": "string"
+      },
+      "buyer": {
+        "type": "string"
+      },
+      "buyerPhone": {
+        "type": "string"
+      },
+      "date": {
+        "type": "string"
+      },
+      "lines": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "unit": {
+              "type": "string"
+            },
+            "quantity": {
+              "type": "number"
+            },
+            "price": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "name",
+            "price",
+            "quantity",
+            "unit"
+          ]
+        }
+      },
+      "subtotal": {
+        "type": "number"
+      },
+      "shipping": {
+        "type": "number"
+      },
+      "total": {
+        "type": "number"
+      },
+      "note": {
+        "type": "string"
+      },
+      "signature": {
+        "description": "Tanda tangan elektronik invoice. Bukan PSrE bersertifikat negara, melainkan\ntanda tangan kriptografis internal: `hash` adalah SHA-256 atas isi invoice\n(integritas — berubah bila invoice diubah), `code` kode dokumen yang\nditurunkan dari hash, dipakai di QR verifikasi pada cetakan.",
+        "type": "object",
+        "properties": {
+          "signedBy": {
+            "type": "string"
+          },
+          "signedAt": {
+            "type": "string"
+          },
+          "hash": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "algo": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "algo",
+          "code",
+          "hash",
+          "signedAt",
+          "signedBy"
+        ]
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "buyer",
+      "createdAt",
+      "date",
+      "id",
+      "lines",
+      "number",
+      "shipping",
+      "storeId",
+      "storeName",
+      "subtotal",
+      "total"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "reportProfiles": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "organization": {
+        "type": "string"
+      },
+      "tagline": {
+        "type": "string"
+      },
+      "program": {
+        "type": "string"
+      },
+      "address": {
+        "type": "string"
+      },
+      "phone": {
+        "type": "string"
+      },
+      "email": {
+        "type": "string"
+      },
+      "logo": {
+        "type": "string"
+      },
+      "accent": {
+        "type": "string"
+      },
+      "reportTitle": {
+        "type": "string"
+      },
+      "currencyLabel": {
+        "type": "string"
+      },
+      "signaturePlace": {
+        "type": "string"
+      },
+      "signatureRole": {
+        "type": "string"
+      },
+      "signatureName": {
+        "type": "string"
+      },
+      "signatureId": {
+        "type": "string"
+      },
+      "signatureImage": {
+        "type": "string"
+      },
+      "approverRole": {
+        "type": "string"
+      },
+      "approverName": {
+        "type": "string"
+      },
+      "approverId": {
+        "type": "string"
+      },
+      "notes": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "showHst": {
+        "type": "boolean"
+      },
+      "showAmount": {
+        "type": "boolean"
+      },
+      "showOutput": {
+        "type": "boolean"
+      },
+      "showPhoto": {
+        "type": "boolean"
+      },
+      "showPayment": {
+        "type": "boolean"
+      },
+      "showSummary": {
+        "type": "boolean"
+      },
+      "showNotes": {
+        "type": "boolean"
+      },
+      "autoFit": {
+        "type": "boolean"
+      },
+      "minRows": {
+        "type": "number"
+      },
+      "rowHeight": {
+        "description": "Tinggi tiap baris tabel & kotak foto/bukti pembayaran dalam px. Semakin\nbesar, kotak \"Bukti Pembayaran\"/\"Foto\" makin tinggi sehingga gambar/tempat\ntempel nota terlihat jelas. Kosong = tinggi bawaan (70px).",
+        "type": "number"
+      },
+      "columns": {
+        "description": "Pengaturan kolom tabel: urutan, tampil/sembunyi, dan lebar (%). Bila kosong\n(profil lama), tampilan diturunkan dari flag show* di atas dengan lebar\nbawaan. Ini yang membuat SEMUA kolom — termasuk No, Tanggal, Jenis Kegiatan,\ndan Tujuan — bisa dicentang dan diatur lebarnya.",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/ReportColumnKey"
+            },
+            "visible": {
+              "type": "boolean"
+            },
+            "width": {
+              "description": "Lebar kolom dalam persen (0–100). Kosong/0 = dibagi otomatis.",
+              "type": "number"
+            }
+          },
+          "required": [
+            "key",
+            "visible"
+          ]
+        }
+      },
+      "showExecutiveSummary": {
+        "description": "Kartu ringkasan eksekutif di atas tabel (serapan, jumlah kegiatan, periode).",
+        "type": "boolean"
+      },
+      "signExecutor": {
+        "description": "Blok tanda tangan \"Dibuat oleh\" (pelaksana). Default aktif.",
+        "type": "boolean"
+      },
+      "signApprover": {
+        "description": "Blok tanda tangan \"Mengetahui/Menyetujui\" (manajer/yayasan).",
+        "type": "boolean"
+      },
+      "showESign": {
+        "description": "Tanda tangan elektronik (QR + hash SHA-256) pada blok \"Dibuat oleh\".",
+        "type": "boolean"
+      },
+      "showReimbursement": {
+        "description": "Blok klaim reimbursement (instruksi pembayaran). Default nonaktif.",
+        "type": "boolean"
+      },
+      "reimbursementBank": {
+        "type": "string"
+      },
+      "reimbursementAccount": {
+        "type": "string"
+      },
+      "reimbursementHolder": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "accent",
+      "autoFit",
+      "createdAt",
+      "currencyLabel",
+      "id",
+      "minRows",
+      "name",
+      "notes",
+      "organization",
+      "reportTitle",
+      "showAmount",
+      "showHst",
+      "showNotes",
+      "showOutput",
+      "showPayment",
+      "showPhoto",
+      "showSummary",
+      "signatureRole"
+    ],
+    "definitions": {
+      "ReportColumnKey": {
+        "description": "Kolom tabel laporan yang bisa diatur tampil/sembunyi dan lebarnya.",
+        "enum": [
+          "activity",
+          "amount",
+          "date",
+          "hst",
+          "no",
+          "output",
+          "payment",
+          "photo",
+          "purpose"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "weeklyReports": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "number": {
+        "type": "string"
+      },
+      "profileId": {
+        "type": "string"
+      },
+      "profileName": {
+        "type": "string"
+      },
+      "executor": {
+        "type": "string"
+      },
+      "group": {
+        "type": "string"
+      },
+      "location": {
+        "type": "string"
+      },
+      "week": {
+        "type": "string"
+      },
+      "periodStart": {
+        "type": "string"
+      },
+      "periodEnd": {
+        "type": "string"
+      },
+      "signPlace": {
+        "type": "string"
+      },
+      "signDate": {
+        "type": "string"
+      },
+      "eSignAt": {
+        "type": "string"
+      },
+      "activities": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "activity": {
+              "type": "string"
+            },
+            "purpose": {
+              "type": "string"
+            },
+            "hst": {
+              "type": "string"
+            },
+            "amount": {
+              "type": "number"
+            },
+            "output": {
+              "type": "string"
+            },
+            "photo": {
+              "type": "string"
+            },
+            "photos": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "paymentProof": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "activity",
+            "amount",
+            "date",
+            "hst",
+            "id",
+            "output",
+            "purpose"
+          ]
+        }
+      },
+      "total": {
+        "type": "number"
+      },
+      "actor": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      },
+      "updatedAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "activities",
+      "actor",
+      "createdAt",
+      "executor",
+      "group",
+      "id",
+      "location",
+      "number",
+      "profileId",
+      "profileName",
+      "signDate",
+      "signPlace",
+      "total",
+      "updatedAt",
+      "week"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "ponds": {
+    "description": "Satu kolam fisik dengan kode unik (mis. \"A12\"). Bisa dipakai berulang\nlewat beberapa siklus tebar–panen sepanjang waktu.",
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "code": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "type": {
+        "$ref": "#/definitions/PondType"
+      },
+      "kind": {
+        "description": "Peran kolam: produksi (pembesaran) atau tampungan/stok siap jual (T1–T4).",
+        "enum": [
+          "produksi",
+          "tampungan"
+        ],
+        "type": "string"
+      },
+      "areaM2": {
+        "type": "number"
+      },
+      "note": {
+        "type": "string"
+      },
+      "active": {
+        "type": "boolean"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "active",
+      "code",
+      "createdAt",
+      "id",
+      "type"
+    ],
+    "definitions": {
+      "PondType": {
+        "enum": [
+          "Beton",
+          "Bioflok",
+          "Tanah",
+          "Terpal"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "fishCycles": {
+    "description": "Satu siklus budidaya pada sebuah kolam: dari tebar benih sampai panen.",
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "pondId": {
+        "type": "string"
+      },
+      "pondCode": {
+        "type": "string"
+      },
+      "species": {
+        "type": "string"
+      },
+      "stockDate": {
+        "type": "string"
+      },
+      "source": {
+        "type": "string"
+      },
+      "initialCount": {
+        "type": "number"
+      },
+      "sizeAtStock": {
+        "type": "string"
+      },
+      "seedCostRp": {
+        "type": "number"
+      },
+      "otherCostRp": {
+        "type": "number"
+      },
+      "targetDate": {
+        "type": "string"
+      },
+      "targetWeightG": {
+        "type": "number"
+      },
+      "status": {
+        "$ref": "#/definitions/CycleStatus"
+      },
+      "closedAt": {
+        "type": "string"
+      },
+      "note": {
+        "type": "string"
+      },
+      "actor": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "actor",
+      "createdAt",
+      "id",
+      "initialCount",
+      "otherCostRp",
+      "pondCode",
+      "pondId",
+      "seedCostRp",
+      "source",
+      "species",
+      "status",
+      "stockDate"
+    ],
+    "definitions": {
+      "CycleStatus": {
+        "enum": [
+          "Aktif",
+          "Gagal",
+          "Selesai"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "pondLogs": {
+    "description": "Catatan harian per siklus: pakan, kematian, dan sampling bobot.",
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "cycleId": {
+        "type": "string"
+      },
+      "pondId": {
+        "type": "string"
+      },
+      "date": {
+        "type": "string"
+      },
+      "session": {
+        "enum": [
+          "Pagi",
+          "Sore",
+          "Tambahan"
+        ],
+        "type": "string"
+      },
+      "feedKg": {
+        "type": "number"
+      },
+      "feedBrand": {
+        "type": "string"
+      },
+      "feedType": {
+        "type": "string"
+      },
+      "feedCostRp": {
+        "type": "number"
+      },
+      "deaths": {
+        "type": "number"
+      },
+      "avgWeightG": {
+        "type": "number"
+      },
+      "waterChanged": {
+        "type": "boolean"
+      },
+      "note": {
+        "type": "string"
+      },
+      "actor": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "actor",
+      "createdAt",
+      "cycleId",
+      "date",
+      "deaths",
+      "feedCostRp",
+      "feedKg",
+      "id",
+      "pondId"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "pondHarvests": {
+    "description": "Panen (bisa sebagian/sortir atau total menutup siklus).",
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "cycleId": {
+        "type": "string"
+      },
+      "pondId": {
+        "type": "string"
+      },
+      "date": {
+        "type": "string"
+      },
+      "count": {
+        "type": "number"
+      },
+      "weightKg": {
+        "type": "number"
+      },
+      "pricePerKg": {
+        "type": "number"
+      },
+      "revenueRp": {
+        "type": "number"
+      },
+      "buyer": {
+        "type": "string"
+      },
+      "isFinal": {
+        "type": "boolean"
+      },
+      "outputs": {
+        "type": "array",
+        "items": {
+          "description": "Hasil sortir/grading panen: bagian panen yang masuk kategori tertentu dan\nbisa dialihkan ke kolam lain (mis. Konsumsi → T3, Brojolan → D2).",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "kategori": {
+              "enum": [
+                "Brojolan",
+                "Konsumsi"
+              ],
+              "type": "string"
+            },
+            "weightKg": {
+              "type": "number"
+            },
+            "count": {
+              "type": "number"
+            },
+            "targetPondId": {
+              "type": "string"
+            },
+            "targetPondCode": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "kategori",
+            "weightKg"
+          ]
+        }
+      },
+      "note": {
+        "type": "string"
+      },
+      "actor": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "actor",
+      "count",
+      "createdAt",
+      "cycleId",
+      "date",
+      "id",
+      "isFinal",
+      "pondId",
+      "pricePerKg",
+      "revenueRp",
+      "weightKg"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "pondJournals": {
+    "description": "Jurnal/diary kolam: catatan kejadian, perlakuan, kondisi air, cuaca, dll.",
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "pondId": {
+        "type": "string"
+      },
+      "pondCode": {
+        "type": "string"
+      },
+      "cycleId": {
+        "type": "string"
+      },
+      "date": {
+        "type": "string"
+      },
+      "category": {
+        "$ref": "#/definitions/JournalCategory"
+      },
+      "title": {
+        "type": "string"
+      },
+      "note": {
+        "type": "string"
+      },
+      "waterTemp": {
+        "type": "number"
+      },
+      "waterPh": {
+        "type": "number"
+      },
+      "photo": {
+        "type": "string"
+      },
+      "actor": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "actor",
+      "category",
+      "createdAt",
+      "date",
+      "id",
+      "note",
+      "title"
+    ],
+    "definitions": {
+      "JournalCategory": {
+        "enum": [
+          "Catatan Umum",
+          "Cuaca",
+          "Kesehatan & Penyakit",
+          "Kualitas Air",
+          "Pemeliharaan",
+          "Perlakuan"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "leleSales": {
+    "description": "Penjualan lele (konsumsi/sortir/tampungan). PENTING: tidak ada validasi\nbobot terhadap tebar — biomassa tumbuh, jumlah panen bisa jauh > tebar.",
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "number": {
+        "type": "string"
+      },
+      "date": {
+        "type": "string"
+      },
+      "buyer": {
+        "type": "string"
+      },
+      "item": {
+        "type": "string"
+      },
+      "pondCode": {
+        "type": "string"
+      },
+      "weightKg": {
+        "type": "number"
+      },
+      "pricePerKg": {
+        "type": "number"
+      },
+      "total": {
+        "type": "number"
+      },
+      "paid": {
+        "type": "number"
+      },
+      "method": {
+        "$ref": "#/definitions/PayMethod"
+      },
+      "note": {
+        "type": "string"
+      },
+      "actor": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "actor",
+      "buyer",
+      "createdAt",
+      "date",
+      "id",
+      "item",
+      "method",
+      "number",
+      "paid",
+      "pricePerKg",
+      "total",
+      "weightKg"
+    ],
+    "definitions": {
+      "PayMethod": {
+        "enum": [
+          "QRIS",
+          "Tempo",
+          "Transfer",
+          "Tunai"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "receivables": {
+    "description": "Piutang: tagihan ke pembeli (penjualan tempo / kurang bayar).",
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "saleId": {
+        "type": "string"
+      },
+      "party": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "amount": {
+        "type": "number"
+      },
+      "payments": {
+        "type": "array",
+        "items": {
+          "description": "Satu kali pembayaran/cicilan pada piutang atau utang.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "amount": {
+              "type": "number"
+            },
+            "method": {
+              "$ref": "#/definitions/PayMethod"
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount",
+            "date",
+            "id",
+            "method"
+          ]
+        }
+      },
+      "dueDate": {
+        "type": "string"
+      },
+      "actor": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "actor",
+      "amount",
+      "createdAt",
+      "description",
+      "id",
+      "party",
+      "payments"
+    ],
+    "definitions": {
+      "PayMethod": {
+        "enum": [
+          "QRIS",
+          "Tempo",
+          "Transfer",
+          "Tunai"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "payables": {
+    "description": "Utang usaha: kewajiban ke pemasok/pihak lain (pakan, benih, dll).",
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "party": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "amount": {
+        "type": "number"
+      },
+      "payments": {
+        "type": "array",
+        "items": {
+          "description": "Satu kali pembayaran/cicilan pada piutang atau utang.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "amount": {
+              "type": "number"
+            },
+            "method": {
+              "$ref": "#/definitions/PayMethod"
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount",
+            "date",
+            "id",
+            "method"
+          ]
+        }
+      },
+      "dueDate": {
+        "type": "string"
+      },
+      "actor": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "actor",
+      "amount",
+      "createdAt",
+      "description",
+      "id",
+      "party",
+      "payments"
+    ],
+    "definitions": {
+      "PayMethod": {
+        "enum": [
+          "QRIS",
+          "Tempo",
+          "Transfer",
+          "Tunai"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "financeTx": {
+    "description": "Transaksi kas/keuangan umum di luar penjualan lele.",
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "date": {
+        "type": "string"
+      },
+      "kind": {
+        "$ref": "#/definitions/FinanceKind"
+      },
+      "category": {
+        "type": "string"
+      },
+      "amount": {
+        "type": "number"
+      },
+      "party": {
+        "type": "string"
+      },
+      "note": {
+        "type": "string"
+      },
+      "actor": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "actor",
+      "amount",
+      "category",
+      "createdAt",
+      "date",
+      "id",
+      "kind"
+    ],
+    "definitions": {
+      "FinanceKind": {
+        "enum": [
+          "keluar",
+          "masuk"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "financeCategories": {
+    "description": "Kategori keuangan yang bisa diedit admin (mis. Bon, Ops Ardhi, Inves).",
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "kind": {
+        "enum": [
+          "both",
+          "keluar",
+          "masuk"
+        ],
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "createdAt",
+      "id",
+      "kind",
+      "name"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "leleMovements": {
+    "description": "Satu baris pergerakan fisik lele pada sebuah kolam. Informatif untuk laporan\n& jejak; transfer antar-kolam selalu tercatat berpasangan (keluar + masuk).",
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "date": {
+        "type": "string"
+      },
+      "type": {
+        "$ref": "#/definitions/LeleMoveType"
+      },
+      "pondId": {
+        "type": "string"
+      },
+      "pondCode": {
+        "type": "string"
+      },
+      "toPondId": {
+        "type": "string"
+      },
+      "toPondCode": {
+        "type": "string"
+      },
+      "kategori": {
+        "enum": [
+          "Brojolan",
+          "Konsumsi",
+          "Pemindahan"
+        ],
+        "type": "string"
+      },
+      "qtyKg": {
+        "type": "number"
+      },
+      "qtyEkor": {
+        "type": "number"
+      },
+      "ref": {
+        "type": "string"
+      },
+      "note": {
+        "type": "string"
+      },
+      "actor": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "actor",
+      "createdAt",
+      "date",
+      "id",
+      "pondCode",
+      "pondId",
+      "type"
+    ],
+    "definitions": {
+      "LeleMoveType": {
+        "enum": [
+          "KELUAR",
+          "KEMATIAN",
+          "MASUK",
+          "PANEN",
+          "PENJUALAN",
+          "PENYESUAIAN",
+          "PENYUSUTAN",
+          "SORTIR",
+          "TRANSFER_KELUAR",
+          "TRANSFER_MASUK"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "auditLog": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "actor": {
+        "type": "string"
+      },
+      "action": {
+        "type": "string"
+      },
+      "entity": {
+        "type": "string"
+      },
+      "detail": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "action",
+      "actor",
+      "createdAt",
+      "detail",
+      "entity",
+      "id"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "settings": {
+    "type": "object",
+    "properties": {
+      "companyName": {
+        "type": "string"
+      },
+      "address": {
+        "type": "string"
+      },
+      "phone": {
+        "type": "string"
+      },
+      "taxNumber": {
+        "type": "string"
+      },
+      "lowStockThreshold": {
+        "type": "number"
+      },
+      "expiryWarningDays": {
+        "type": "number"
+      },
+      "currency": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "address",
+      "companyName",
+      "currency",
+      "expiryWarningDays",
+      "lowStockThreshold",
+      "phone",
+      "taxNumber"
+    ],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}

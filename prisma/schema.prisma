@@ -25,7 +25,47 @@ model AppUser {
   passwordHash String
   role         String    @default("STAFF_LELE")
   active       Boolean   @default(true)
+  sessionVersion Int     @default(0)
   permissions  String[]  @default([])
   lastLogin    DateTime?
   createdAt    DateTime  @default(now())
+}
+
+// Each operational record has its own revision; deletions retain a tombstone.
+model WorkspaceRecord {
+  collection String
+  recordId   String
+  data       Json
+  version    Int      @default(1)
+  deleted    Boolean  @default(false)
+  position   Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  @@id([collection, recordId])
+}
+
+// Immutable batches provide idempotency and a server-side change history.
+model WorkspaceChange {
+  id        String   @id
+  actorId   String
+  digest    String
+  changes   Json
+  result    Json
+  createdAt DateTime @default(now())
+}
+
+// Compressed original workspace, retained before the first migration.
+model WorkspaceBackup {
+  id        String   @id
+  payload   Bytes
+  createdAt DateTime @default(now())
+}
+
+// Private attachment authorization follows the current record's collection.
+model WorkspaceAsset {
+  collection String
+  recordId   String
+  digest     String
+  @@id([collection, recordId, digest])
+  @@index([digest])
 }

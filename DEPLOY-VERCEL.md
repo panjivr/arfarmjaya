@@ -1,3 +1,9 @@
+# Pembaruan penyimpanan — baca sebelum deploy
+
+Panduan lama di bawah sudah digantikan oleh [panduan upgrade penyimpanan](docs/STORAGE_UPGRADE.md) dan [perbandingan biaya](docs/STORAGE_COSTS_2026-10-16.md). Build tidak lagi menjalankan db push. Siapkan schema, backup, environment dan flag aktivasi sebelum memakai versi baru. Preview harus memakai database terisolasi. Paket gratis memiliki kuota dan kebijakan layanan; jangan menganggap data atau layanan dijamin permanen.
+
+---
+
 # Deploy ke Vercel + Neon (database permanen, gratis)
 
 Render memakai PostgreSQL **gratis yang kedaluwarsa berkala** — itu penyebab

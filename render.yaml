@@ -8,7 +8,7 @@ services:
     plan: free
     region: singapore
     buildCommand: npm install --include=dev && npx prisma generate && npm run build
-    startCommand: npx prisma db push --skip-generate && npm run start
+    startCommand: npm run start
     healthCheckPath: /login
     envVars:
       - key: DATABASE_URL

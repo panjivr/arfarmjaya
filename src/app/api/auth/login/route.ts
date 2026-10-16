@@ -17,10 +17,10 @@ export async function POST(request: Request) {
   if (!username || !password) return NextResponse.json({ ok: false, message: "Username dan password wajib diisi." }, { status: 400 });
 
   const result = await authenticate(username, password);
-  if (!result.ok || !result.user) return NextResponse.json({ ok: false, message: result.message ?? "Gagal masuk." }, { status: 401 });
+  if (!result.ok || !result.user) return NextResponse.json({ ok: false, message: result.message ?? "Gagal masuk." }, { status: result.unavailable ? 503 : 401 });
 
   const u = result.user;
-  const { token, maxAge } = await signSession({ uid: u.id, username: u.username, name: u.name, role: u.role });
+  const { token, maxAge } = await signSession({ uid: u.id, username: u.username, name: u.name, role: u.role, sessionVersion: u.sessionVersion ?? 0 });
   const res = NextResponse.json({ ok: true, user: { id: u.id, name: u.name, username: u.username, role: u.role } });
   res.cookies.set(sessionCookie(token, maxAge));
   return res;
