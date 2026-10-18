@@ -5,41 +5,10 @@ import { create } from "zustand";
 import { useUiStore } from "@/lib/store";
 import { decideSync } from "@/lib/sync-decide";
 
-// Keys that represent shared business data (synced to the server).
-// Per-device/session state (theme, user, sidebar, etc.) is intentionally excluded.
-const SYNC_KEYS = [
-  "products",
-  "movements",
-  "categories",
-  "suppliers",
-  "warehouses",
-  "racks",
-  "users",
-  "purchaseOrders",
-  "receipts",
-  "distributions",
-  "requests",
-  "opnameSessions",
-  "posSales",
-  "stores",
-  "invoices",
-  "reportProfiles",
-  "weeklyReports",
-  "ponds",
-  "fishCycles",
-  "pondLogs",
-  "pondHarvests",
-  "pondJournals",
-  "leleSales",
-  "receivables",
-  "payables",
-  "financeTx",
-  "financeCategories",
-  "leleMovements",
-  "auditLog",
-  "readNotifications",
-  "settings",
-] as const;
+import { WORKSPACE_KEYS, parseWorkspace, canonicalJson } from "@/lib/workspace-data";
+import { preserveLocalSnapshot, useStorageHealth } from "@/lib/local-persistence";
+import { SyncQueue, type SaveResult } from "@/lib/sync-queue";
+export { readLocalBackup } from "@/lib/local-persistence";
 
 type Snapshot = Record<string, unknown>;
 
@@ -66,10 +35,10 @@ const CHUNK_LIMIT = 3_500_000;
  * batas request, dipecah menjadi beberapa potongan (chunk). Mengembalikan
  * status HTTP terakhir + JSON balasan, agar pemanggil menangani sukses/gagal.
  */
-async function sendStateRequest(serialized: string): Promise<{ status: number; json: Record<string, unknown> }> {
+async function sendStateRequest(serialized: string, revision: string): Promise<{ status: number; json: Record<string, unknown> }> {
   const { bytes, gzip } = await toBytes(serialized);
   const enc: Record<string, string> = gzip ? { "x-encoding": "gzip" } : {};
-  const base: Record<string, string> = { "Content-Type": "application/octet-stream", ...enc };
+  const base: Record<string, string> = { "Content-Type": "application/octet-stream", "x-base-revision": revision, ...enc };
 
   if (bytes.length <= CHUNK_LIMIT) {
     const res = await fetch("/api/state", { method: "PUT", headers: base, body: bytes as unknown as BodyInit });
@@ -94,21 +63,8 @@ async function sendStateRequest(serialized: string): Promise<{ status: number; j
 
 function snapshot(state: Record<string, unknown>): Snapshot {
   const out: Snapshot = {};
-  for (const key of SYNC_KEYS) out[key] = state[key];
+  for (const key of WORKSPACE_KEYS) out[key] = state[key];
   return out;
-}
-
-// Rough "how much real activity" score, used only during first migration so a
-// data-rich browser is never overwritten by an empty/seed one.
-function weight(data: Snapshot | null): number {
-  if (!data) return -1;
-  const arrays = [
-    "movements", "invoices", "posSales", "purchaseOrders", "distributions",
-    "requests", "opnameSessions", "receipts", "auditLog", "stores", "weeklyReports",
-    "ponds", "fishCycles", "pondLogs", "pondHarvests", "pondJournals",
-    "leleSales", "receivables", "payables", "financeTx", "leleMovements",
-  ];
-  return arrays.reduce((sum, k) => sum + (Array.isArray(data[k]) ? (data[k] as unknown[]).length : 0), 0);
 }
 
 // Hash cepat (cyrb53) untuk menandai isi snapshot terakhir yang sudah sinkron.
@@ -125,35 +81,16 @@ function sig(str: string): string {
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
 }
 
-const META_KEY = "arfarmjaya-sync-meta";
-type Meta = { syncedAt?: string; sig?: string };
+const META_KEY = "arfarmjaya-sync-meta-v2";
+type Meta = { syncedAt?: string; sig?: string; cacheFailed?: boolean };
+// Per-tab metadata: another tab must never advance this tab's write revision.
 function readMeta(): Meta {
-  try { return JSON.parse(localStorage.getItem(META_KEY) || "{}") as Meta; } catch { return {}; }
+  try { return JSON.parse(sessionStorage.getItem(META_KEY) || "{}") as Meta; } catch { return {}; }
 }
 function writeMeta(meta: Meta) {
-  try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch { /* ignore */ }
+  try { sessionStorage.setItem(META_KEY, JSON.stringify(meta)); } catch { /* next load will preserve a backup before adopting */ }
 }
 
-// Cadangan data lokal sebelum ditimpa data server — jaring pengaman agar tidak
-// ada perubahan yang hilang diam-diam. Bisa dipulihkan dari Pengaturan.
-const LOCAL_BACKUP_KEY = "arfarmjaya-local-backup";
-function stashLocalBackup(serialized: string) {
-  try {
-    localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify({ at: new Date().toISOString(), data: JSON.parse(serialized) }));
-  } catch { /* kuota penuh — abaikan */ }
-}
-export function readLocalBackup(): { at: string; data: Record<string, unknown> } | null {
-  try {
-    const raw = localStorage.getItem(LOCAL_BACKUP_KEY);
-    const parsed = raw ? JSON.parse(raw) : null;
-    return parsed?.data ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-// Status sinkronisasi yang bisa ditampilkan di UI, supaya kegagalan menyimpan
-// ke server terlihat jelas (bukan gagal diam-diam).
 export type SyncStatusValue = "idle" | "saving" | "saved" | "error";
 type SyncStatusState = {
   status: SyncStatusValue;
@@ -162,158 +99,138 @@ type SyncStatusState = {
   serverUpdatedAt?: string;
   setStatus: (patch: Partial<Omit<SyncStatusState, "setStatus">>) => void;
 };
-export const useSyncStatus = create<SyncStatusState>((set) => ({
-  status: "idle",
-  setStatus: (patch) => set(patch),
-}));
+export const useSyncStatus = create<SyncStatusState>((set) => ({ status: "idle", setStatus: (patch) => set(patch) }));
+let activeSave: (() => Promise<SaveResult>) | undefined;
+export async function syncNow(): Promise<SaveResult> {
+  return activeSave ? activeSave() : { ok: false, message: "Sinkronisasi belum siap. Masuk dan tunggu data server berhasil dimuat." };
+}
 
-/**
- * Dorong seluruh data ke server SEKARANG dan laporkan hasilnya. Dipakai setelah
- * memulihkan cadangan agar data langsung tersimpan di server — bukan menunggu
- * sinkron otomatis — dan pengguna tahu pasti berhasil atau tidak.
- */
-export async function syncNow(): Promise<{ ok: boolean; message?: string }> {
+export function reloadFromServer(): SaveResult {
   const data = snapshot(useUiStore.getState() as unknown as Record<string, unknown>);
-  const serialized = JSON.stringify(data);
-  const sizeMb = (serialized.length / 1_048_576).toFixed(1);
-  const setStatus = useSyncStatus.getState().setStatus;
-  setStatus({ status: "saving", message: undefined });
-  try {
-    const { status, json } = await sendStateRequest(serialized);
-    if (json?.ok) {
-      writeMeta({ syncedAt: (json?.updatedAt as string) ?? undefined, sig: sig(serialized) });
-      setStatus({ status: "saved", at: new Date().toISOString(), serverUpdatedAt: (json?.updatedAt as string) ?? undefined, message: undefined });
-      return { ok: true };
-    }
-    const message = status === 401
-      ? "Sesi login berakhir — masuk ulang lalu ulangi."
-      : json?.db === false
-        ? "Database server tidak aktif."
-        : `Server menolak simpan (HTTP ${status}, ukuran ${sizeMb} MB).`;
-    setStatus({ status: "error", at: new Date().toISOString(), message });
-    return { ok: false, message };
-  } catch {
-    const message = `Tidak terhubung ke server (ukuran data ${sizeMb} MB).`;
-    setStatus({ status: "error", at: new Date().toISOString(), message });
-    return { ok: false, message };
-  }
+  if (!preserveLocalSnapshot(data)) return { ok: false, message: "Cadangan lokal gagal disimpan. Unduh cadangan dan kosongkan ruang penyimpanan sebelum memuat data server." };
+  try { sessionStorage.removeItem(META_KEY); }
+  catch { return { ok: false, message: "Metadata perangkat tidak dapat diperbarui. Periksa izin penyimpanan browser." }; }
+  window.location.reload();
+  return { ok: true };
 }
 
 export function SyncProvider() {
   const hasHydrated = useUiStore((s) => s.hasHydrated);
-  // Sinkronisasi hanya berjalan untuk pengguna yang sudah login — /api/state
-  // butuh sesi, jadi tanpa user kita tidak menyentuh server sama sekali.
   const userId = useUiStore((s) => s.user?.id ?? null);
 
   useEffect(() => {
     if (!hasHydrated || !userId) return;
     let cancelled = false;
-    let lastSent = "";
-    let timer: ReturnType<typeof setTimeout> | null = null;
-
+    let ready = false;
+    let applyingServer = false;
+    let pending = 0;
+    let initializing: Promise<void> | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const snap = () => snapshot(useUiStore.getState() as unknown as Record<string, unknown>);
-    const baseline = JSON.stringify(snap());
-
+    const baseline = canonicalJson(snap());
+    const meta = readMeta();
     const setStatus = useSyncStatus.getState().setStatus;
-
-    async function push(data: Snapshot) {
-      const serialized = JSON.stringify(data);
-      const sizeMb = (serialized.length / 1_048_576).toFixed(1);
-      setStatus({ status: "saving", message: undefined });
-      try {
-        const { status, json } = await sendStateRequest(serialized);
-        if (json?.ok) {
-          lastSent = serialized;
-          writeMeta({ syncedAt: (json?.updatedAt as string) ?? undefined, sig: sig(serialized) });
-          setStatus({ status: "saved", at: new Date().toISOString(), serverUpdatedAt: (json?.updatedAt as string) ?? undefined, message: undefined });
-          return;
-        }
-        // Server menolak/gagal menulis — beri tahu, jangan gagal diam-diam.
-        const reason = status === 401
-          ? "Sesi login berakhir — masuk ulang agar data tersimpan."
-          : json?.db === false
-            ? "Database server tidak aktif."
-            : `Server menolak simpan (HTTP ${status}, ukuran ${sizeMb} MB).`;
-        setStatus({ status: "error", at: new Date().toISOString(), message: reason });
-      } catch {
-        setStatus({ status: "error", at: new Date().toISOString(), message: `Tidak terhubung ke server (ukuran data ${sizeMb} MB).` });
-      }
-    }
-
-    // Start watching immediately so no local change made during the initial
-    // load can be lost.
-    const unsubscribe = useUiStore.subscribe((state) => {
-      const data = snapshot(state as unknown as Record<string, unknown>);
-      const serialized = JSON.stringify(data);
-      if (serialized === lastSent) return;
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => push(data), 700);
+    setStatus({ status: "idle", message: "Memeriksa data server…", serverUpdatedAt: undefined });
+    const queue = new SyncQueue(sendStateRequest, (serialized, reply) => {
+      writeMeta({ syncedAt: reply.updatedAt as string, sig: sig(serialized), cacheFailed: Boolean(useStorageHealth.getState().error) });
+      setStatus({ serverUpdatedAt: reply.updatedAt as string });
     });
 
-    // Saat halaman disembunyikan/ditutup, kirim perubahan yang belum sempat
-    // tersinkron (best-effort) supaya tidak hilang saat refresh cepat.
+    async function save(): Promise<SaveResult> {
+      if (!ready || cancelled) return { ok: false, message: "Data server belum siap atau terjadi konflik. Unduh cadangan lokal sebelum memuat ulang." };
+      const serialized = canonicalJson(snap());
+      pending++;
+      setStatus({ status: "saving", message: undefined });
+      const result = await queue.save(serialized);
+      pending--;
+      if (!cancelled) {
+        const current = canonicalJson(snap());
+        setStatus({ status: result.ok ? (pending || current !== queue.acknowledgedSnapshot ? "saving" : "saved") : "error", at: new Date().toISOString(), message: result.message });
+      }
+      return result;
+    }
+    const saveOrInitialize = async (): Promise<SaveResult> => {
+      if (!ready) await initialize();
+      return save();
+    };
+    activeSave = saveOrInitialize;
+    const schedule = () => {
+      if (!ready || applyingServer || cancelled) return;
+      if (canonicalJson(snap()) === queue.acknowledgedSnapshot) return;
+      setStatus({ status: "saving", message: undefined });
+      clearTimeout(timer);
+      timer = setTimeout(() => { void save(); }, 700);
+    };
+    const unsubscribe = useUiStore.subscribe(schedule);
     const flush = () => {
-      const serialized = JSON.stringify(snap());
-      if (serialized === lastSent) return;
-      if (timer) { clearTimeout(timer); timer = null; }
-      push(snap());
+      if (!ready || canonicalJson(snap()) === queue.acknowledgedSnapshot) return;
+      clearTimeout(timer);
+      void save();
     };
     const onHide = () => { if (document.visibilityState === "hidden") flush(); };
     document.addEventListener("visibilitychange", onHide);
     window.addEventListener("pagehide", flush);
+    const onOnline = () => { if (ready) flush(); else void initialize(); };
+    window.addEventListener("online", onOnline);
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (useSyncStatus.getState().status !== "saved") { event.preventDefault(); event.returnValue = ""; }
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
 
-    (async () => {
-      let serverData: Snapshot | null = null;
-      let serverUpdatedAt: string | null = null;
+    async function load() {
       try {
-        const json = await (await fetch("/api/state", { cache: "no-store" })).json();
-        serverData = (json?.data as Snapshot | null) ?? null;
-        serverUpdatedAt = json?.updatedAt ?? null;
-      } catch {
-        serverData = null;
+        const response = await fetch("/api/state", { cache: "no-store" });
+        const json = await response.json();
+        if (!response.ok || json.db !== true || typeof json.revision !== "string" || !(json.data === null || (json.data && typeof json.updatedAt === "string"))) {
+          throw new Error(response.status === 401 ? "Sesi login berakhir. Masuk ulang." : "Database server tidak dapat dibaca. Tidak ada data yang ditimpa atau dikirim.");
+        }
+        if (cancelled) return;
+        const serverData = json.data === null ? null : parseWorkspace(json.data);
+        const localStr = canonicalJson(snap());
+        const decision = decideSync({ localStr, baseline, hasServerData: Boolean(serverData), serverStr: serverData ? canonicalJson(serverData) : undefined, serverUpdatedAt: json.updatedAt ?? null,
+          metaSyncedAt: meta.syncedAt, metaSig: meta.sig, metaCacheFailed: meta.cacheFailed, localSig: sig(localStr) });
+        if (decision === "conflict") throw new Error("Perubahan lokal berbeda dengan versi server. Data lokal dipertahankan; unduh cadangan sebelum memuat ulang dan rekonsiliasi data.");
+        if (decision === "adopt-server" && serverData) {
+          // Never drop fields unknown to this browser (e.g. an older client).
+          const unknown = Object.keys(json.data).filter((key) => !(WORKSPACE_KEYS as readonly string[]).includes(key));
+          if (unknown.length) throw new Error("Versi data server berbeda. Perbarui aplikasi sebelum menyimpan.");
+          if (localStr !== canonicalJson(serverData) && !preserveLocalSnapshot(snap())) throw new Error("Cadangan lokal gagal dibuat. Data perangkat dipertahankan; unduh cadangan dan kosongkan ruang penyimpanan sebelum memuat ulang.");
+          applyingServer = true;
+          useUiStore.setState(serverData);
+          applyingServer = false;
+          const adopted = canonicalJson(snap());
+          queue.initialize(json.revision, adopted);
+          writeMeta({ syncedAt: json.updatedAt, sig: sig(adopted), cacheFailed: Boolean(useStorageHealth.getState().error) });
+          ready = true;
+          setStatus({ status: "saved", at: new Date().toISOString(), message: undefined, serverUpdatedAt: json.updatedAt });
+        } else {
+          queue.initialize(json.revision);
+          ready = true;
+          await save();
+        }
+      } catch (error) {
+        if (!cancelled) setStatus({ status: "error", message: error instanceof Error ? error.message : "Data server gagal dimuat. Perubahan lokal dipertahankan." });
       }
-      if (cancelled) return;
-
-      const localStr = JSON.stringify(snap());
-      const meta = readMeta();
-
-      const decision = decideSync({
-        localStr,
-        baseline,
-        hasServerData: Boolean(serverData),
-        serverUpdatedAt,
-        metaSyncedAt: meta.syncedAt,
-        metaSig: meta.sig,
-        localSig: sig(localStr),
-        localWeight: weight(snap()),
-        serverWeight: weight(serverData),
-      });
-
-      if (decision === "push-local") {
-        await push(snap());
-        return;
-      }
-
-      // Server menang (sumber kebenaran bersama). Sebelum menimpa, simpan
-      // cadangan data lokal supaya tidak ada yang hilang diam-diam — bisa
-      // dipulihkan lewat Pengaturan → Pulihkan Data Lokal.
-      if (serverData && localStr !== JSON.stringify(serverData)) {
-        stashLocalBackup(localStr);
-      }
-      useUiStore.setState(serverData as never);
-      lastSent = JSON.stringify(snap());
-      writeMeta({ syncedAt: serverUpdatedAt ?? undefined, sig: sig(lastSent) });
-      setStatus({ status: "saved", at: new Date().toISOString(), serverUpdatedAt: serverUpdatedAt ?? undefined });
-    })();
+    }
+    function initialize(): Promise<void> {
+      if (cancelled) return Promise.resolve();
+      if (!initializing) initializing = load().finally(() => { initializing = undefined; });
+      return initializing;
+    }
+    void initialize();
 
     return () => {
       cancelled = true;
-      if (timer) clearTimeout(timer);
+      ready = false;
+      queue.stop();
+      if (activeSave === saveOrInitialize) activeSave = undefined;
+      clearTimeout(timer);
       unsubscribe();
       document.removeEventListener("visibilitychange", onHide);
       window.removeEventListener("pagehide", flush);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("beforeunload", onBeforeUnload);
     };
   }, [hasHydrated, userId]);
-
   return null;
 }

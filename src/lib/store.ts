@@ -3,19 +3,8 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
-// Penyimpanan lokal yang tahan-error: bila kuota localStorage penuh (mis. foto
-// besar), penulisan dilewati tanpa melempar error — data tetap aman di server.
-const safeStorage = {
-  getItem: (name: string) => {
-    try { return localStorage.getItem(name); } catch { return null; }
-  },
-  setItem: (name: string, value: string) => {
-    try { localStorage.setItem(name, value); } catch { /* kuota penuh — abaikan, server yang menyimpan */ }
-  },
-  removeItem: (name: string) => {
-    try { localStorage.removeItem(name); } catch { /* abaikan */ }
-  },
-};
+import { safeStorage, preserveLocalSnapshot } from "@/lib/local-persistence";
+import { parseWorkspace } from "@/lib/workspace-data";
 import type { Product } from "@/lib/data";
 import { realStockProducts } from "@/lib/stock-products";
 import type {
@@ -544,7 +533,7 @@ export const useUiStore = create<State & Actions>()(
       audit: (action, entity, detail) => {
         const actor = get().user?.name ?? "Sistem";
         set((s) => ({
-          auditLog: [{ id: uid(), actor, action, entity, detail, createdAt: now() }, ...s.auditLog].slice(0, 500),
+          auditLog: [{ id: uid(), actor, action, entity, detail, createdAt: now() }, ...s.auditLog],
         }));
       },
 
@@ -607,7 +596,7 @@ export const useUiStore = create<State & Actions>()(
               createdAt: now(),
             },
             ...s.movements,
-          ].slice(0, 1000),
+          ],
         }));
         const labelMap = { in: "Barang Masuk", out: "Barang Keluar", adjust: "Penyesuaian", sale: "Penjualan", transfer: "Transfer" };
         get().audit(labelMap[type], "Stok", `${product.name} ${isOut ? "-" : type === "adjust" ? "=" : "+"}${quantity} ${product.unit}`);
@@ -1022,7 +1011,7 @@ export const useUiStore = create<State & Actions>()(
             kategori: o.kategori, qtyKg: Number(o.weightKg) || undefined, qtyEkor: Number(o.count) || undefined,
             ref: harvest.id, note: `Hasil panen ${cycle.pondCode}`, actor, createdAt: t,
           }));
-        if (inbound.length) set((s) => ({ leleMovements: [...inbound, ...s.leleMovements].slice(0, 5000) }));
+        if (inbound.length) set((s) => ({ leleMovements: [...inbound, ...s.leleMovements] }));
         get().audit("Panen", "Kolam Lele", `${cycle.pondCode} · ${harvest.count} ekor / ${harvest.weightKg}kg${outputs?.length ? ` · ${outputs.length} grading` : ""}`);
         if (harvest.isFinal) get().closeCycle(cycle.id, "Selesai");
         return { ok: true };
@@ -1201,7 +1190,7 @@ export const useUiStore = create<State & Actions>()(
           id: uid(), date: data.date, type: data.type, pondId: pond.id, pondCode: pond.code,
           kategori: data.kategori, qtyKg, qtyEkor, note: data.note, actor: get().user?.name ?? "Pengguna", createdAt: now(),
         };
-        set((s) => ({ leleMovements: [mv, ...s.leleMovements].slice(0, 5000) }));
+        set((s) => ({ leleMovements: [mv, ...s.leleMovements] }));
         get().audit("Mutasi", "Stok Lele", `${pond.code} · ${data.type}${data.kategori ? ` (${data.kategori})` : ""}${qtyKg ? ` · ${qtyKg}kg` : ""}`);
         return { ok: true };
       },
@@ -1220,7 +1209,7 @@ export const useUiStore = create<State & Actions>()(
         const t = now();
         const out: LeleMovement = { id: uid(), date: data.date, type: "TRANSFER_KELUAR", pondId: from.id, pondCode: from.code, toPondId: to.id, toPondCode: to.code, kategori: data.kategori, qtyKg, qtyEkor, ref, note: data.note, actor, createdAt: t };
         const inn: LeleMovement = { id: uid(), date: data.date, type: "TRANSFER_MASUK", pondId: to.id, pondCode: to.code, toPondId: from.id, toPondCode: from.code, kategori: data.kategori, qtyKg, qtyEkor, ref, note: data.note, actor, createdAt: t };
-        set((s) => ({ leleMovements: [inn, out, ...s.leleMovements].slice(0, 5000) }));
+        set((s) => ({ leleMovements: [inn, out, ...s.leleMovements] }));
         get().audit("Transfer", "Stok Lele", `${from.code} → ${to.code}${qtyKg ? ` · ${qtyKg}kg` : ""}${qtyEkor ? ` · ${qtyEkor} ekor` : ""} (${ref})`);
         return { ok: true };
       },
@@ -1238,15 +1227,13 @@ export const useUiStore = create<State & Actions>()(
         return JSON.stringify(payload, null, 2);
       },
       importBackup: (json) => {
-        let parsed: Record<string, unknown>;
-        try { parsed = JSON.parse(json); } catch { return { ok: false, message: "Berkas bukan JSON yang valid." }; }
-        if (!parsed || typeof parsed !== "object") return { ok: false, message: "Format cadangan tidak dikenali." };
-        const patch: Record<string, unknown> = {};
-        let found = 0;
-        for (const k of BACKUP_KEYS) {
-          if (k in parsed) { patch[k] = parsed[k]; found++; }
-        }
-        if (found === 0) return { ok: false, message: "Tidak ada data yang bisa dipulihkan dari berkas ini." };
+        let patch: Record<string, unknown>;
+        try { patch = parseWorkspace(JSON.parse(json)); }
+        catch (error) { return { ok: false, message: error instanceof Error ? error.message : "Berkas cadangan tidak valid." }; }
+        const previous: Record<string, unknown> = {};
+        for (const k of BACKUP_KEYS) previous[k] = (get() as unknown as Record<string, unknown>)[k];
+        if (!preserveLocalSnapshot(previous)) return { ok: false, message: "Cadangan sebelum pemulihan gagal disimpan. Unduh cadangan dan kosongkan ruang penyimpanan sebelum mengulangi." };
+        const found = Object.keys(patch).length;
         set(patch as never);
         get().audit("Pulihkan", "Cadangan Data", `${found} bagian data dipulihkan`);
         return { ok: true, message: `${found} bagian data dipulihkan.` };
@@ -1260,6 +1247,9 @@ export const useUiStore = create<State & Actions>()(
         get().audit("Ubah", "Pengaturan", "Konfigurasi sistem diperbarui");
       },
       resetData: () => {
+        const previous: Record<string, unknown> = {};
+        for (const k of BACKUP_KEYS) previous[k] = (get() as unknown as Record<string, unknown>)[k];
+        if (!preserveLocalSnapshot(previous)) throw new Error("Reset dibatalkan: cadangan lokal gagal disimpan.");
         const fresh = buildInitial();
         set({ ...fresh, hasHydrated: true, user: get().user, theme: get().theme });
       },

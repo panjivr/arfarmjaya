@@ -5,10 +5,15 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "vercel-build": "prisma generate && prisma db push --skip-generate && next build",
+    "vercel-build": "npm run check:production && prisma generate && next build",
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",
+    "test": "tsx --test tests/*.test.ts",
+    "test:postgres": "tsx scripts/test-postgres.ts",
+    "test:auth:postgres": "tsx scripts/test-production-auth.ts",
+    "check:production": "tsx scripts/check-production.ts",
+    "verify:deployment": "tsx scripts/verify-deployment.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:push": "prisma db push"

@@ -3,6 +3,7 @@ import { promisify } from "util";
 import { prisma } from "@/lib/prisma";
 import type { AppRole } from "@/lib/rbac";
 import { isAppRole } from "@/lib/rbac";
+import { seedAccounts } from "@/lib/seed-accounts";
 
 const scrypt = promisify(_scrypt) as (pw: string, salt: string, keylen: number) => Promise<Buffer>;
 
@@ -18,16 +19,8 @@ export type AuthUser = {
 };
 
 // Akun bawaan: menjadi sumber seed saat DB pertama kali kosong, sekaligus
-// cadangan darurat saat DB tak terjangkau agar pemilik tak pernah terkunci.
-type Builtin = { username: string; name: string; role: AppRole; password: string };
-function builtins(): Builtin[] {
-  return [
-    { username: "admin", name: "Admin Utama", role: "ADMIN_UTAMA", password: process.env.ADMIN_PASSWORD || "admin123" },
-    { username: "lele", name: "Staff Lele", role: "STAFF_LELE", password: process.env.LELE_PASSWORD || "lele123" },
-    { username: "gudang", name: "Staff Gudang", role: "STAFF_GUDANG", password: process.env.GUDANG_PASSWORD || "gudang123" },
-    { username: "laporan", name: "Staff Reporting", role: "STAFF_REPORTING", password: process.env.LAPORAN_PASSWORD || "laporan123" },
-  ];
-}
+// akun demo untuk mode lokal yang tidak mengonfigurasi database.
+function builtins() { return seedAccounts(process.env, false); }
 
 export async function hashPassword(pw: string): Promise<string> {
   const salt = randomBytes(16).toString("hex");
@@ -59,14 +52,15 @@ export async function ensureSeeded(): Promise<void> {
   if (!prisma) return;
   const count = await (prisma as any).appUser.count();
   if (count > 0) return;
-  for (const b of builtins()) {
-    await (prisma as any).appUser.create({
-      data: { name: b.name, username: b.username, role: b.role, active: true, permissions: [], passwordHash: await hashPassword(b.password) },
-    });
-  }
+  const accounts = await Promise.all(seedAccounts(process.env, process.env.NODE_ENV === "production").map(async (b) => ({
+    name: b.name, username: b.username, role: b.role, active: true, permissions: [], passwordHash: await hashPassword(b.password),
+  })));
+  // PostgreSQL INSERT ... ON CONFLICT DO NOTHING also covers concurrent cold
+  // starts. An ORM upsert with an empty update can still race on first create.
+  await (prisma as any).appUser.createMany({ data: accounts, skipDuplicates: true });
 }
 
-// Autentikasi: utamakan DB; bila DB tak ada/gagal, pakai akun bawaan darurat.
+// Database authentication fails closed; builtins apply only in no-DB local mode.
 export async function authenticate(username: string, password: string): Promise<{ ok: boolean; user?: AuthUser; message?: string }> {
   const uname = username.trim().toLowerCase();
   if (prisma) {
@@ -79,10 +73,13 @@ export async function authenticate(username: string, password: string): Promise<
       await (prisma as any).appUser.update({ where: { id: row.id }, data: { lastLogin: new Date() } });
       return { ok: true, user: toUser({ ...row, lastLogin: new Date() }) };
     } catch (e) {
-      console.error("DB auth failed, fallback to builtin", e);
-      // jatuh ke bawaan di bawah
+      console.error("DB auth failed", e);
+      // A database outage must never reactivate default passwords or disabled
+      // accounts. Builtins are exclusively for explicit local/no-DB mode.
+      return { ok: false, message: "Database tidak dapat dihubungi. Coba lagi nanti." };
     }
   }
+  if (process.env.NODE_ENV === "production") return { ok: false, message: "Database belum aktif. Hubungi administrator." };
   const b = builtins().find((x) => x.username === uname);
   if (!b || b.password !== password) return { ok: false, message: "Username atau password salah." };
   return { ok: true, user: { id: `builtin:${b.username}`, name: b.name, username: b.username, role: b.role, active: true, permissions: [], lastLogin: new Date().toISOString(), createdAt: new Date().toISOString() } };
