@@ -1,50 +1,31 @@
-// Keputusan sinkronisasi saat aplikasi dimuat. Dipisah sebagai fungsi murni
-// agar bisa diuji: aturan yang salah di sini pernah membuat perangkat dengan
-// data lama menimpa data server yang lebih baru.
-
-export type SyncDecision = "push-local" | "adopt-server";
-
+export type SyncDecision = "push-local" | "adopt-server" | "conflict";
 export type SyncInputs = {
-  /** Snapshot lokal saat ini (serialized). */
   localStr: string;
-  /** Snapshot lokal saat effect mulai — dipakai mendeteksi edit selama memuat. */
   baseline: string;
-  /** Apakah server punya data. */
   hasServerData: boolean;
-  /** updatedAt dari server sekarang. */
   serverUpdatedAt: string | null;
-  /** updatedAt server saat perangkat ini terakhir sinkron. */
+  serverStr?: string;
   metaSyncedAt?: string;
-  /** Tanda tangan snapshot saat perangkat ini terakhir sinkron. */
   metaSig?: string;
-  /** Tanda tangan snapshot lokal sekarang. */
+  /** The acknowledged server snapshot could not be persisted on this device. */
+  metaCacheFailed?: boolean;
   localSig: string;
-  /** Jumlah record lokal & server (hanya untuk sinkron pertama kali). */
-  localWeight: number;
-  serverWeight: number;
 };
 
 export function decideSync(i: SyncInputs): SyncDecision {
-  // Ada perubahan lokal selama proses memuat → jangan sampai hilang.
-  if (i.localStr !== i.baseline) return "push-local";
-
-  // Server belum punya data → perangkat ini jadi sumber awal.
-  if (!i.hasServerData) return "push-local";
-
-  // PEMULIHAN OTOMATIS: server ada tapi kosong dari transaksi (mis. database
-  // gratis kedaluwarsa lalu dibuat ulang kosong) sedangkan perangkat ini masih
-  // menyimpan data nyata → dorong data lokal agar server pulih, jangan diganti
-  // menjadi kosong. Data lokal tetap dicadangkan sebelum keputusan apa pun.
-  if (i.serverWeight <= 0 && i.localWeight > 0) return "push-local";
-
-  // Perangkat ini belum pernah sinkron → yang datanya lebih banyak menang.
-  if (!i.metaSyncedAt) return i.localWeight > i.serverWeight ? "push-local" : "adopt-server";
-
-  // Sudah pernah sinkron. Mendorong data lokal hanya aman bila server TIDAK
-  // berubah sejak sinkron terakhir perangkat ini; kalau server sudah berubah
-  // (perangkat lain menulis), server yang menang agar data baru tidak tertimpa.
-  const serverUnchanged = Boolean(i.serverUpdatedAt) && i.serverUpdatedAt === i.metaSyncedAt;
-  if (serverUnchanged && i.metaSig && i.localSig !== i.metaSig) return "push-local";
-
+  const editedDuringLoad = i.localStr !== i.baseline;
+  const dirty = editedDuringLoad || Boolean(i.metaSig && i.localSig !== i.metaSig);
+  // A previously populated server disappearing may mean the wrong database or
+  // an outage/reset. Never silently seed it from a potentially stale device.
+  if (!i.hasServerData) return i.metaSyncedAt ? "conflict" : "push-local";
+  // A lost response or another tab may already have saved exactly this data.
+  // Matching validated snapshots need no manual conflict reconciliation.
+  if (i.serverStr === i.localStr) return "adopt-server";
+  // An older durable cache is not an offline edit. Never upload it over the
+  // newer acknowledged server snapshot after a quota failure and reload.
+  if (i.metaCacheFailed && dirty) return "conflict";
+  const unchanged = Boolean(i.serverUpdatedAt) && i.serverUpdatedAt === i.metaSyncedAt;
+  if (dirty) return unchanged ? "push-local" : "conflict";
+  // Record counts are not versions. Deleting records is also a legitimate edit.
   return "adopt-server";
 }

@@ -1,6 +1,6 @@
 # AR FARM JAYA WMS
 
-Sistem Manajemen Gudang untuk ARFARM BHINNEKA NUSA JAYA — aplikasi web yang berjalan penuh di sisi klien (static export) dengan data tersimpan di browser (localStorage). Semua modul saling terhubung ke satu sumber data inventori.
+Sistem Manajemen Gudang untuk ARFARM BHINNEKA NUSA JAYA — aplikasi Next.js dengan API server dan PostgreSQL untuk data bersama, serta cache browser (localStorage). Semua modul saling terhubung ke satu sumber data inventori. Penyimpanan perusahaan memerlukan database persisten; cache browser bukan pengganti backup server.
 
 ## Fitur
 
@@ -29,15 +29,19 @@ Pada dialog cetak, pilih tujuan **Simpan sebagai PDF** untuk menghasilkan berkas
 ## Akun Demo
 
 - Admin Utama: `admin` / `admin123`
-- Karyawan Gudang: `karyawan` / `gudang123`
+- Staff Gudang: `gudang` / `gudang123`
+- Staff Lele: `lele` / `lele123`
+- Staff Reporting: `laporan` / `laporan123`
+
+Akun bawaan digunakan untuk mode demo lokal atau seed database kosong. Konfigurasikan kata sandi akun saat menyiapkan production; gangguan database tidak mengaktifkan kembali akun demo.
 
 ## Data
 
-Stok awal berasal dari `STOCK BAHAN BAKU GUDANG ARFARM.xlsx` (`src/lib/stock-products.ts`). Saat aplikasi dijalankan, data di-seed ke store dan perubahan disimpan di browser. Gunakan menu **Pengaturan → Reset Data** untuk mengembalikan ke data awal.
+Stok awal berasal dari `STOCK BAHAN BAKU GUDANG ARFARM.xlsx` (`src/lib/stock-products.ts`). Saat aplikasi dijalankan, data di-seed ke store dan perubahan dicache di browser. Jika `DATABASE_URL` tersedia, data disinkronkan ke PostgreSQL dengan pemeriksaan revisi agar perangkat lain tidak tertimpa. Periksa indikator **Tersimpan** untuk konfirmasi server. **Pengaturan → Reset Data** mengganti data ke kondisi awal dan wajib membuat cadangan pengaman terlebih dahulu.
 
 ## Stack
 
-- Next.js 15 (App Router, static export) + React 19 + TypeScript
+- Next.js 15 (App Router + API server) + React 19 + TypeScript
 - TailwindCSS v4
 - Zustand (state + persistensi localStorage)
 - Recharts, Lucide Icons, Framer Motion
@@ -45,19 +49,32 @@ Stok awal berasal dari `STOCK BAHAN BAKU GUDANG ARFARM.xlsx` (`src/lib/stock-pro
 ## Menjalankan Lokal
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
 Buka `http://localhost:3000`.
 
-## Build Statis
+## Build dan penyimpanan production
 
 ```bash
 npm run build
+npm run start
 ```
 
-Output diekspor ke `out/` dan dapat dihosting sebagai situs statis (mis. GitHub Pages).
+Output server berada di `.next/`; aplikasi ini memerlukan API dan **bukan static export**.
+Konfigurasikan `DATABASE_URL` ke PostgreSQL persisten dan `AUTH_SECRET` sebelum
+menjalankan production. Tanpa database, mode lokal dapat dipakai untuk demo,
+tetapi simpan ke server ditandai gagal. Lihat [panduan deployment](DEPLOY-VERCEL.md).
+
+```bash
+npm test
+npm run lint
+```
+
+Temuan, perlindungan konflik, pengujian database, dan prosedur pemulihan dijelaskan
+di [audit penyimpanan data](docs/DATA-STORAGE-AUDIT.md). Server mempertahankan 20
+versi sebelumnya; tetap siapkan backup terjadwal di lokasi terpisah.
 
 ## Arsitektur
 

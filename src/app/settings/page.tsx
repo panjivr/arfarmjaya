@@ -80,14 +80,18 @@ export default function SettingsPage() {
         s.pondJournals.map(async (j) => ({ ...j, photo: j.photo ? await compressDataUrl(j.photo) : j.photo })),
       );
 
+      const current = useUiStore.getState();
+      if (current.weeklyReports !== s.weeklyReports || current.reportProfiles !== s.reportProfiles || current.stores !== s.stores || current.pondJournals !== s.pondJournals) {
+        throw new Error("Data berubah selama optimasi. Ulangi agar perubahan terbaru tidak tertimpa.");
+      }
       useUiStore.setState({ weeklyReports, reportProfiles, stores, pondJournals } as never);
       const after = sizeOf(useUiStore.getState());
       const sent = await syncNow();
       const delta = `${before.toFixed(1)} MB → ${after.toFixed(1)} MB`;
       if (sent.ok) toast.success(`Foto dioptimalkan (${delta}) & tersimpan ke server.`);
       else toast.error(`Foto dioptimalkan (${delta}), tapi gagal simpan: ${sent.message}`);
-    } catch {
-      toast.error("Gagal mengoptimalkan gambar.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal mengoptimalkan gambar.");
     } finally {
       setOptimizing(false);
     }
@@ -153,9 +157,13 @@ export default function SettingsPage() {
 
   function handleReset() {
     if (confirm("Reset semua data ke kondisi awal? Tindakan ini tidak dapat dibatalkan.")) {
-      resetData();
-      setForm(useUiStore.getState().settings);
-      toast.success("Data berhasil direset ke awal.");
+      try {
+        resetData();
+        setForm(useUiStore.getState().settings);
+        toast.info("Data perangkat direset. Periksa status sinkronisasi untuk memastikan tersimpan di server.");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Reset gagal.");
+      }
     }
   }
 

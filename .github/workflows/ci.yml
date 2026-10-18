@@ -1,0 +1,39 @@
+name: Validate application
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: arfarmjaya_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test-only-ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d arfarmjaya_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:test-only-ci@localhost:5432/arfarmjaya_test
+      AUTH_SECRET: ci-only-session-secret-never-use-this-in-production
+      ADMIN_PASSWORD: ci-admin-password-only-for-tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - name: Initialize disposable CI database
+        run: npx prisma db push --skip-generate
+      - run: npm run test:postgres
+      - run: NODE_ENV=production npm run test:auth:postgres
+      - run: npm run vercel-build

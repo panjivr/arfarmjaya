@@ -16,6 +16,9 @@ export type SessionPayload = {
 };
 
 function secret(): string {
+  if (process.env.NODE_ENV === "production" && (!process.env.AUTH_SECRET || process.env.AUTH_SECRET.length < 32)) {
+    throw new Error("AUTH_SECRET minimal 32 karakter wajib dikonfigurasi untuk production.");
+  }
   return process.env.AUTH_SECRET || "arfarmjaya-dev-secret-change-me";
 }
 
