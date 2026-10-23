@@ -52,6 +52,7 @@ export default function InvoicesPage() {
   const [lines, setLines] = useState<InvoiceLine[]>([]);
   const [shipping, setShipping] = useState(0);
   const [draft, setDraft] = useState({ name: "", unit: "Kg", quantity: "", price: "" });
+  const [catalogQuery, setCatalogQuery] = useState("");
   // Mode edit invoice tersimpan + tanda tangan elektronik.
   const [editingId, setEditingId] = useState<string | null>(null);
   const [eSign, setESign] = useState(false);
@@ -111,6 +112,28 @@ export default function InvoicesPage() {
     setDraft({ name: "", unit: draft.unit, quantity: "", price: "" });
   }
 
+  // Tambah barang dari katalog toko: jika sudah ada baris sama, tambah jumlahnya.
+  function addFromCatalog(item: { name: string; unit: string; price: number }) {
+    setLines((prev) => {
+      const i = prev.findIndex((l) => l.name === item.name && l.unit === item.unit && l.price === item.price);
+      if (i >= 0) {
+        const next = [...prev];
+        next[i] = { ...next[i], quantity: next[i].quantity + 1 };
+        return next;
+      }
+      return [...prev, { name: item.name, unit: item.unit, quantity: 1, price: item.price }];
+    });
+  }
+  function updateLineQty(i: number, qty: number) {
+    setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, quantity: qty > 0 ? qty : 0 } : l)));
+  }
+
+  const catalogMatches = useMemo(() => {
+    const items = store?.catalog ?? [];
+    const q = catalogQuery.trim().toLowerCase();
+    return q ? items.filter((it) => it.name.toLowerCase().includes(q) || it.unit.toLowerCase().includes(q)) : items;
+  }, [store?.catalog, catalogQuery]);
+
   function resetForm() {
     setEditingId(null);
     setLines([]);
@@ -121,6 +144,7 @@ export default function InvoicesPage() {
     setESign(Boolean(store?.eSignEnabled));
     setSignAt(nowLocalInput());
     setPreviewSig(undefined);
+    setCatalogQuery("");
   }
 
   async function save() {
@@ -257,7 +281,48 @@ export default function InvoicesPage() {
           </Card>
 
           <Card>
-            <CardHeader><h2 className="font-semibold">Tambah Barang</h2></CardHeader>
+            <CardHeader className="flex items-center justify-between gap-2">
+              <h2 className="font-semibold">Barang dari Katalog {store ? `· ${store.name}` : ""}</h2>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {store?.catalog && store.catalog.length > 0 ? (
+                <>
+                  <Input value={catalogQuery} onChange={(e) => setCatalogQuery(e.target.value)} placeholder="Cari barang di katalog…" />
+                  <div className="max-h-72 space-y-1.5 overflow-y-auto">
+                    {catalogMatches.length === 0 ? (
+                      <p className="px-1 py-3 text-center text-sm text-muted">Tidak ada barang cocok.</p>
+                    ) : (
+                      catalogMatches.map((it) => (
+                        <button
+                          key={it.id}
+                          type="button"
+                          onClick={() => addFromCatalog(it)}
+                          className="flex w-full items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-left text-sm transition hover:border-primary/60 hover:bg-primary/5"
+                        >
+                          <span className="min-w-0 flex-1 truncate">
+                            <span className="font-medium">{it.name}</span>
+                            <span className="text-muted"> · {it.unit}</span>
+                          </span>
+                          <span className="shrink-0 font-semibold">{currency.format(it.price)}</span>
+                          <Plus className="h-4 w-4 shrink-0 text-primary" />
+                        </button>
+                      ))
+                    )}
+                  </div>
+                  <p className="text-xs text-muted">Klik barang untuk menambahkan. Klik lagi untuk menambah jumlah, atau atur jumlah di daftar bawah.</p>
+                </>
+              ) : (
+                <div className="rounded-lg border border-dashed border-border bg-background px-3 py-4 text-center text-sm text-muted">
+                  Toko ini belum punya katalog barang.
+                  <br />
+                  Buka menu <span className="font-semibold text-foreground">Toko → Edit → Katalog Barang</span> untuk menyimpan daftar harga, agar bisa dipilih cepat di sini.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><h2 className="font-semibold">Tambah Barang Manual</h2></CardHeader>
             <CardContent className="space-y-3">
               <Field label="Nama Barang"><Input value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} placeholder="Pakcoy" /></Field>
               <div className="grid grid-cols-3 gap-2">
@@ -269,11 +334,24 @@ export default function InvoicesPage() {
 
               {lines.length > 0 && (
                 <div className="space-y-1.5 pt-1">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">Barang di Invoice ({lines.length})</p>
                   {lines.map((l, i) => (
                     <div key={i} className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 text-sm">
-                      <span className="min-w-0 flex-1 truncate">{l.name} · {l.quantity} {l.unit}</span>
-                      <span className="font-medium">{currency.format(l.price * l.quantity)}</span>
-                      <button type="button" onClick={() => setLines((prev) => prev.filter((_, idx) => idx !== i))} className="text-danger"><Trash2 className="h-4 w-4" /></button>
+                      <span className="min-w-0 flex-1 truncate">
+                        {l.name}
+                        <span className="text-muted"> · {currency.format(l.price)}/{l.unit}</span>
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="any"
+                        value={l.quantity}
+                        onChange={(e) => updateLineQty(i, Number(e.target.value))}
+                        className="h-8 w-16 rounded-md border border-border bg-card px-2 text-right text-sm outline-none focus:border-primary"
+                        aria-label={`Jumlah ${l.name}`}
+                      />
+                      <span className="w-24 shrink-0 text-right font-medium">{currency.format(l.price * l.quantity)}</span>
+                      <button type="button" onClick={() => setLines((prev) => prev.filter((_, idx) => idx !== i))} className="text-danger" aria-label="Hapus barang"><Trash2 className="h-4 w-4" /></button>
                     </div>
                   ))}
                 </div>

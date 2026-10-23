@@ -204,7 +204,17 @@ export type Store = {
   eSignEnabled?: boolean;
   /** Nama penanda tangan elektronik (fallback: signatureName lalu name). */
   eSignerName?: string;
+  /** Katalog barang/daftar harga toko — dipakai untuk mengisi invoice cepat. */
+  catalog?: StoreItem[];
   createdAt: string;
+};
+
+/** Satu barang di katalog toko (daftar harga yang bisa dipilih saat buat invoice). */
+export type StoreItem = {
+  id: string;
+  name: string;
+  unit: string;
+  price: number;
 };
 
 export type InvoiceLine = {

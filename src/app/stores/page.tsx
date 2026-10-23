@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Image from "next/image";
-import { Building2, ImagePlus, Pencil, Plus, ShieldCheck, Store as StoreIcon, Trash2 } from "lucide-react";
+import { Building2, ImagePlus, Package, Pencil, Plus, ShieldCheck, Store as StoreIcon, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import { PageHeader, StatCard, EmptyState } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,7 +11,9 @@ import { Modal } from "@/components/ui/modal";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { toast } from "@/components/ui/toast";
 import { useUiStore } from "@/lib/store";
-import type { Store } from "@/lib/types";
+import type { Store, StoreItem } from "@/lib/types";
+
+const uid = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
 
 const empty = {
   name: "",
@@ -38,15 +40,33 @@ export default function StoresPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Store | null>(null);
   const [form, setForm] = useState(empty);
+  const [catalog, setCatalog] = useState<StoreItem[]>([]);
+  const [itemDraft, setItemDraft] = useState({ name: "", unit: "Pcs", price: "" });
   const fileRef = useRef<HTMLInputElement>(null);
 
   function set<K extends keyof typeof form>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
+  function addCatalogItem() {
+    const name = itemDraft.name.trim();
+    const price = Number(itemDraft.price);
+    if (!name) return toast.error("Isi nama barang.");
+    setCatalog((c) => [...c, { id: uid(), name, unit: itemDraft.unit.trim() || "Pcs", price: Number.isFinite(price) ? price : 0 }]);
+    setItemDraft({ name: "", unit: itemDraft.unit, price: "" });
+  }
+  function updateCatalogItem(id: string, patch: Partial<StoreItem>) {
+    setCatalog((c) => c.map((it) => (it.id === id ? { ...it, ...patch } : it)));
+  }
+  function removeCatalogItem(id: string) {
+    setCatalog((c) => c.filter((it) => it.id !== id));
+  }
+
   function openCreate() {
     setEditing(null);
     setForm(empty);
+    setCatalog([]);
+    setItemDraft({ name: "", unit: "Pcs", price: "" });
     setOpen(true);
   }
   function openEdit(store: Store) {
@@ -65,6 +85,8 @@ export default function StoresPage() {
       eSignEnabled: Boolean(store.eSignEnabled),
       eSignerName: store.eSignerName ?? "",
     });
+    setCatalog((store.catalog ?? []).map((it) => ({ ...it })));
+    setItemDraft({ name: "", unit: "Pcs", price: "" });
     setOpen(true);
   }
 
@@ -96,6 +118,9 @@ export default function StoresPage() {
       accent: form.accent || "#007a4b",
       eSignEnabled: form.eSignEnabled,
       eSignerName: form.eSignerName.trim() || undefined,
+      catalog: catalog
+        .map((it) => ({ ...it, name: it.name.trim(), unit: it.unit.trim() || "Pcs", price: Number.isFinite(it.price) ? it.price : 0 }))
+        .filter((it) => it.name),
     };
     if (editing) {
       updateStore(editing.id, payload);
@@ -149,6 +174,10 @@ export default function StoresPage() {
                   <div className="mt-3 flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2 text-xs">
                     <span className="text-muted">Prefix: <span className="font-mono font-semibold text-foreground">{store.invoicePrefix}</span></span>
                     <span className="text-muted">{count} invoice</span>
+                  </div>
+                  <div className="mt-2 flex items-center gap-1.5 text-xs text-muted">
+                    <Package className="h-3.5 w-3.5" />
+                    <span>{store.catalog?.length ?? 0} barang di katalog</span>
                   </div>
                   {store.bankInfo && <p className="mt-2 truncate text-xs text-muted">{store.bankInfo}</p>}
                   <div className="mt-3 flex justify-end gap-1">
@@ -223,6 +252,43 @@ export default function StoresPage() {
           </div>
           <div className="sm:col-span-2"><Field label="Nama Penanda Tangan Elektronik" hint="Kosongkan untuk memakai Nama pada Tanda Tangan / nama toko."><Input value={form.eSignerName} onChange={(e) => set("eSignerName", e.target.value)} placeholder="Direktur AR FARM JAYA" /></Field></div>
           <div className="sm:col-span-2"><Field label="Catatan Default"><Textarea value={form.note} onChange={(e) => set("note", e.target.value)} placeholder="Barang yang sudah dibeli tidak bisa ditukar." /></Field></div>
+          <div className="sm:col-span-2">
+            <div className="rounded-lg border border-border bg-background p-3">
+              <div className="mb-2 flex items-center gap-2">
+                <Package className="h-4 w-4 text-primary" />
+                <p className="text-sm font-semibold">Katalog Barang (Daftar Harga)</p>
+                <span className="ml-auto text-xs text-muted">{catalog.length} barang</span>
+              </div>
+              <p className="mb-3 text-xs text-muted">
+                Simpan barang yang sering dijual beserta harganya. Saat membuat invoice, tinggal pilih dari katalog ini — tak perlu ketik ulang nama &amp; harga.
+              </p>
+
+              {/* Tambah cepat */}
+              <div className="grid grid-cols-[1fr_72px_96px_auto] gap-2">
+                <Input value={itemDraft.name} onChange={(e) => setItemDraft((d) => ({ ...d, name: e.target.value }))} placeholder="Galon Air Mineral 19L"
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCatalogItem(); } }} />
+                <Input value={itemDraft.unit} onChange={(e) => setItemDraft((d) => ({ ...d, unit: e.target.value }))} placeholder="Pcs" />
+                <Input type="number" min={0} value={itemDraft.price} onChange={(e) => setItemDraft((d) => ({ ...d, price: e.target.value }))} placeholder="Harga" />
+                <Button type="button" variant="secondary" className="px-3" onClick={addCatalogItem} aria-label="Tambah barang"><Plus className="h-4 w-4" /></Button>
+              </div>
+
+              {catalog.length > 0 && (
+                <div className="mt-3 space-y-1.5">
+                  <div className="grid grid-cols-[1fr_72px_96px_auto] gap-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                    <span>Nama</span><span>Satuan</span><span className="text-right">Harga</span><span />
+                  </div>
+                  {catalog.map((it) => (
+                    <div key={it.id} className="grid grid-cols-[1fr_72px_96px_auto] items-center gap-2">
+                      <Input value={it.name} onChange={(e) => updateCatalogItem(it.id, { name: e.target.value })} />
+                      <Input value={it.unit} onChange={(e) => updateCatalogItem(it.id, { unit: e.target.value })} />
+                      <Input type="number" min={0} value={it.price} onChange={(e) => updateCatalogItem(it.id, { price: Number(e.target.value) || 0 })} className="text-right" />
+                      <button type="button" onClick={() => removeCatalogItem(it.id)} className="px-1 text-danger" aria-label="Hapus barang"><Trash2 className="h-4 w-4" /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
           <div className="sm:col-span-2 flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>Batal</Button>
             <Button type="submit">Simpan Toko</Button>
