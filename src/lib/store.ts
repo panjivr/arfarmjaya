@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
 import { safeStorage, preserveLocalSnapshot } from "@/lib/local-persistence";
+import { cleanLetterLines, letterTotal } from "@/lib/letters";
 import { parseWorkspace } from "@/lib/workspace-data";
 import type { Product } from "@/lib/data";
 import { realStockProducts } from "@/lib/stock-products";
@@ -15,6 +16,8 @@ import type {
   Invoice,
   InvoiceLine,
   InvoiceSignature,
+  OfficialLetter,
+  LetterLine,
   ItemRequest,
   ManagedUser,
   OpnameSession,
@@ -64,6 +67,60 @@ const stamp = () => {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
 };
 const seq = (n: number) => String(n + 1).padStart(4, "0");
+
+type LetterDraft = {
+  storeId: string;
+  recipient: string;
+  recipientPhone?: string;
+  recipientAddress?: string;
+  place: string;
+  date: string;
+  dueDate?: string;
+  number?: string;
+  subject: string;
+  reference?: string;
+  opening: string;
+  closing: string;
+  lines: LetterLine[];
+  bankInfo?: string;
+};
+
+function buildLetterRecord(
+  state: { stores: Store[]; letters: OfficialLetter[] },
+  data: LetterDraft,
+  existing?: OfficialLetter,
+): { ok: boolean; message?: string; letter?: OfficialLetter } {
+  const store = state.stores.find((x) => x.id === data.storeId);
+  if (!store) return { ok: false, message: "Toko tidak ditemukan." };
+  if (!data.recipient.trim()) return { ok: false, message: "Nama penerima wajib diisi." };
+  if (!data.opening.trim() || !data.closing.trim()) return { ok: false, message: "Teks surat belum diisi." };
+  const lines = cleanLetterLines(data.lines);
+  if (lines.length === 0) return { ok: false, message: "Tambahkan minimal satu barang." };
+  const total = letterTotal(lines);
+  const letter: OfficialLetter = {
+    id: existing?.id ?? uid(),
+    kind: "penagihan",
+    number: data.number?.trim() || existing?.number || `001/SPH/${seq(state.letters.length)}`,
+    storeId: store.id,
+    storeName: store.name,
+    recipient: data.recipient.trim(),
+    recipientPhone: data.recipientPhone?.trim() || undefined,
+    recipientAddress: data.recipientAddress?.trim() || undefined,
+    place: data.place.trim() || "Ponorogo",
+    date: data.date,
+    dueDate: data.dueDate || undefined,
+    subject: data.subject.trim() || "Penagihan Piutang Usaha",
+    reference: data.reference?.trim() || undefined,
+    opening: data.opening.trim(),
+    closing: data.closing.trim(),
+    lines,
+    total,
+    bankInfo: data.bankInfo?.trim() || undefined,
+    createdAt: existing?.createdAt ?? now(),
+    updatedAt: now(),
+  };
+  return { ok: true, letter };
+}
 const rupiah = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 });
 const currencyStr = (n: number) => rupiah.format(Math.round(n) || 0);
 
@@ -71,7 +128,7 @@ const currencyStr = (n: number) => rupiah.format(Math.round(n) || 0);
 const BACKUP_KEYS = [
   "products", "movements", "categories", "suppliers", "warehouses", "racks", "users",
   "purchaseOrders", "receipts", "distributions", "requests", "opnameSessions", "posSales",
-  "stores", "invoices", "reportProfiles", "weeklyReports",
+  "stores", "invoices", "letters", "reportProfiles", "weeklyReports",
   "ponds", "fishCycles", "pondLogs", "pondHarvests", "pondJournals",
   "leleSales", "receivables", "payables", "financeTx", "financeCategories", "leleMovements",
   "auditLog", "settings",
@@ -200,6 +257,7 @@ type State = {
   posSales: PosSale[];
   stores: Store[];
   invoices: Invoice[];
+  letters: OfficialLetter[];
   reportProfiles: ReportProfile[];
   weeklyReports: WeeklyReport[];
   ponds: Pond[];
@@ -303,6 +361,42 @@ type Actions = {
     },
   ) => { ok: boolean; message?: string; invoice?: Invoice };
   deleteInvoice: (id: string) => void;
+  createLetter: (data: {
+    storeId: string;
+    recipient: string;
+    recipientPhone?: string;
+    recipientAddress?: string;
+    place: string;
+    date: string;
+    dueDate?: string;
+    number?: string;
+    subject: string;
+    reference?: string;
+    opening: string;
+    closing: string;
+    lines: LetterLine[];
+    bankInfo?: string;
+  }) => { ok: boolean; message?: string; letter?: OfficialLetter };
+  updateLetter: (
+    id: string,
+    data: {
+      storeId: string;
+      recipient: string;
+      recipientPhone?: string;
+      recipientAddress?: string;
+      place: string;
+      date: string;
+      dueDate?: string;
+      number?: string;
+      subject: string;
+      reference?: string;
+      opening: string;
+      closing: string;
+      lines: LetterLine[];
+      bankInfo?: string;
+    },
+  ) => { ok: boolean; message?: string; letter?: OfficialLetter };
+  deleteLetter: (id: string) => void;
 
   // laporan pelaksanaan mingguan
   addReportProfile: (data: Omit<ReportProfile, "id" | "createdAt">) => ReportProfile;
@@ -500,6 +594,7 @@ function buildInitial(): State {
     posSales: [],
     stores: seedStores,
     invoices: [],
+    letters: [],
     reportProfiles: seedReportProfiles,
     weeklyReports: [],
     ...seedLele(),
@@ -833,6 +928,28 @@ export const useUiStore = create<State & Actions>()(
         const inv = get().invoices.find((x) => x.id === id);
         set((s) => ({ invoices: s.invoices.filter((x) => x.id !== id) }));
         get().audit("Hapus", "Invoice", inv?.number ?? id);
+      },
+
+      createLetter: (data) => {
+        const built = buildLetterRecord(get(), data);
+        if (!built.ok || !built.letter) return { ok: false, message: built.message };
+        set((s) => ({ letters: [built.letter!, ...s.letters] }));
+        get().audit("Buat", "Surat", `${built.letter.number} · ${built.letter.recipient}`);
+        return { ok: true, letter: built.letter };
+      },
+      updateLetter: (id, data) => {
+        const existing = get().letters.find((x) => x.id === id);
+        if (!existing) return { ok: false, message: "Surat tidak ditemukan." };
+        const built = buildLetterRecord(get(), data, existing);
+        if (!built.ok || !built.letter) return { ok: false, message: built.message };
+        set((s) => ({ letters: s.letters.map((x) => (x.id === id ? built.letter! : x)) }));
+        get().audit("Ubah", "Surat", `${built.letter.number} · ${built.letter.recipient}`);
+        return { ok: true, letter: built.letter };
+      },
+      deleteLetter: (id) => {
+        const letter = get().letters.find((x) => x.id === id);
+        set((s) => ({ letters: s.letters.filter((x) => x.id !== id) }));
+        get().audit("Hapus", "Surat", letter?.number ?? id);
       },
 
       addReportProfile: (data) => {
@@ -1288,6 +1405,7 @@ export const useUiStore = create<State & Actions>()(
         posSales: s.posSales,
         stores: s.stores,
         invoices: s.invoices,
+        letters: s.letters,
         reportProfiles: s.reportProfiles,
         weeklyReports: s.weeklyReports,
         ponds: s.ponds,

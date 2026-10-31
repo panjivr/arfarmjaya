@@ -255,6 +255,45 @@ export type Invoice = {
   createdAt: string;
 };
 
+/** Jenis surat. Saat ini hanya penagihan; jenis lain bisa ditambah tanpa mengubah invoice. */
+export type LetterKind = "penagihan";
+
+/** Satu baris di tengah surat: barang, jumlah, keterangan, dan nilai rupiah. */
+export type LetterLine = {
+  name: string;
+  quantity: number;
+  unit: string;
+  note: string;
+  amount: number;
+};
+
+/**
+ * Surat resmi yang disimpan terpisah dari invoice.
+ * Kop memakai data toko; isi teks dan tabel milik surat itu sendiri.
+ */
+export type OfficialLetter = {
+  id: string;
+  kind: LetterKind;
+  number: string;
+  storeId: string;
+  storeName: string;
+  recipient: string;
+  recipientPhone?: string;
+  recipientAddress?: string;
+  place: string;
+  date: string; // yyyy-mm-dd
+  dueDate?: string; // yyyy-mm-dd
+  subject: string;
+  reference?: string;
+  opening: string;
+  closing: string;
+  lines: LetterLine[];
+  total: number;
+  bankInfo?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 /* ── Laporan Pelaksanaan Mingguan (laporan kegiatan lapangan) ───────────── */
 
 /**

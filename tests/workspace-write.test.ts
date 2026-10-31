@@ -51,6 +51,12 @@ test("retain latest 20 pre-write snapshots and strictly advance revision", async
   assert.equal(db.backups.length, 20);
   assert.deepEqual(db.backups.at(-1)?.data, { products: [23] });
 });
+test("staff cannot rewrite collection letters", () => {
+  const before = { products: [], letters: [{ id: "1" }], settings: { companyName: "AR" } };
+  assert.throws(() => authorizeWorkspaceWrite("STAFF_GUDANG", before, { ...before, letters: [] }), /forbidden_workspace_change/);
+  assert.doesNotThrow(() => authorizeWorkspaceWrite("STAFF_GUDANG", before, { ...before, products: ["changed"] }));
+  assert.doesNotThrow(() => authorizeWorkspaceWrite("ADMIN_UTAMA", before, { ...before, letters: [] }));
+});
 test("staff cannot replace another department's data or initialize a database", () => {
   const before = { products: [], ponds: [], settings: { companyName: "AR" } };
   assert.throws(() => authorizeWorkspaceWrite("STAFF_LELE", before, { ...before, products: ["changed"] }), /forbidden_workspace_change/);

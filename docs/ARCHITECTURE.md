@@ -46,6 +46,7 @@ The database schema includes role based access control via `Role` and `Permissio
 - Request Goods
 - Stock Opname
 - Retail POS
+- Official Letters (Surat Penagihan)
 - Reports
 - Weekly Field Report (Laporan Pelaksanaan Mingguan)
 - Fish Pond Farming (Budidaya Lele)
@@ -67,6 +68,7 @@ Recommended production services:
 - `RetailService`: POS payment flow, receipt generation, automatic stock deduction.
 - `AuditService`: immutable audit log writer.
 - `FieldReportService`: weekly implementation reports, report profiles (letterhead + print format), activity photos.
+- `LetterService`: official letters (first kind: debt collection) that reuse a store letterhead, keep their own prose and line table, and never mutate invoices or stock.
 
 ## Weekly Field Report Module
 

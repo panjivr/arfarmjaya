@@ -180,7 +180,8 @@ textarea {
   .no-print {
     display: none !important;
   }
-  .invoice-doc {
+  .invoice-doc,
+  .letter-doc {
     box-shadow: none !important;
   }
   /* Laporan mingguan dicetak dari portal di <body>; sisa aplikasi disembunyikan

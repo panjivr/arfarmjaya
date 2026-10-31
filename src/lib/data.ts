@@ -8,6 +8,7 @@ import {
   ClipboardList,
   FileBarChart,
   FileText,
+  Mail,
   LayoutDashboard,
   PackageCheck,
   PackagePlus,
@@ -102,6 +103,7 @@ export const navigation: NavItem[] = [
   { label: "POS Retail", href: "/pos", icon: ReceiptText, adminOnly: true, group: "Penjualan" },
   { label: "Toko", href: "/stores", icon: Store, adminOnly: true, group: "Penjualan" },
   { label: "Invoice", href: "/invoices", icon: FileText, adminOnly: true, group: "Penjualan" },
+  { label: "Surat", href: "/letters", icon: Mail, adminOnly: true, group: "Penjualan" },
 
   { label: "Role & Akses", href: "/users", icon: Users, adminOnly: true, group: "Administrasi" },
   { label: "Log Audit", href: "/audit-log", icon: ShieldCheck, adminOnly: true, group: "Administrasi" },
