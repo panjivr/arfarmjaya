@@ -4,7 +4,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
 import { safeStorage, preserveLocalSnapshot } from "@/lib/local-persistence";
-import { cleanLetterLines, letterTotal } from "@/lib/letters";
+import { cleanLetterLines, letterTotal, resolveLetterChrome, suggestLetterNumber } from "@/lib/letters";
 import { parseWorkspace } from "@/lib/workspace-data";
 import type { Product } from "@/lib/data";
 import { realStockProducts } from "@/lib/stock-products";
@@ -17,7 +17,7 @@ import type {
   InvoiceLine,
   InvoiceSignature,
   OfficialLetter,
-  LetterLine,
+  LetterInput,
   ItemRequest,
   ManagedUser,
   OpnameSession,
@@ -68,26 +68,9 @@ const stamp = () => {
 };
 const seq = (n: number) => String(n + 1).padStart(4, "0");
 
-type LetterDraft = {
-  storeId: string;
-  recipient: string;
-  recipientPhone?: string;
-  recipientAddress?: string;
-  place: string;
-  date: string;
-  dueDate?: string;
-  number?: string;
-  subject: string;
-  reference?: string;
-  opening: string;
-  closing: string;
-  lines: LetterLine[];
-  bankInfo?: string;
-};
-
 function buildLetterRecord(
   state: { stores: Store[]; letters: OfficialLetter[] },
-  data: LetterDraft,
+  data: LetterInput,
   existing?: OfficialLetter,
 ): { ok: boolean; message?: string; letter?: OfficialLetter } {
   const store = state.stores.find((x) => x.id === data.storeId);
@@ -95,12 +78,13 @@ function buildLetterRecord(
   if (!data.recipient.trim()) return { ok: false, message: "Nama penerima wajib diisi." };
   if (!data.opening.trim() || !data.closing.trim()) return { ok: false, message: "Teks surat belum diisi." };
   const lines = cleanLetterLines(data.lines);
-  if (lines.length === 0) return { ok: false, message: "Tambahkan minimal satu barang." };
+  if (lines.length === 0) return { ok: false, message: "Tambahkan minimal satu baris rincian." };
+  const chrome = resolveLetterChrome(data);
   const total = letterTotal(lines);
   const letter: OfficialLetter = {
     id: existing?.id ?? uid(),
     kind: "penagihan",
-    number: data.number?.trim() || existing?.number || `001/SPH/${seq(state.letters.length)}`,
+    number: data.number?.trim() || existing?.number || suggestLetterNumber(data.date, state.letters.length, chrome.code),
     storeId: store.id,
     storeName: store.name,
     recipient: data.recipient.trim(),
@@ -109,13 +93,20 @@ function buildLetterRecord(
     place: data.place.trim() || "Ponorogo",
     date: data.date,
     dueDate: data.dueDate || undefined,
-    subject: data.subject.trim() || "Penagihan Piutang Usaha",
+    subject: data.subject.trim() || chrome.subject,
     reference: data.reference?.trim() || undefined,
     opening: data.opening.trim(),
     closing: data.closing.trim(),
     lines,
     total,
     bankInfo: data.bankInfo?.trim() || undefined,
+    purpose: chrome.id,
+    heading: chrome.heading,
+    code: chrome.code,
+    columns: chrome.columns,
+    totalLabel: chrome.totalLabel,
+    paymentTitle: chrome.paymentTitle,
+    signOff: chrome.signOff,
     createdAt: existing?.createdAt ?? now(),
     updatedAt: now(),
   };
@@ -361,41 +352,8 @@ type Actions = {
     },
   ) => { ok: boolean; message?: string; invoice?: Invoice };
   deleteInvoice: (id: string) => void;
-  createLetter: (data: {
-    storeId: string;
-    recipient: string;
-    recipientPhone?: string;
-    recipientAddress?: string;
-    place: string;
-    date: string;
-    dueDate?: string;
-    number?: string;
-    subject: string;
-    reference?: string;
-    opening: string;
-    closing: string;
-    lines: LetterLine[];
-    bankInfo?: string;
-  }) => { ok: boolean; message?: string; letter?: OfficialLetter };
-  updateLetter: (
-    id: string,
-    data: {
-      storeId: string;
-      recipient: string;
-      recipientPhone?: string;
-      recipientAddress?: string;
-      place: string;
-      date: string;
-      dueDate?: string;
-      number?: string;
-      subject: string;
-      reference?: string;
-      opening: string;
-      closing: string;
-      lines: LetterLine[];
-      bankInfo?: string;
-    },
-  ) => { ok: boolean; message?: string; letter?: OfficialLetter };
+  createLetter: (data: LetterInput) => { ok: boolean; message?: string; letter?: OfficialLetter };
+  updateLetter: (id: string, data: LetterInput) => { ok: boolean; message?: string; letter?: OfficialLetter };
   deleteLetter: (id: string) => void;
 
   // laporan pelaksanaan mingguan

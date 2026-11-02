@@ -14,15 +14,16 @@ import { LetterDocument } from "@/components/letter/letter-document";
 import { useUiStore } from "@/lib/store";
 import { currency, formatDate } from "@/lib/utils";
 import {
-  PENAGIHAN_SUBJECT,
   addCalendarDays,
+  letterProse,
+  letterPurpose,
   letterTotal,
   linesFromInvoice,
-  penagihanClosing,
-  penagihanOpening,
+  resolveLetterChrome,
   suggestLetterNumber,
+  LETTER_PURPOSES,
 } from "@/lib/letters";
-import type { LetterLine, OfficialLetter, Store } from "@/lib/types";
+import type { LetterColumns, LetterLine, LetterPurposeId, OfficialLetter, Store } from "@/lib/types";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -44,7 +45,14 @@ export default function LettersPage() {
   const [date, setDate] = useState(today());
   const [dueDate, setDueDate] = useState(addCalendarDays(today(), 7));
   const [numberOverride, setNumberOverride] = useState("");
-  const [subject, setSubject] = useState(PENAGIHAN_SUBJECT);
+  const [purpose, setPurpose] = useState<LetterPurposeId>("barang");
+  const [heading, setHeading] = useState(letterPurpose("barang").heading);
+  const [code, setCode] = useState(letterPurpose("barang").code);
+  const [columns, setColumns] = useState<LetterColumns>(letterPurpose("barang").columns);
+  const [totalLabel, setTotalLabel] = useState(letterPurpose("barang").totalLabel);
+  const [paymentTitle, setPaymentTitle] = useState(letterPurpose("barang").paymentTitle);
+  const [signOff, setSignOff] = useState(letterPurpose("barang").signOff);
+  const [subject, setSubject] = useState(letterPurpose("barang").subject);
   const [reference, setReference] = useState("");
   const [opening, setOpening] = useState("");
   const [closing, setClosing] = useState("");
@@ -62,14 +70,19 @@ export default function LettersPage() {
 
   const store = stores.find((s) => s.id === storeId);
   const total = useMemo(() => letterTotal(lines), [lines]);
-  const suggestedNumber = suggestLetterNumber(date, letters.length);
+  const suggestedNumber = suggestLetterNumber(date, letters.length, code);
   const letterNumber = numberOverride.trim() || suggestedNumber;
   const storeInvoices = invoices.filter((inv) => inv.storeId === storeId);
+  const selectedPurpose = letterPurpose(purpose);
+  const chrome = useMemo(
+    () => resolveLetterChrome({ purpose, heading, code, subject, columns, totalLabel, paymentTitle, signOff }),
+    [purpose, heading, code, subject, columns, totalLabel, paymentTitle, signOff],
+  );
 
   const prose = useMemo(() => {
     const ctx = { storeName: store?.name ?? "", recipient, reference, dueDate, total };
-    return { opening: penagihanOpening(ctx), closing: penagihanClosing(ctx) };
-  }, [store?.name, recipient, reference, dueDate, total]);
+    return letterProse(purpose, ctx);
+  }, [purpose, store?.name, recipient, reference, dueDate, total]);
 
   useEffect(() => {
     if (textMode === "auto") {
@@ -94,13 +107,20 @@ export default function LettersPage() {
     place,
     date,
     dueDate,
-    subject: subject.trim() || PENAGIHAN_SUBJECT,
+    subject: chrome.subject,
     reference,
     opening,
     closing,
     lines,
     total,
     bankInfo,
+    purpose: chrome.id,
+    heading: chrome.heading,
+    code: chrome.code,
+    columns: chrome.columns,
+    totalLabel: chrome.totalLabel,
+    paymentTitle: chrome.paymentTitle,
+    signOff: chrome.signOff,
     createdAt: "",
     updatedAt: "",
   };
@@ -108,7 +128,7 @@ export default function LettersPage() {
   function addLine() {
     const quantity = Number(draft.quantity);
     const amount = Number(draft.amount);
-    if (!draft.name.trim()) return toast.error("Isi nama barang.");
+    if (!draft.name.trim()) return toast.error(`Isi ${chrome.columns.item.toLowerCase()}.`);
     if (!(amount >= 0) || Number.isNaN(amount)) return toast.error("Isi nilai rupiah.");
     setLines((prev) => [...prev, {
       name: draft.name.trim(),
@@ -132,6 +152,31 @@ export default function LettersPage() {
     toast.success(`Rincian ${invoice.number} disalin ke surat. Invoice asli tidak diubah.`);
   }
 
+  function applyChrome(next: ReturnType<typeof letterPurpose>, keepText: boolean) {
+    setPurpose(next.id);
+    setHeading(next.heading);
+    setCode(next.code);
+    setColumns(next.columns);
+    setTotalLabel(next.totalLabel);
+    setPaymentTitle(next.paymentTitle);
+    setSignOff(next.signOff);
+    setSubject(next.subject);
+    setDraft((current) => (
+      current.name || current.amount || current.quantity || current.note
+        ? current
+        : { ...emptyDraft, unit: next.unit }
+    ));
+    if (!keepText) setTextMode("auto");
+  }
+
+  function onPurposeChange(nextId: LetterPurposeId) {
+    if (nextId === purpose) return;
+    const previous = letterProse(purpose, { storeName: store?.name ?? "", recipient, reference, dueDate, total });
+    const untouched = textMode === "auto" || (opening === previous.opening && closing === previous.closing);
+    applyChrome(letterPurpose(nextId), !untouched);
+    if (!untouched) toast.info("Label surat diganti. Teks yang sudah diubah tetap. Tekan Teks profesional bila ingin naskah baru.");
+  }
+
   function resetForm() {
     setEditingId(null);
     setRecipient("");
@@ -141,10 +186,10 @@ export default function LettersPage() {
     setDate(today());
     setDueDate(addCalendarDays(today(), 7));
     setNumberOverride("");
-    setSubject(PENAGIHAN_SUBJECT);
+    applyChrome(letterPurpose("barang"), false);
     setReference("");
     setLines([]);
-    setDraft(emptyDraft);
+    setDraft({ ...emptyDraft, unit: letterPurpose("barang").unit });
     setInvoiceId("");
     setTextMode("auto");
     setBankInfo(store?.bankInfo ?? "");
@@ -166,6 +211,13 @@ export default function LettersPage() {
       closing,
       lines,
       bankInfo,
+      purpose,
+      heading,
+      code,
+      columns,
+      totalLabel,
+      paymentTitle,
+      signOff,
     };
     const result = editingId ? updateLetter(editingId, payload) : createLetter(payload);
     if (!result.ok) return toast.error(result.message ?? "Gagal menyimpan.");
@@ -182,8 +234,16 @@ export default function LettersPage() {
     setPlace(letter.place);
     setDate(letter.date);
     setDueDate(letter.dueDate ?? addCalendarDays(letter.date, 7));
+    const saved = resolveLetterChrome(letter);
     setNumberOverride(letter.number);
+    applyChrome(saved, true);
     setSubject(letter.subject);
+    setHeading(saved.heading);
+    setCode(saved.code);
+    setColumns(saved.columns);
+    setTotalLabel(saved.totalLabel);
+    setPaymentTitle(saved.paymentTitle);
+    setSignOff(saved.signOff);
     setReference(letter.reference ?? "");
     setOpening(letter.opening);
     setClosing(letter.closing);
@@ -220,13 +280,13 @@ export default function LettersPage() {
       <PageHeader
         eyebrow="Penjualan"
         title="Surat"
-        description="Buat surat penagihan dengan kop toko, teks yang bisa diubah, dan tabel barang di tengah surat. Simpan atau cetak sebagai PDF."
+        description="Pilih maksud surat, lalu ubah judul, teks, dan kolom tabel. Cocok untuk hutang barang, kasbon, gaji, atau pembayaran ke perusahaan. Simpan atau cetak sebagai PDF."
       />
 
       <section className="no-print mb-4 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3">
         <StatCard label="Surat Tersimpan" value={letters.length} icon={Mail} />
-        <StatCard label="Nilai Tagihan" value={currency.format(letters.reduce((sum, letter) => sum + letter.total, 0))} icon={Mail} tone="primary" />
-        <StatCard label="Jenis Aktif" value="Penagihan" icon={FileText} tone="amber" />
+        <StatCard label="Nilai Surat" value={currency.format(letters.reduce((sum, letter) => sum + letter.total, 0))} icon={Mail} tone="primary" />
+        <StatCard label="Judul Surat" value={chrome.heading} icon={FileText} tone="amber" />
       </section>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
@@ -245,9 +305,9 @@ export default function LettersPage() {
           <Card>
             <CardHeader><h2 className="font-semibold">Data Surat</h2></CardHeader>
             <CardContent className="space-y-3">
-              <Field label="Jenis Surat">
-                <Select value="penagihan" onChange={() => undefined}>
-                  <option value="penagihan">Surat Penagihan Hutang</option>
+              <Field label="Maksud Surat" hint={selectedPurpose.hint}>
+                <Select value={purpose} onChange={(e) => onPurposeChange(e.target.value as LetterPurposeId)}>
+                  {LETTER_PURPOSES.map((item) => (<option key={item.id} value={item.id}>{item.label}</option>))}
                 </Select>
               </Field>
               <Field label="Toko (kop surat)">
@@ -276,7 +336,29 @@ export default function LettersPage() {
               <Field label="Telepon Penerima"><Input value={recipientPhone} onChange={(e) => setRecipientPhone(e.target.value)} placeholder="0812…" /></Field>
               <Field label="Alamat Penerima"><Textarea value={recipientAddress} onChange={(e) => setRecipientAddress(e.target.value)} placeholder="Alamat lengkap, bila perlu" /></Field>
               <Field label="Referensi"><Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Invoice INV0007 tanggal 1 Oktober 2026" /></Field>
-              <Field label="Rekening Pembayaran"><Input value={bankInfo} onChange={(e) => setBankInfo(e.target.value)} placeholder={store?.bankInfo || "BNI … a.n. …"} /></Field>
+              <Field label="Rekening Pembayaran" hint={selectedPurpose.paymentHint}><Input value={bankInfo} onChange={(e) => setBankInfo(e.target.value)} placeholder={store?.bankInfo || "BNI … a.n. …"} /></Field>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><h2 className="font-semibold">Label di Kertas</h2></CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted">Pilihan maksud mengisi label ini. Setelah itu setiap tulisan bisa diganti, termasuk judul kolom supaya tidak harus tertulis barang.</p>
+              <Field label="Judul surat"><Input value={heading} onChange={(e) => setHeading(e.target.value)} /></Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Kode nomor"><Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="SPH" /></Field>
+                <Field label="Tulisan total"><Input value={totalLabel} onChange={(e) => setTotalLabel(e.target.value)} /></Field>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Kolom uraian"><Input value={columns.item} onChange={(e) => setColumns((current) => ({ ...current, item: e.target.value }))} /></Field>
+                <Field label="Kolom jumlah"><Input value={columns.quantity} onChange={(e) => setColumns((current) => ({ ...current, quantity: e.target.value }))} /></Field>
+                <Field label="Kolom keterangan"><Input value={columns.note} onChange={(e) => setColumns((current) => ({ ...current, note: e.target.value }))} /></Field>
+                <Field label="Kolom rupiah"><Input value={columns.amount} onChange={(e) => setColumns((current) => ({ ...current, amount: e.target.value }))} /></Field>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Judul pembayaran"><Input value={paymentTitle} onChange={(e) => setPaymentTitle(e.target.value)} /></Field>
+                <Field label="Salam penutup"><Input value={signOff} onChange={(e) => setSignOff(e.target.value)} /></Field>
+              </div>
             </CardContent>
           </Card>
 
@@ -288,26 +370,26 @@ export default function LettersPage() {
               </Button>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Field label="Teks sebelum tabel" hint="Bagian ini tampil di atas rincian barang.">
+              <Field label="Teks sebelum tabel" hint="Bagian ini tampil di atas tabel rincian.">
                 <Textarea value={opening} onChange={(e) => { setTextMode("manual"); setOpening(e.target.value); }} className="min-h-36" />
               </Field>
-              <Field label="Teks sesudah tabel" hint="Memuat nominal, batas bayar, dan klausul bila sudah lunas.">
+              <Field label="Teks sesudah tabel" hint="Nominal, batas waktu, dan kalimat penutup. Bisa diubah bebas.">
                 <Textarea value={closing} onChange={(e) => { setTextMode("manual"); setClosing(e.target.value); }} className="min-h-44" />
               </Field>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader><h2 className="font-semibold">Barang Tagihan</h2></CardHeader>
+            <CardHeader><h2 className="font-semibold">Rincian</h2></CardHeader>
             <CardContent className="space-y-3">
-              <Field label="Nama Barang"><Input value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} placeholder="Pakcoy" /></Field>
+              <Field label={chrome.columns.item}><Input value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} placeholder={selectedPurpose.itemPlaceholder} /></Field>
               <div className="grid grid-cols-2 gap-2">
-                <Field label="Jumlah"><Input type="number" min={0} step="any" value={draft.quantity} onChange={(e) => setDraft((d) => ({ ...d, quantity: e.target.value }))} /></Field>
+                <Field label={chrome.columns.quantity}><Input type="number" min={0} step="any" value={draft.quantity} onChange={(e) => setDraft((d) => ({ ...d, quantity: e.target.value }))} /></Field>
                 <Field label="Satuan"><Input value={draft.unit} onChange={(e) => setDraft((d) => ({ ...d, unit: e.target.value }))} /></Field>
               </div>
-              <Field label="Keterangan"><Input value={draft.note} onChange={(e) => setDraft((d) => ({ ...d, note: e.target.value }))} placeholder="Hutang pengiriman minggu lalu" /></Field>
-              <Field label="Jumlah (Rp)"><Input type="number" min={0} value={draft.amount} onChange={(e) => setDraft((d) => ({ ...d, amount: e.target.value }))} /></Field>
-              <Button type="button" variant="secondary" className="w-full" onClick={addLine}><Plus className="h-4 w-4" /> Tambah ke Surat</Button>
+              <Field label={chrome.columns.note}><Input value={draft.note} onChange={(e) => setDraft((d) => ({ ...d, note: e.target.value }))} placeholder="Opsional" /></Field>
+              <Field label={chrome.columns.amount}><Input type="number" min={0} value={draft.amount} onChange={(e) => setDraft((d) => ({ ...d, amount: e.target.value }))} /></Field>
+              <Button type="button" variant="secondary" className="w-full" onClick={addLine}><Plus className="h-4 w-4" /> Tambah baris</Button>
 
               {lines.length > 0 && (
                 <div className="space-y-1.5 pt-1">
@@ -327,7 +409,7 @@ export default function LettersPage() {
               )}
 
               <div className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2 text-sm">
-                <span className="text-muted">Total tagihan</span>
+                <span className="text-muted">{chrome.totalLabel}</span>
                 <span className="text-lg font-bold">{currency.format(total)}</span>
               </div>
               <div className="flex gap-2">
@@ -363,6 +445,7 @@ export default function LettersPage() {
                       <div className="min-w-0">
                         <p className="font-mono text-sm font-bold">{letter.number}</p>
                         <p className="truncate text-sm text-muted">{letter.recipient}</p>
+                        <p className="truncate text-xs text-muted">{letter.heading || "Surat Penagihan"} · {letter.subject}</p>
                         <p className="text-xs text-muted">{letter.storeName} · {formatDate(letter.date)}</p>
                       </div>
                       <span className="shrink-0 font-bold">{currency.format(letter.total)}</span>

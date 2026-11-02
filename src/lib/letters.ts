@@ -1,4 +1,4 @@
-import type { InvoiceLine, LetterLine } from "@/lib/types";
+import type { InvoiceLine, LetterColumns, LetterLine, LetterPurposeId } from "@/lib/types";
 
 /** Perihal baku surat penagihan pertama (bukan somasi). */
 export const PENAGIHAN_SUBJECT = "Penagihan Piutang Usaha";
@@ -30,12 +30,18 @@ export function addCalendarDays(value: string, days: number): string {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
+/** Kode nomor surat: huruf dan angka, paling panjang 8 karakter. Kosong berarti SPH. */
+export function sanitizeLetterCode(code?: string): string {
+  return (code ?? "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+}
+
 /** Nomor surat resmi: 001/SPH/X/2026. Urutan mengikuti jumlah surat yang sudah ada. */
-export function suggestLetterNumber(date: string, existingCount: number): string {
+export function suggestLetterNumber(date: string, existingCount: number, code = "SPH"): string {
   const match = /^(\d{4})-(\d{2})/.exec(date);
   const year = match?.[1] ?? String(new Date().getFullYear());
   const month = match ? ROMAN[Number(match[2]) - 1] ?? ROMAN[new Date().getMonth()] : ROMAN[new Date().getMonth()];
-  return `${String(existingCount + 1).padStart(3, "0")}/SPH/${month}/${year}`;
+  const prefix = sanitizeLetterCode(code) || "SPH";
+  return `${String(existingCount + 1).padStart(3, "0")}/${prefix}/${month}/${year}`;
 }
 
 /** Angka menjadi kalimat terbilang rupiah. */
@@ -130,4 +136,245 @@ export function cleanLetterLines(lines: LetterLine[]): LetterLine[] {
       amount: Number(line.amount) || 0,
     }))
     .filter((line) => line.name.length > 0);
+}
+
+export type LetterPurpose = {
+  id: LetterPurposeId;
+  label: string;
+  hint: string;
+  heading: string;
+  code: string;
+  subject: string;
+  columns: LetterColumns;
+  totalLabel: string;
+  paymentTitle: string;
+  paymentHint: string;
+  signOff: string;
+  itemPlaceholder: string;
+  unit: string;
+};
+
+export const LETTER_PURPOSES: LetterPurpose[] = [
+  {
+    id: "barang",
+    label: "Penagihan hutang barang",
+    hint: "Anda menagih pembeli atas barang yang belum dibayar.",
+    heading: "Surat Penagihan",
+    code: "SPH",
+    subject: PENAGIHAN_SUBJECT,
+    columns: { item: "Barang", quantity: "Jumlah", note: "Keterangan", amount: "Jumlah (Rp)" },
+    totalLabel: "TOTAL TAGIHAN",
+    paymentTitle: "Informasi Pembayaran",
+    paymentHint: "Rekening yang menerima pembayaran dari pelanggan.",
+    signOff: "Hormat kami,",
+    itemPlaceholder: "Pakcoy",
+    unit: "Kg",
+  },
+  {
+    id: "kasbon",
+    label: "Penagihan kasbon karyawan",
+    hint: "Anda menagih karyawan atas kasbon atau pinjaman. Kolom uraian, bukan barang.",
+    heading: "Surat Penagihan",
+    code: "SPK",
+    subject: "Penagihan Kasbon Karyawan",
+    columns: { item: "Uraian", quantity: "Jumlah", note: "Keterangan", amount: "Nominal (Rp)" },
+    totalLabel: "TOTAL TAGIHAN",
+    paymentTitle: "Informasi Pembayaran",
+    paymentHint: "Rekening yang menerima pelunasan kasbon.",
+    signOff: "Hormat kami,",
+    itemPlaceholder: "Kasbon Oktober 2026",
+    unit: "Kali",
+  },
+  {
+    id: "gaji",
+    label: "Pemberitahuan hutang gaji",
+    hint: "Anda memberitahu karyawan bahwa gaji belum dibayar. Kolom komponen, bukan barang.",
+    heading: "Surat Pemberitahuan",
+    code: "SHG",
+    subject: "Pemberitahuan Hutang Gaji",
+    columns: { item: "Komponen", quantity: "Jumlah", note: "Keterangan", amount: "Nominal (Rp)" },
+    totalLabel: "TOTAL HUTANG",
+    paymentTitle: "Informasi Pembayaran",
+    paymentHint: "Rekening karyawan, bila gaji ditransfer.",
+    signOff: "Hormat kami,",
+    itemPlaceholder: "Gaji pokok Oktober 2026",
+    unit: "Bulan",
+  },
+  {
+    id: "perusahaan",
+    label: "Pemberitahuan hutang ke perusahaan",
+    hint: "Anda menyatakan hutang kepada perusahaan atau vendor lain.",
+    heading: "Surat Pemberitahuan",
+    code: "SHU",
+    subject: "Pemberitahuan Hutang Usaha",
+    columns: { item: "Uraian", quantity: "Jumlah", note: "Keterangan", amount: "Nilai (Rp)" },
+    totalLabel: "TOTAL HUTANG",
+    paymentTitle: "Informasi Pembayaran",
+    paymentHint: "Rekening perusahaan yang akan menerima pembayaran.",
+    signOff: "Hormat kami,",
+    itemPlaceholder: "Jasa angkut September 2026",
+    unit: "Inv",
+  },
+  {
+    id: "bebas",
+    label: "Surat bebas",
+    hint: "Teks netral. Semua judul, kolom, dan isi Anda atur sendiri.",
+    heading: "Surat",
+    code: "SRT",
+    subject: "Pemberitahuan",
+    columns: { item: "Uraian", quantity: "Jumlah", note: "Keterangan", amount: "Jumlah (Rp)" },
+    totalLabel: "TOTAL",
+    paymentTitle: "Informasi Pembayaran",
+    paymentHint: "Rekening atau catatan pembayaran, bila perlu.",
+    signOff: "Hormat kami,",
+    itemPlaceholder: "Uraian",
+    unit: "Pcs",
+  },
+];
+
+export function letterPurpose(id?: string): LetterPurpose {
+  return LETTER_PURPOSES.find((item) => item.id === id) ?? LETTER_PURPOSES[0];
+}
+
+type LetterChromeInput = {
+  purpose?: string;
+  heading?: string;
+  code?: string;
+  subject?: string;
+  columns?: Partial<LetterColumns>;
+  totalLabel?: string;
+  paymentTitle?: string;
+  signOff?: string;
+};
+
+/** Label yang benar-benar tercetak. Field kosong jatuh ke baku maksud surat. Surat lama tanpa field tetap penagihan barang. */
+export function resolveLetterChrome(input?: LetterChromeInput): LetterPurpose {
+  const base = letterPurpose(input?.purpose);
+  const columns = input?.columns;
+  return {
+    ...base,
+    heading: input?.heading?.trim() || base.heading,
+    code: sanitizeLetterCode(input?.code) || base.code,
+    subject: input?.subject?.trim() || base.subject,
+    columns: {
+      item: columns?.item?.trim() || base.columns.item,
+      quantity: columns?.quantity?.trim() || base.columns.quantity,
+      note: columns?.note?.trim() || base.columns.note,
+      amount: columns?.amount?.trim() || base.columns.amount,
+    },
+    totalLabel: input?.totalLabel?.trim() || base.totalLabel,
+    paymentTitle: input?.paymentTitle?.trim() || base.paymentTitle,
+    signOff: input?.signOff?.trim() || base.signOff,
+  };
+}
+
+function parties(ctx: PenagihanContext) {
+  return {
+    who: ctx.recipient.trim() || "Bapak/Ibu",
+    store: ctx.storeName.trim() || "kami",
+    reference: ctx.reference?.trim() ?? "",
+    due: ctx.dueDate ? formatLongDate(ctx.dueDate) : "tanggal yang kami sepakati bersama",
+    nominal: rupiah.format(Math.round(ctx.total) || 0),
+    words: terbilang(ctx.total),
+  };
+}
+
+function withReference(reference: string, sentence: string): string {
+  if (reference) return `Merujuk pada ${reference}, ${sentence}`;
+  return `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}`;
+}
+
+function kasbonOpening(ctx: PenagihanContext): string {
+  const { who, store, reference } = parties(ctx);
+  const lead = withReference(
+    reference,
+    `bersama surat ini kami sampaikan penagihan atas kasbon atau pinjaman ${who} kepada ${store} yang hingga tanggal surat ini belum diselesaikan.`,
+  );
+  return ["Dengan hormat,", "", lead, "", "Adapun rincian kewajiban tersebut adalah sebagai berikut:"].join("\n");
+}
+
+function kasbonClosing(ctx: PenagihanContext): string {
+  const { due, nominal, words } = parties(ctx);
+  return [
+    `Jumlah seluruh tagihan adalah ${nominal} (${words}).`,
+    "",
+    `Kami mohon kesediaan Bapak/Ibu untuk menyelesaikan kewajiban tersebut paling lambat pada ${due}. Pelunasan dapat dilakukan secara tunai, ditransfer ke rekening pada surat ini, atau diperhitungkan pada gaji sesuai kesepakatan. Mohon mencantumkan nomor surat pada berita transfer bila dibayar melalui transfer.`,
+    "",
+    "Apabila kewajiban telah diselesaikan sebelum surat ini diterima, mohon abaikan surat ini dan sampaikan bukti pelunasan agar catatan dapat segera disesuaikan.",
+    "",
+    "Demikian surat penagihan ini kami sampaikan. Atas perhatian dan kerja sama Bapak/Ibu, kami ucapkan terima kasih.",
+  ].join("\n");
+}
+
+function gajiOpening(ctx: PenagihanContext): string {
+  const { who, store, reference } = parties(ctx);
+  const lead = withReference(
+    reference,
+    `bersama surat ini kami memberitahukan bahwa ${store} masih memiliki kewajiban pembayaran gaji dan tunjangan kepada ${who} yang hingga tanggal surat ini belum diselesaikan.`,
+  );
+  return ["Dengan hormat,", "", lead, "", "Adapun rincian komponen kewajiban tersebut adalah sebagai berikut:"].join("\n");
+}
+
+function gajiClosing(ctx: PenagihanContext): string {
+  const { due, nominal, words } = parties(ctx);
+  return [
+    `Jumlah seluruh kewajiban adalah ${nominal} (${words}).`,
+    "",
+    `Pembayaran akan kami selesaikan paling lambat pada ${due}. Apabila terdapat perbedaan rincian, mohon disampaikan kepada kami agar catatan dapat segera disesuaikan.`,
+    "",
+    "Apabila pembayaran telah kami lakukan sebelum surat ini diterima, mohon abaikan pemberitahuan ini dan sampaikan bukti penerimaan agar catatan hutang dapat ditutup.",
+    "",
+    "Demikian surat ini kami sampaikan. Atas perhatian dan kerja sama Bapak/Ibu, kami ucapkan terima kasih.",
+  ].join("\n");
+}
+
+function perusahaanOpening(ctx: PenagihanContext): string {
+  const { who, store, reference } = parties(ctx);
+  const lead = withReference(
+    reference,
+    `bersama surat ini kami memberitahukan bahwa ${store} masih memiliki kewajiban pembayaran kepada ${who} yang hingga tanggal surat ini belum kami selesaikan.`,
+  );
+  return ["Dengan hormat,", "", lead, "", "Adapun rincian kewajiban yang menjadi dasar surat ini adalah sebagai berikut:"].join("\n");
+}
+
+function perusahaanClosing(ctx: PenagihanContext): string {
+  const { due, nominal, words } = parties(ctx);
+  return [
+    `Jumlah seluruh kewajiban adalah ${nominal} (${words}).`,
+    "",
+    `Kami akan menyelesaikan pembayaran tersebut paling lambat pada ${due}. Pembayaran ditransfer ke rekening yang tercantum pada surat ini. Mohon konfirmasi penerimaan agar pencatatan kedua belah pihak sesuai.`,
+    "",
+    "Apabila pembayaran telah kami lakukan sebelum surat ini diterima, mohon abaikan pemberitahuan ini dan sampaikan bukti penerimaan.",
+    "",
+    "Demikian surat ini kami sampaikan. Atas perhatian dan kerja sama Bapak/Ibu, kami ucapkan terima kasih.",
+  ].join("\n");
+}
+
+function bebasOpening(ctx: PenagihanContext): string {
+  const { who, reference } = parties(ctx);
+  const lead = withReference(
+    reference,
+    `bersama surat ini kami sampaikan kepada ${who} hal sebagaimana tercantum pada perihal.`,
+  );
+  return ["Dengan hormat,", "", lead, "", "Rincian yang menyertai surat ini adalah sebagai berikut:"].join("\n");
+}
+
+function bebasClosing(ctx: PenagihanContext): string {
+  const { due, nominal, words } = parties(ctx);
+  return [
+    `Jumlah seluruhnya adalah ${nominal} (${words}).`,
+    "",
+    `Mohon perhatian Bapak/Ibu atas hal tersebut paling lambat pada ${due}.`,
+    "",
+    "Demikian surat ini kami sampaikan. Atas perhatian dan kerja sama Bapak/Ibu, kami ucapkan terima kasih.",
+  ].join("\n");
+}
+
+/** Teks profesional sesuai maksud surat. Penagihan barang memakai naskah yang sudah ada. */
+export function letterProse(purpose: LetterPurposeId, ctx: PenagihanContext): { opening: string; closing: string } {
+  if (purpose === "kasbon") return { opening: kasbonOpening(ctx), closing: kasbonClosing(ctx) };
+  if (purpose === "gaji") return { opening: gajiOpening(ctx), closing: gajiClosing(ctx) };
+  if (purpose === "perusahaan") return { opening: perusahaanOpening(ctx), closing: perusahaanClosing(ctx) };
+  if (purpose === "bebas") return { opening: bebasOpening(ctx), closing: bebasClosing(ctx) };
+  return { opening: penagihanOpening(ctx), closing: penagihanClosing(ctx) };
 }

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { Store as StoreIcon } from "lucide-react";
 import type { OfficialLetter, Store } from "@/lib/types";
-import { formatLongDate, terbilang } from "@/lib/letters";
+import { formatLongDate, resolveLetterChrome, terbilang } from "@/lib/letters";
 import { currency, numberFmt } from "@/lib/utils";
 
 export function LetterDocument({ store, letter, id }: { store?: Store; letter: OfficialLetter; id?: string }) {
@@ -12,6 +12,7 @@ export function LetterDocument({ store, letter, id }: { store?: Store; letter: O
   const phone = letter.recipientPhone?.trim() ?? "";
   const hasPhone = phone.length > 0 && phone !== "-";
   const signer = store?.signatureName?.trim() || store?.name || "";
+  const chrome = resolveLetterChrome(letter);
 
   return (
     <div
@@ -38,7 +39,7 @@ export function LetterDocument({ store, letter, id }: { store?: Store; letter: O
             </div>
           </div>
           <div className="shrink-0 text-right">
-            <p className="text-xl font-extrabold uppercase tracking-wide" style={{ color: accent }}>Surat Penagihan</p>
+            <p className="max-w-[220px] text-right text-xl font-extrabold uppercase leading-tight tracking-wide" style={{ color: accent }}>{chrome.heading}</p>
             <p className="mt-1 font-mono text-sm font-semibold text-slate-800">{letter.number}</p>
             <p className="text-[11px] text-slate-500">{letter.place}, {formatLongDate(letter.date)}</p>
           </div>
@@ -63,21 +64,21 @@ export function LetterDocument({ store, letter, id }: { store?: Store; letter: O
           <thead>
             <tr style={{ background: accent, color: "#fff" }}>
               <th className="px-2 py-2 text-center font-semibold" style={{ width: "6%" }}>No</th>
-              <th className="px-3 py-2 text-left font-semibold">Barang</th>
-              <th className="px-2 py-2 text-right font-semibold" style={{ width: "14%" }}>Jumlah</th>
-              <th className="px-3 py-2 text-left font-semibold" style={{ width: "28%" }}>Keterangan</th>
-              <th className="px-3 py-2 text-right font-semibold" style={{ width: "20%" }}>Jumlah (Rp)</th>
+              <th className="px-3 py-2 text-left font-semibold">{chrome.columns.item}</th>
+              <th className="px-2 py-2 text-right font-semibold" style={{ width: "14%" }}>{chrome.columns.quantity}</th>
+              <th className="px-3 py-2 text-left font-semibold" style={{ width: "28%" }}>{chrome.columns.note}</th>
+              <th className="px-3 py-2 text-right font-semibold" style={{ width: "20%" }}>{chrome.columns.amount}</th>
             </tr>
           </thead>
           <tbody>
             {letter.lines.length === 0 ? (
-              <tr><td colSpan={5} className="border border-slate-200 px-2 py-5 text-center text-slate-400">Belum ada barang</td></tr>
+              <tr><td colSpan={5} className="border border-slate-200 px-2 py-5 text-center text-slate-400">Belum ada rincian</td></tr>
             ) : (
               letter.lines.map((line, index) => (
                 <tr key={`${line.name}-${index}`} style={{ background: index % 2 === 1 ? "#f8fafc" : "#ffffff" }}>
                   <td className="border-x border-slate-200 px-2 py-1.5 text-center text-slate-500">{index + 1}</td>
                   <td className="border-x border-slate-200 px-3 py-1.5 font-medium">{line.name}</td>
-                  <td className="border-x border-slate-200 px-2 py-1.5 text-right">{numberFmt.format(line.quantity)} {line.unit}</td>
+                  <td className="border-x border-slate-200 px-2 py-1.5 text-right">{line.quantity > 0 ? `${numberFmt.format(line.quantity)} ${line.unit}` : "—"}</td>
                   <td className="border-x border-slate-200 px-3 py-1.5 text-slate-600">{line.note || "—"}</td>
                   <td className="border-x border-slate-200 px-3 py-1.5 text-right font-semibold">{numberFmt.format(line.amount)}</td>
                 </tr>
@@ -93,7 +94,7 @@ export function LetterDocument({ store, letter, id }: { store?: Store; letter: O
             <p className="italic text-slate-600">{terbilang(letter.total)}</p>
           </div>
           <div className="flex items-center justify-between rounded-md px-3 py-2 text-sm font-bold text-white sm:min-w-[240px]" style={{ background: accent }}>
-            <span>TOTAL TAGIHAN</span>
+            <span>{chrome.totalLabel}</span>
             <span>{currency.format(letter.total)}</span>
           </div>
         </div>
@@ -102,7 +103,7 @@ export function LetterDocument({ store, letter, id }: { store?: Store; letter: O
 
         <div className="mt-6 flex items-end justify-between gap-6 text-xs" style={{ breakInside: "avoid" }}>
           <div className="max-w-[55%]">
-            <p className="font-semibold text-slate-700">Informasi Pembayaran</p>
+            <p className="font-semibold text-slate-700">{chrome.paymentTitle}</p>
             {letter.bankInfo ? (
               <p className="mt-0.5 text-slate-600">Transfer: {letter.bankInfo}</p>
             ) : (
@@ -111,7 +112,7 @@ export function LetterDocument({ store, letter, id }: { store?: Store; letter: O
           </div>
           <div className="min-w-[180px] text-center">
             <p className="text-slate-600">{letter.place}, {formatLongDate(letter.date)}</p>
-            <p className="text-slate-600">Hormat kami,</p>
+            <p className="text-slate-600">{chrome.signOff}</p>
             <div className="h-14" />
             <p className="border-t border-slate-400 px-6 pt-1 font-semibold text-slate-700">{signer}</p>
           </div>

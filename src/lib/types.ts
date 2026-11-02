@@ -255,10 +255,24 @@ export type Invoice = {
   createdAt: string;
 };
 
-/** Jenis surat. Saat ini hanya penagihan; jenis lain bisa ditambah tanpa mengubah invoice. */
+/** Jenis surat. Tetap satu jenis tersimpan agar surat lama tidak perlu migrasi. */
 export type LetterKind = "penagihan";
 
-/** Satu baris di tengah surat: barang, jumlah, keterangan, dan nilai rupiah. */
+/**
+ * Maksud surat. Mengatur teks awal dan label baku.
+ * Isi kertas tetap bisa diganti satu per satu setelah pilihan ini.
+ */
+export type LetterPurposeId = "barang" | "kasbon" | "gaji" | "perusahaan" | "bebas";
+
+/** Judul kolom tabel di tengah surat. */
+export type LetterColumns = {
+  item: string;
+  quantity: string;
+  note: string;
+  amount: string;
+};
+
+/** Satu baris di tengah surat: uraian, jumlah, keterangan, dan nilai rupiah. */
 export type LetterLine = {
   name: string;
   quantity: number;
@@ -267,9 +281,35 @@ export type LetterLine = {
   amount: number;
 };
 
+/** Data yang dikirim saat membuat atau memperbarui surat. */
+export type LetterInput = {
+  storeId: string;
+  recipient: string;
+  recipientPhone?: string;
+  recipientAddress?: string;
+  place: string;
+  date: string;
+  dueDate?: string;
+  number?: string;
+  subject: string;
+  reference?: string;
+  opening: string;
+  closing: string;
+  lines: LetterLine[];
+  bankInfo?: string;
+  purpose?: LetterPurposeId;
+  heading?: string;
+  code?: string;
+  columns?: Partial<LetterColumns>;
+  totalLabel?: string;
+  paymentTitle?: string;
+  signOff?: string;
+};
+
 /**
  * Surat resmi yang disimpan terpisah dari invoice.
- * Kop memakai data toko; isi teks dan tabel milik surat itu sendiri.
+ * Kop memakai data toko; isi teks, label, dan tabel milik surat itu sendiri.
+ * Surat lama tanpa purpose tetap sah dan tampil sebagai penagihan barang.
  */
 export type OfficialLetter = {
   id: string;
@@ -290,6 +330,13 @@ export type OfficialLetter = {
   lines: LetterLine[];
   total: number;
   bankInfo?: string;
+  purpose?: LetterPurposeId;
+  heading?: string;
+  code?: string;
+  columns?: LetterColumns;
+  totalLabel?: string;
+  paymentTitle?: string;
+  signOff?: string;
   createdAt: string;
   updatedAt: string;
 };

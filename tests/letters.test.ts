@@ -5,10 +5,12 @@ import {
   addCalendarDays,
   cleanLetterLines,
   formatLongDate,
+  letterProse,
   letterTotal,
   linesFromInvoice,
   penagihanClosing,
   penagihanOpening,
+  resolveLetterChrome,
   suggestLetterNumber,
   terbilang,
 } from "../src/lib/letters";
@@ -76,4 +78,43 @@ test("baris tagihan dijumlahkan dan bisa disalin dari invoice tanpa mengubah sum
   assert.deepEqual(cleaned, [{ name: "Beras", quantity: 1, unit: "Pcs", note: "hutang minggu lalu", amount: 50000 }]);
   assert.equal(letterTotal(cleaned), 50000);
   assert.equal(letterTotal([{ amount: Number.NaN }, { amount: 10 }]), 10);
+});
+
+test("maksud surat mengganti nada dan judul kolom tanpa mengunci kata barang", () => {
+  const ctx = {
+    storeName: "AR FARM JAYA",
+    recipient: "Siti Aminah",
+    reference: "rekap gaji Oktober 2026",
+    dueDate: "2026-11-07",
+    total: 250000,
+  };
+  for (const purpose of ["kasbon", "gaji", "perusahaan", "bebas"] as const) {
+    const prose = letterProse(purpose, ctx);
+    assert.equal(prose.opening.startsWith("Dengan hormat,"), true, purpose);
+    assert.doesNotMatch(`${prose.opening}\n${prose.closing}`, /barang/i, purpose);
+    assert.match(prose.closing, /250\.000/);
+    assert.match(prose.closing, /7 November 2026/);
+  }
+  assert.match(letterProse("kasbon", ctx).opening, /kasbon atau pinjaman Siti Aminah/i);
+  assert.match(letterProse("gaji", ctx).opening, /gaji dan tunjangan kepada Siti Aminah/i);
+  assert.match(letterProse("gaji", ctx).closing, /akan kami selesaikan/i);
+  assert.match(letterProse("perusahaan", ctx).opening, /kewajiban pembayaran kepada Siti Aminah/i);
+  assert.match(letterProse("perusahaan", ctx).closing, /akan menyelesaikan pembayaran/i);
+  assert.match(letterProse("bebas", ctx).opening, /hal sebagaimana tercantum pada perihal/i);
+  assert.equal(letterProse("kasbon", { ...ctx, reference: "" }).opening.includes("Merujuk"), false);
+  assert.match(letterProse("gaji", { ...ctx, reference: "" }).opening, /^Dengan hormat,\n\nBersama surat/);
+
+  assert.equal(resolveLetterChrome().columns.item, "Barang");
+  assert.equal(resolveLetterChrome().heading, "Surat Penagihan");
+  assert.equal(resolveLetterChrome({ purpose: "gaji" }).columns.item, "Komponen");
+  assert.equal(resolveLetterChrome({ purpose: "gaji" }).totalLabel, "TOTAL HUTANG");
+  assert.equal(resolveLetterChrome({ purpose: "perusahaan" }).columns.item, "Uraian");
+  assert.equal(
+    resolveLetterChrome({ purpose: "gaji", columns: { item: "Potongan" }, heading: "Surat Khusus" }).columns.item,
+    "Potongan",
+  );
+  assert.equal(resolveLetterChrome({ subject: "Hal lain" }).heading, "Surat Penagihan");
+  assert.equal(resolveLetterChrome({ subject: "Hal lain" }).subject, "Hal lain");
+  assert.equal(suggestLetterNumber("2026-10-31", 0, "shg"), "001/SHG/X/2026");
+  assert.equal(suggestLetterNumber("2026-10-31", 0, "  "), "001/SPH/X/2026");
 });
