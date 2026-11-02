@@ -225,15 +225,14 @@ export type InvoiceLine = {
 };
 
 /**
- * Tanda tangan elektronik invoice. Bukan PSrE bersertifikat negara, melainkan
- * tanda tangan kriptografis internal: `hash` adalah SHA-256 atas isi invoice
- * (integritas — berubah bila invoice diubah), `code` kode dokumen yang
- * diturunkan dari hash, dipakai di QR verifikasi pada cetakan.
+ * Tanda tangan elektronik invoice atau surat. Bukan PSrE bersertifikat negara,
+ * melainkan tanda tangan kriptografis internal: `hash` adalah SHA-256 atas isi
+ * dokumen (berubah bila isi diubah), `code` diturunkan dari hash untuk QR.
  */
 export type InvoiceSignature = {
   signedBy: string; // nama penanda tangan
   signedAt: string; // ISO timestamp
-  hash: string; // SHA-256 hex atas isi invoice
+  hash: string; // SHA-256 hex atas isi dokumen
   code: string; // kode dokumen (turunan hash), mis. AFJ-9F2A-77C1-1B0E
   algo: string; // "SHA-256"
 };
@@ -304,6 +303,8 @@ export type LetterInput = {
   totalLabel?: string;
   paymentTitle?: string;
   signOff?: string;
+  /** Ada bila ditandatangani elektronik. Kosong berarti surat tanpa TTE. */
+  signature?: InvoiceSignature;
 };
 
 /**
@@ -337,6 +338,8 @@ export type OfficialLetter = {
   totalLabel?: string;
   paymentTitle?: string;
   signOff?: string;
+  /** Ada bila surat ditandatangani elektronik. Surat lama tanpa field ini tetap sah. */
+  signature?: InvoiceSignature;
   createdAt: string;
   updatedAt: string;
 };

@@ -68,7 +68,7 @@ Recommended production services:
 - `RetailService`: POS payment flow, receipt generation, automatic stock deduction.
 - `AuditService`: immutable audit log writer.
 - `FieldReportService`: weekly implementation reports, report profiles (letterhead + print format), activity photos.
-- `LetterService`: official letters that reuse a store letterhead. A purpose preset sets the prose and column labels for goods collection, employee advances, unpaid wages, or amounts owed to another company. Every label and both text blocks stay editable. Letters never mutate invoices or stock.
+- `LetterService`: official letters that reuse a store letterhead. A purpose preset sets the prose and column labels for goods collection, employee advances, unpaid wages, or amounts owed to another company. Every label and both text blocks stay editable. Optional electronic signature matches invoices: SHA-256 over the letter body, a short document code, and a verification QR. Saved invoice and letter lists follow the store chosen in the page dropdown. Letters never mutate invoices or stock.
 
 ## Weekly Field Report Module
 

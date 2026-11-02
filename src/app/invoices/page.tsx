@@ -70,6 +70,7 @@ export default function InvoicesPage() {
   const [printTarget, setPrintTarget] = useState<{ store?: Store; data: InvoiceData } | null>(null);
 
   const store = stores.find((s) => s.id === storeId);
+  const storeInvoices = useMemo(() => invoices.filter((inv) => inv.storeId === storeId), [invoices, storeId]);
   const subtotal = useMemo(() => lines.reduce((t, l) => t + l.price * l.quantity, 0), [lines]);
   const total = subtotal + (shipping || 0);
   const suggestedNumber = store ? `${store.invoicePrefix}${String(invoices.length + 1).padStart(4, "0")}` : "";
@@ -215,8 +216,8 @@ export default function InvoicesPage() {
       />
 
       <section className="no-print mb-4 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3">
-        <StatCard label="Total Invoice" value={invoices.length} icon={FileText} />
-        <StatCard label="Nilai Invoice" value={currency.format(invoices.reduce((t, i) => t + i.total, 0))} icon={FileText} tone="primary" />
+        <StatCard label="Invoice Toko Ini" value={storeInvoices.length} icon={FileText} />
+        <StatCard label="Nilai Invoice" value={currency.format(storeInvoices.reduce((t, i) => t + i.total, 0))} icon={FileText} tone="primary" />
         <StatCard label="Toko Aktif" value={stores.length} icon={FileText} tone="amber" />
       </section>
 
@@ -384,12 +385,13 @@ export default function InvoicesPage() {
 
       {/* Saved invoices */}
       <div className="no-print mt-6">
-        <h2 className="mb-3 text-lg font-bold">Invoice Tersimpan</h2>
-        {invoices.length === 0 ? (
-          <EmptyState icon={FileText} title="Belum ada invoice tersimpan" description="Invoice yang disimpan akan muncul di sini." />
+        <h2 className="mb-1 text-lg font-bold">Riwayat Invoice · {store?.name}</h2>
+        <p className="mb-3 text-sm text-muted">Menampilkan invoice toko yang sedang dipilih. Ganti toko di atas untuk melihat riwayat toko lain.</p>
+        {storeInvoices.length === 0 ? (
+          <EmptyState icon={FileText} title={`Belum ada invoice untuk ${store?.name ?? "toko ini"}`} description="Invoice toko yang dipilih akan muncul di sini." />
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {invoices.map((inv) => {
+            {storeInvoices.map((inv) => {
               const s = stores.find((x) => x.id === inv.storeId);
               return (
                 <Card key={inv.id}>

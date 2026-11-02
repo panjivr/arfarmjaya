@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Mail, Pencil, Plus, Printer, RotateCcw, Save, Trash2, X } from "lucide-react";
+import { FileText, Mail, Pencil, Plus, Printer, RotateCcw, Save, ShieldCheck, Trash2, X } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import { useMobileActions } from "@/components/shell/mobile-actions";
 import { PageHeader, StatCard, EmptyState } from "@/components/ui/page-header";
@@ -13,6 +13,7 @@ import { ScaledPreview } from "@/components/ui/scaled-preview";
 import { LetterDocument } from "@/components/letter/letter-document";
 import { useUiStore } from "@/lib/store";
 import { currency, formatDate } from "@/lib/utils";
+import { buildLetterSignature } from "@/lib/letter-sign";
 import {
   addCalendarDays,
   letterProse,
@@ -23,9 +24,25 @@ import {
   suggestLetterNumber,
   LETTER_PURPOSES,
 } from "@/lib/letters";
-import type { LetterColumns, LetterLine, LetterPurposeId, OfficialLetter, Store } from "@/lib/types";
+import type { InvoiceSignature, LetterColumns, LetterLine, LetterPurposeId, OfficialLetter, Store } from "@/lib/types";
 
 const today = () => new Date().toISOString().slice(0, 10);
+
+function nowLocalInput(): string {
+  const d = new Date();
+  const off = d.getTimezoneOffset();
+  return new Date(d.getTime() - off * 60_000).toISOString().slice(0, 16);
+}
+function isoToLocalInput(iso?: string): string {
+  if (!iso || Number.isNaN(Date.parse(iso))) return nowLocalInput();
+  const d = new Date(iso);
+  const off = d.getTimezoneOffset();
+  return new Date(d.getTime() - off * 60_000).toISOString().slice(0, 16);
+}
+function localInputToIso(local: string): string {
+  const t = Date.parse(local);
+  return Number.isNaN(t) ? new Date().toISOString() : new Date(local).toISOString();
+}
 
 const emptyDraft = { name: "", unit: "Kg", quantity: "", note: "", amount: "" };
 
@@ -62,6 +79,9 @@ export default function LettersPage() {
   const [bankInfo, setBankInfo] = useState("");
   const [invoiceId, setInvoiceId] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [eSign, setESign] = useState(false);
+  const [signAt, setSignAt] = useState(nowLocalInput());
+  const [previewSig, setPreviewSig] = useState<InvoiceSignature | undefined>(undefined);
   const [printTarget, setPrintTarget] = useState<{ store?: Store; letter: OfficialLetter } | null>(null);
 
   useEffect(() => {
@@ -73,6 +93,8 @@ export default function LettersPage() {
   const suggestedNumber = suggestLetterNumber(date, letters.length, code);
   const letterNumber = numberOverride.trim() || suggestedNumber;
   const storeInvoices = invoices.filter((inv) => inv.storeId === storeId);
+  const storeLetters = useMemo(() => letters.filter((letter) => letter.storeId === storeId), [letters, storeId]);
+  const signerName = store?.eSignerName?.trim() || store?.signatureName?.trim() || store?.name?.trim() || "Penandatangan";
   const selectedPurpose = letterPurpose(purpose);
   const chrome = useMemo(
     () => resolveLetterChrome({ purpose, heading, code, subject, columns, totalLabel, paymentTitle, signOff }),
@@ -94,6 +116,50 @@ export default function LettersPage() {
   useEffect(() => {
     if (!editingId) setBankInfo(store?.bankInfo ?? "");
   }, [storeId, store?.bankInfo, editingId]);
+
+  useEffect(() => {
+    if (!editingId) setESign(Boolean(store?.eSignEnabled));
+    // Default TTE mengikuti pengaturan toko, kecuali saat surat tersimpan sedang diedit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId]);
+
+  useEffect(() => {
+    let alive = true;
+    if (!eSign || lines.length === 0) {
+      setPreviewSig(undefined);
+      return;
+    }
+    buildLetterSignature(
+      {
+        number: letterNumber,
+        storeName: store?.name ?? "",
+        recipient,
+        place,
+        date,
+        dueDate,
+        subject: chrome.subject,
+        reference,
+        opening,
+        closing,
+        lines,
+        total,
+        purpose: chrome.id,
+        heading: chrome.heading,
+        code: chrome.code,
+        columns: chrome.columns,
+        totalLabel: chrome.totalLabel,
+        paymentTitle: chrome.paymentTitle,
+        signOff: chrome.signOff,
+      },
+      signerName,
+      localInputToIso(signAt),
+    ).then((signature) => {
+      if (alive) setPreviewSig(signature);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [eSign, lines, letterNumber, recipient, place, date, dueDate, reference, opening, closing, total, chrome, store?.name, signerName, signAt]);
 
   const previewLetter: OfficialLetter = {
     id: editingId ?? "preview",
@@ -121,6 +187,7 @@ export default function LettersPage() {
     totalLabel: chrome.totalLabel,
     paymentTitle: chrome.paymentTitle,
     signOff: chrome.signOff,
+    signature: eSign ? previewSig : undefined,
     createdAt: "",
     updatedAt: "",
   };
@@ -193,9 +260,44 @@ export default function LettersPage() {
     setInvoiceId("");
     setTextMode("auto");
     setBankInfo(store?.bankInfo ?? "");
+    setESign(Boolean(store?.eSignEnabled));
+    setSignAt(nowLocalInput());
+    setPreviewSig(undefined);
   }
 
-  function save() {
+  async function save() {
+    let signature: InvoiceSignature | undefined;
+    if (eSign) {
+      try {
+        signature = await buildLetterSignature(
+          {
+            number: letterNumber,
+            storeName: store?.name ?? "",
+            recipient,
+            place,
+            date,
+            dueDate,
+            subject: chrome.subject,
+            reference,
+            opening,
+            closing,
+            lines,
+            total,
+            purpose: chrome.id,
+            heading: chrome.heading,
+            code: chrome.code,
+            columns: chrome.columns,
+            totalLabel: chrome.totalLabel,
+            paymentTitle: chrome.paymentTitle,
+            signOff: chrome.signOff,
+          },
+          signerName,
+          localInputToIso(signAt),
+        );
+      } catch {
+        return toast.error("Gagal membuat tanda tangan elektronik.");
+      }
+    }
     const payload = {
       storeId,
       recipient,
@@ -218,6 +320,7 @@ export default function LettersPage() {
       totalLabel,
       paymentTitle,
       signOff,
+      signature,
     };
     const result = editingId ? updateLetter(editingId, payload) : createLetter(payload);
     if (!result.ok) return toast.error(result.message ?? "Gagal menyimpan.");
@@ -251,6 +354,9 @@ export default function LettersPage() {
     setLines(letter.lines.map((line) => ({ ...line })));
     setBankInfo(letter.bankInfo ?? "");
     setInvoiceId("");
+    setESign(Boolean(letter.signature));
+    setSignAt(isoToLocalInput(letter.signature?.signedAt));
+    setPreviewSig(undefined);
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
     toast.info(`Mengedit surat ${letter.number}.`);
   }
@@ -284,8 +390,8 @@ export default function LettersPage() {
       />
 
       <section className="no-print mb-4 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3">
-        <StatCard label="Surat Tersimpan" value={letters.length} icon={Mail} />
-        <StatCard label="Nilai Surat" value={currency.format(letters.reduce((sum, letter) => sum + letter.total, 0))} icon={Mail} tone="primary" />
+        <StatCard label="Surat Toko Ini" value={storeLetters.length} icon={Mail} />
+        <StatCard label="Nilai Surat" value={currency.format(storeLetters.reduce((sum, letter) => sum + letter.total, 0))} icon={Mail} tone="primary" />
         <StatCard label="Judul Surat" value={chrome.heading} icon={FileText} tone="amber" />
       </section>
 
@@ -412,6 +518,33 @@ export default function LettersPage() {
                 <span className="text-muted">{chrome.totalLabel}</span>
                 <span className="text-lg font-bold">{currency.format(total)}</span>
               </div>
+              <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-sm">
+                <input
+                  type="checkbox"
+                  checked={eSign}
+                  onChange={(e) => setESign(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--primary)]"
+                />
+                <span className="min-w-0">
+                  <span className="flex items-center gap-1.5 font-semibold">
+                    <ShieldCheck className="h-4 w-4 text-primary" /> Tanda Tangan Elektronik
+                  </span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    Menambahkan QR verifikasi dan hash SHA-256 pada surat, sama seperti invoice.
+                    {eSign && <> Penandatangan: <span className="font-medium text-foreground">{signerName}</span>.</>}
+                  </span>
+                </span>
+              </label>
+              {eSign && (
+                <Field label="Tanggal & Waktu Tanda Tangan" hint="Bisa diatur. Waktu ini tercetak di surat, isi surat yang menentukan hash.">
+                  <div className="flex items-center gap-2">
+                    <Input type="datetime-local" value={signAt} onChange={(e) => setSignAt(e.target.value || nowLocalInput())} />
+                    <Button type="button" variant="secondary" className="h-11 shrink-0 whitespace-nowrap px-3" onClick={() => setSignAt(nowLocalInput())}>
+                      Sekarang
+                    </Button>
+                  </div>
+                </Field>
+              )}
               <div className="flex gap-2">
                 <Button className="flex-1" onClick={save} disabled={lines.length === 0}><Save className="h-4 w-4" /> {editingId ? "Perbarui" : "Simpan"}</Button>
                 <Button variant="secondary" onClick={() => printLetter(previewLetter, store)} disabled={lines.length === 0}><Printer className="h-4 w-4" /> Cetak</Button>
@@ -431,12 +564,13 @@ export default function LettersPage() {
       </div>
 
       <div className="no-print mt-6">
-        <h2 className="mb-3 text-lg font-bold">Surat Tersimpan</h2>
-        {letters.length === 0 ? (
-          <EmptyState icon={Mail} title="Belum ada surat tersimpan" description="Surat yang disimpan akan muncul di sini dan ikut tersinkron ke server." />
+        <h2 className="mb-1 text-lg font-bold">Riwayat Surat · {store?.name}</h2>
+        <p className="mb-3 text-sm text-muted">Menampilkan surat toko yang sedang dipilih. Ganti toko di formulir untuk melihat riwayat toko lain.</p>
+        {storeLetters.length === 0 ? (
+          <EmptyState icon={Mail} title={`Belum ada surat untuk ${store?.name ?? "toko ini"}`} description="Surat toko yang dipilih akan muncul di sini dan ikut tersinkron ke server." />
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {letters.map((letter) => {
+            {storeLetters.map((letter) => {
               const savedStore = stores.find((item) => item.id === letter.storeId);
               return (
                 <Card key={letter.id}>
@@ -450,6 +584,11 @@ export default function LettersPage() {
                       </div>
                       <span className="shrink-0 font-bold">{currency.format(letter.total)}</span>
                     </div>
+                    {letter.signature && (
+                      <p className="mt-2 inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold text-primary">
+                        <ShieldCheck className="h-3 w-3" /> TTE {letter.signature.code}
+                      </p>
+                    )}
                     <div className="mt-3 flex justify-end gap-1">
                       <Button variant="secondary" className="h-8" onClick={() => startEdit(letter)}><Pencil className="h-4 w-4" /> Edit</Button>
                       <Button variant="secondary" className="h-8" onClick={() => printLetter(letter, savedStore)}><Printer className="h-4 w-4" /> Cetak</Button>

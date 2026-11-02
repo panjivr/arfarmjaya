@@ -107,6 +107,9 @@ function buildLetterRecord(
     totalLabel: chrome.totalLabel,
     paymentTitle: chrome.paymentTitle,
     signOff: chrome.signOff,
+    // Tanda tangan mengikuti isi yang baru disimpan. Bila TTE dimatikan,
+    // sidik lama tidak dipertahankan.
+    signature: data.signature,
     createdAt: existing?.createdAt ?? now(),
     updatedAt: now(),
   };

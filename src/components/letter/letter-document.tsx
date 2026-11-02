@@ -1,10 +1,27 @@
 "use client";
 
 import Image from "next/image";
-import { Store as StoreIcon } from "lucide-react";
-import type { OfficialLetter, Store } from "@/lib/types";
+import { useMemo } from "react";
+import qrcode from "qrcode-generator";
+import { ShieldCheck, Store as StoreIcon } from "lucide-react";
+import type { InvoiceSignature, OfficialLetter, Store } from "@/lib/types";
 import { formatLongDate, resolveLetterChrome, terbilang } from "@/lib/letters";
-import { currency, numberFmt } from "@/lib/utils";
+import { letterQrPayload } from "@/lib/letter-sign";
+import { currency, formatDateTime, numberFmt } from "@/lib/utils";
+
+function useLetterQr(payload: string | null): string | null {
+  return useMemo(() => {
+    if (!payload) return null;
+    try {
+      const qr = qrcode(0, "M");
+      qr.addData(payload);
+      qr.make();
+      return qr.createDataURL(10, 4);
+    } catch {
+      return null;
+    }
+  }, [payload]);
+}
 
 export function LetterDocument({ store, letter, id }: { store?: Store; letter: OfficialLetter; id?: string }) {
   const accent = store?.accent ?? "#007a4b";
@@ -13,6 +30,34 @@ export function LetterDocument({ store, letter, id }: { store?: Store; letter: O
   const hasPhone = phone.length > 0 && phone !== "-";
   const signer = store?.signatureName?.trim() || store?.name || "";
   const chrome = resolveLetterChrome(letter);
+  const sig: InvoiceSignature | undefined = letter.signature;
+  const qrPayload = sig
+    ? letterQrPayload(
+        {
+          number: letter.number,
+          storeName: store?.name ?? letter.storeName,
+          recipient: letter.recipient,
+          place: letter.place,
+          date: letter.date,
+          dueDate: letter.dueDate,
+          subject: letter.subject,
+          reference: letter.reference,
+          opening: letter.opening,
+          closing: letter.closing,
+          lines: letter.lines,
+          total: letter.total,
+          purpose: chrome.id,
+          heading: chrome.heading,
+          code: chrome.code,
+          columns: chrome.columns,
+          totalLabel: chrome.totalLabel,
+          paymentTitle: chrome.paymentTitle,
+          signOff: chrome.signOff,
+        },
+        sig,
+      )
+    : null;
+  const qr = useLetterQr(qrPayload);
 
   return (
     <div
@@ -110,14 +155,50 @@ export function LetterDocument({ store, letter, id }: { store?: Store; letter: O
               <p className="mt-0.5 text-slate-400">Rekening belum diisi pada pengaturan toko.</p>
             )}
           </div>
-          <div className="min-w-[180px] text-center">
+          <div className="min-w-[180px] max-w-[240px] text-center">
             <p className="text-slate-600">{letter.place}, {formatLongDate(letter.date)}</p>
             <p className="text-slate-600">{chrome.signOff}</p>
-            <div className="h-14" />
-            <p className="border-t border-slate-400 px-6 pt-1 font-semibold text-slate-700">{signer}</p>
+            {sig ? (
+              <>
+                <p className="mt-1 flex items-center justify-center gap-1 text-xs font-medium text-green-700">
+                  <ShieldCheck className="h-3 w-3" /> Ditandatangani secara elektronik
+                </p>
+                {qr && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={qr}
+                    alt={`QR verifikasi ${sig.code}`}
+                    width={80}
+                    height={80}
+                    className="mx-auto my-1 rounded bg-white p-1 ring-1 ring-slate-200"
+                    style={{ imageRendering: "pixelated", width: 80, height: 80 }}
+                  />
+                )}
+                <p className="font-bold text-slate-800">{sig.signedBy || signer}</p>
+                <p className="text-xs text-gray-500">{formatDateTime(sig.signedAt)}</p>
+              </>
+            ) : (
+              <>
+                <div className="h-14" />
+                <p className="border-t border-slate-400 px-6 pt-1 font-semibold text-slate-700">{signer}</p>
+              </>
+            )}
           </div>
         </div>
       </div>
+
+      {sig && (
+        <div
+          className="border-t border-slate-100 px-6 py-2 text-[9px] leading-relaxed text-gray-400 sm:px-8"
+          style={{ breakInside: "avoid" }}
+        >
+          <p>
+            Verifikasi TTE · Kode: <span className="font-mono">{sig.code}</span> · Algoritma: {sig.algo} · Hash:{" "}
+            <span className="break-all font-mono">{sig.hash}</span>
+          </p>
+          <p>Keaslian dan keutuhan dapat diperiksa dengan memindai QR. Perubahan isi surat mengubah hash.</p>
+        </div>
+      )}
     </div>
   );
 }
