@@ -1,3 +1,3 @@
 // Penanda versi build. Dinaikkan tiap rilis supaya mudah memastikan versi mana
 // yang benar-benar termuat di browser (membedakan "belum ter-deploy" vs "cache lama").
-export const APP_BUILD = "2026-11-02 · surat-tte-toko-1";
+export const APP_BUILD = "2026-11-02 · nama-pdf-1";

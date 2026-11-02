@@ -64,6 +64,42 @@ export function formatLongDate(value?: string) {
 }
 
 /**
+ * Nama berkas untuk dialog "Simpan sebagai PDF". Browser memakai document.title,
+ * dan karakter yang tidak boleh ada di nama berkas Windows diganti.
+ */
+export function documentFileName(parts: Array<string | undefined | null>, fallback: string): string {
+  const base = parts.map((part) => (part ?? "").trim()).filter(Boolean).join(" - ");
+  const clean = (base || fallback)
+    .replace(/[\\/]+/g, "-")
+    .replace(/[:*?"<>|\r\n]+/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/^[.\s-]+|[.\s-]+$/g, "")
+    .slice(0, 120)
+    .trim();
+  return clean || fallback;
+}
+
+/** Cetak dengan nama PDF yang mengikuti dokumen, lalu kembalikan judul halaman. */
+export function printNamed(fileName: string) {
+  if (typeof document === "undefined") {
+    window.print();
+    return;
+  }
+  const previous = document.title;
+  document.title = fileName;
+  let restored = false;
+  const restore = () => {
+    if (restored) return;
+    restored = true;
+    document.title = previous;
+    window.removeEventListener("afterprint", restore);
+  };
+  window.addEventListener("afterprint", restore);
+  window.print();
+  window.setTimeout(restore, 8000);
+}
+
+/**
  * Buka dialog cetak browser dengan ukuran kertas yang sudah diatur. Dialog yang
  * sama dipakai untuk "Simpan sebagai PDF", sehingga hasil PDF mengikuti margin
  * dan orientasi di bawah ini (bukan hasil tangkapan layar).

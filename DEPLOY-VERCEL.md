@@ -51,7 +51,7 @@ perintah ini tidak mencetak nilai rahasia. `verify:deployment` hanya membaca
 endpoint publik, tidak membuat transaksi atau membaca data perusahaan.
 
 - `/api/health` harus HTTP 200, `status: ready`, dan build
-  `2026-11-02 · surat-tte-toko-1`. Endpoint memeriksa kedua tabel yang diperlukan
+  `2026-11-02 · nama-pdf-1`. Endpoint memeriksa kedua tabel yang diperlukan
   tanpa membaca isi data perusahaan. HTTP 503 berarti belum siap.
 - Login dengan akun yang sah. Buat perubahan yang memang diizinkan pengguna,
   tunggu indikator **Tersimpan**, muat ulang, lalu periksa hasilnya dari

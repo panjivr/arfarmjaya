@@ -12,7 +12,7 @@ import { toast } from "@/components/ui/toast";
 import { ScaledPreview } from "@/components/ui/scaled-preview";
 import { InvoiceDocument, type InvoiceData } from "@/components/invoice/invoice-document";
 import { useUiStore } from "@/lib/store";
-import { currency, formatDate } from "@/lib/utils";
+import { currency, documentFileName, formatDate, printNamed } from "@/lib/utils";
 import { buildInvoiceSignature } from "@/lib/invoice-sign";
 import type { Invoice, InvoiceLine, InvoiceSignature, Store } from "@/lib/types";
 
@@ -188,7 +188,8 @@ export default function InvoicesPage() {
 
   function printData(data: InvoiceData, s?: Store) {
     setPrintTarget({ store: s, data });
-    setTimeout(() => window.print(), 250);
+    const fileName = documentFileName([s?.name, data.number, data.buyer], "Invoice");
+    setTimeout(() => printNamed(fileName), 250);
   }
 
   // Tombol aksi khusus halaman untuk bilah bawah di HP.

@@ -12,7 +12,7 @@ import { toast } from "@/components/ui/toast";
 import { ScaledPreview } from "@/components/ui/scaled-preview";
 import { LetterDocument } from "@/components/letter/letter-document";
 import { useUiStore } from "@/lib/store";
-import { currency, formatDate } from "@/lib/utils";
+import { currency, documentFileName, formatDate, printNamed } from "@/lib/utils";
 import { buildLetterSignature } from "@/lib/letter-sign";
 import {
   addCalendarDays,
@@ -363,7 +363,8 @@ export default function LettersPage() {
 
   function printLetter(letter: OfficialLetter, s?: Store) {
     setPrintTarget({ store: s, letter });
-    setTimeout(() => window.print(), 250);
+    const fileName = documentFileName([s?.name ?? letter.storeName, letter.number, letter.recipient], "Surat");
+    setTimeout(() => printNamed(fileName), 250);
   }
 
   useMobileActions([
