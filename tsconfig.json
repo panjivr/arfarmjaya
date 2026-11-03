@@ -37,6 +37,7 @@
     "**/*.mts"
   ],
   "exclude": [
+    ".agents/skills",
     "node_modules"
   ]
 }

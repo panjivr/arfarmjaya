@@ -18,7 +18,6 @@ import {
   ShoppingCart,
   Sun,
   Sprout,
-  Fish,
   Truck,
   Warehouse,
 } from "lucide-react";
@@ -26,22 +25,21 @@ import { useUiStore } from "@/lib/store";
 import { roleHome } from "@/lib/rbac";
 
 const features = [
-  { icon: Boxes, title: "Inventori Real-time", desc: "Stok, batch, rak, dan kedaluwarsa terpantau langsung dengan status otomatis." },
+  { icon: Boxes, title: "Inventori Gudang", desc: "Lihat stok, batch, rak, dan tanggal kedaluwarsa untuk menentukan barang yang perlu dipesan atau segera digunakan." },
   { icon: Warehouse, title: "Multi-Gudang & Rak", desc: "Kelola beberapa gudang, rak, dan lokasi penyimpanan dalam satu tempat." },
   { icon: ShoppingCart, title: "Pembelian & Penerimaan", desc: "Pesanan pembelian, persetujuan, dan penerimaan barang yang menambah stok." },
   { icon: Truck, title: "Distribusi & Permintaan", desc: "Alur pengiriman ke cabang/dapur dengan status dari picking hingga selesai." },
   { icon: ReceiptText, title: "POS Retail", desc: "Kasir cepat dengan pengurangan stok otomatis dan riwayat penjualan." },
-  { icon: FileText, title: "Invoice Multi-Toko", desc: "Buat & cetak invoice profesional dengan logo dan data tiap toko." },
+  { icon: FileText, title: "Invoice Multi-Toko", desc: "Atur logo, tagline, warna per bagian, dan rincian invoice untuk setiap toko. Simpan dan cetak dengan desain yang konsisten." },
   { icon: Sprout, title: "Laporan Mingguan Lapangan", desc: "Laporan pelaksanaan program dengan kop lembaga, foto kegiatan, dan cetak/PDF rapi." },
-  { icon: Fish, title: "Budidaya Lele", desc: "Monitoring kolam per kode: umur lele, jumlah, pakan harian, kematian, panen, laba-rugi, dan simulator bisnis." },
   { icon: BarChart3, title: "Laporan & Analitik", desc: "Valuasi inventori, barang laris, stok kritis, dan ekspor CSV." },
-  { icon: ShieldCheck, title: "RBAC & Log Audit", desc: "Hak akses per peran dan jejak audit untuk setiap perubahan." },
+  { icon: ShieldCheck, title: "Hak Akses & Riwayat", desc: "Pisahkan akses admin, gudang, dan pelaporan. Tinjau aktivitas yang tercatat di log audit." },
 ];
 
 const modules = [
   "Dasbor", "Inventori", "Kategori", "Pemasok", "Gudang", "Rak",
   "Pembelian", "Penerimaan", "Barang Keluar", "Distribusi", "Permintaan",
-  "Stok Opname", "POS Retail", "Toko", "Invoice", "Laporan Mingguan", "Budidaya Lele", "Laporan", "Analitik",
+  "Stok Opname", "POS Retail", "Toko", "Invoice", "Surat", "Laporan Mingguan", "Laporan", "Analitik",
   "Notifikasi", "Log Audit", "Pengguna", "Pengaturan",
 ];
 
@@ -99,22 +97,22 @@ export default function LandingPage() {
               <span className="h-2 w-2 rounded-full bg-secondary" /> ARFARM BHINNEKA NUSA JAYA
             </span>
             <h1 className="mt-5 text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
-              Kelola gudang, stok, dan penjualan dalam <span className="text-primary">satu sistem.</span>
+              Stok tertata. Invoice rapi. <span className="text-primary">Operasional terhubung.</span>
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-muted">
-              AR FARM JAYA mengelola bahan baku, distribusi ke cabang & dapur, penjualan retail, hingga invoice —
-              lengkap dengan inventori real-time, laporan, dan jejak audit. Rapi, cepat, dan siap dipakai harian.
+              Catat barang masuk dan keluar, siapkan distribusi ke dapur atau cabang, lalu buat invoice sesuai identitas toko.
+              AR FARM JAYA menyatukan pekerjaan gudang dan penjualan dalam satu ruang kerja.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href={target} className="inline-flex h-12 items-center gap-2 rounded-lg bg-primary px-6 text-sm font-semibold text-white transition hover:bg-emerald-800">
                 {cta} <ArrowRight className="h-4 w-4" />
               </Link>
-              <a href="#fitur" className="inline-flex h-12 items-center gap-2 rounded-lg border border-border bg-card px-6 text-sm font-semibold transition hover:bg-slate-50 dark:hover:bg-slate-900">
-                Pelajari Fitur
+              <a href="#alur" className="inline-flex h-12 items-center gap-2 rounded-lg border border-border bg-card px-6 text-sm font-semibold transition hover:bg-slate-50 dark:hover:bg-slate-900">
+                Lihat alur kerja
               </a>
             </div>
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted">
-              {["Data real-time", "Multi-gudang & toko", "Siap audit"].map((t) => (
+              {["Katalog per toko", "Invoice bisa disesuaikan", "Akses sesuai peran"].map((t) => (
                 <span key={t} className="inline-flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-primary" /> {t}</span>
               ))}
             </div>
@@ -127,12 +125,12 @@ export default function LandingPage() {
                   <LayoutDashboard className="h-5 w-5 text-primary" />
                   <span className="font-semibold">Dasbor Gudang</span>
                 </div>
-                <span className="rounded-full bg-leaf/10 px-2.5 py-1 text-xs font-semibold text-primary">Live</span>
+                <span className="rounded-full bg-leaf/10 px-2.5 py-1 text-xs font-semibold text-primary">Ilustrasi tampilan</span>
               </div>
               <div className="mt-4 grid grid-cols-2 gap-3">
                 {[
-                  { icon: Boxes, label: "Total Produk", value: "200+", tone: "bg-leaf/10 text-primary" },
-                  { icon: PackageCheck, label: "Nilai Inventori", value: "Rp 2,8 M", tone: "bg-amber-50 text-amber-700 dark:bg-amber-950/40" },
+                  { icon: Boxes, label: "Total Produk", value: "Katalog", tone: "bg-leaf/10 text-primary" },
+                  { icon: PackageCheck, label: "Ringkasan Inventori", value: "Per gudang", tone: "bg-amber-50 text-amber-700 dark:bg-amber-950/40" },
                   { icon: Truck, label: "Distribusi", value: "Aktif", tone: "bg-blue-50 text-blue-700 dark:bg-blue-950/40" },
                   { icon: Bell, label: "Peringatan", value: "Terpantau", tone: "bg-red-50 text-danger dark:bg-red-950/40" },
                 ].map((s) => (
@@ -160,10 +158,10 @@ export default function LandingPage() {
       <section className="border-y border-border bg-card">
         <div className="mx-auto grid max-w-6xl grid-cols-2 gap-6 px-4 py-8 sm:px-6 md:grid-cols-4">
           {[
-            { value: "21", label: "Modul terintegrasi" },
-            { value: "Real-time", label: "Pembaruan stok" },
-            { value: "Multi", label: "Gudang & toko" },
-            { value: "100%", label: "Tercatat & audit" },
+            { value: "Stok", label: "Pantau barang per gudang" },
+            { value: "Toko", label: "Katalog dan identitas sendiri" },
+            { value: "Invoice", label: "Atur desain, simpan, dan cetak" },
+            { value: "Laporan", label: "Siapkan rekap operasional" },
           ].map((s) => (
             <div key={s.label} className="text-center">
               <p className="text-2xl font-bold text-primary sm:text-3xl">{s.value}</p>
@@ -211,8 +209,8 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
           <div className="mx-auto max-w-2xl text-center">
             <p className="text-sm font-semibold text-primary">Fitur Unggulan</p>
-            <h2 className="mt-2 text-3xl font-bold tracking-tight">Semua yang dibutuhkan operasional gudang</h2>
-            <p className="mt-3 text-muted">Satu platform untuk stok, pembelian, distribusi, penjualan, dan pelaporan.</p>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight">Alur harian gudang dan penjualan</h2>
+            <p className="mt-3 text-muted">Pilih bagian yang dibutuhkan, dari penerimaan barang sampai invoice dan laporan.</p>
           </div>
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {features.map((f) => (
@@ -226,11 +224,24 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <section id="alur" className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+        <p className="text-sm font-semibold text-primary">Alur penggunaan</p>
+        <h2 className="mt-2 text-3xl font-bold tracking-tight">Dari katalog toko ke invoice siap cetak</h2>
+        <div className="mt-8 grid gap-4 md:grid-cols-3">
+          {[
+            { title: "1. Siapkan toko", text: "Lengkapi identitas dan katalog. Pilih warna tiap bagian, ukuran logo, serta detail yang tampil di invoice." },
+            { title: "2. Isi transaksi", text: "Pilih barang dari katalog, isi pembeli dan jatuh tempo, lalu periksa jumlah, ongkir, diskon, dan total." },
+            { title: "3. Simpan dan cetak", text: "Periksa pratinjau dan simpan invoice. Cetak ke kertas atau simpan PDF dengan identitas toko yang konsisten." },
+          ].map((step) => <div key={step.title} className="rounded-2xl border border-border bg-card p-6"><h3 className="font-bold">{step.title}</h3><p className="mt-2 text-sm leading-6 text-muted">{step.text}</p></div>)}
+        </div>
+        <p className="mt-5 text-sm text-muted">Akses pengaturan toko dan invoice tersedia untuk Admin Utama. Masuk menggunakan akun yang disediakan perusahaan.</p>
+      </section>
+
       {/* Modules */}
       <section id="modul" className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-sm font-semibold text-primary">Modul Lengkap</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight">21 modul siap pakai</h2>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight">Ruang kerja untuk setiap pekerjaan</h2>
           <p className="mt-3 text-muted">Dari data master hingga analitik, semuanya terintegrasi.</p>
         </div>
         <div className="mt-8 flex flex-wrap justify-center gap-2.5">
@@ -248,8 +259,8 @@ export default function LandingPage() {
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.14),transparent_35%)]" />
           <div className="flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-center">
             <div>
-              <h2 className="text-2xl font-bold sm:text-3xl">Siap mengelola gudang lebih rapi?</h2>
-              <p className="mt-2 max-w-xl text-white/80">Masuk ke sistem dan mulai catat stok, buat invoice, dan pantau operasional hari ini.</p>
+              <h2 className="text-2xl font-bold sm:text-3xl">Lanjutkan pekerjaan hari ini</h2>
+              <p className="mt-2 max-w-xl text-white/80">Masuk dengan akun perusahaan untuk mencatat stok, menyiapkan invoice, atau membuka laporan sesuai peran Anda.</p>
             </div>
             <Link href={target} className="inline-flex h-12 shrink-0 items-center gap-2 rounded-lg bg-white px-6 text-sm font-semibold text-primary transition hover:bg-white/90">
               {cta} <ArrowRight className="h-4 w-4" />

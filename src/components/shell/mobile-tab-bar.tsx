@@ -9,13 +9,12 @@ import { useUiStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 // Prioritas destinasi utama untuk bilah bawah; yang tak bisa diakses dilewati.
-const PRIORITY = ["/lele", "/weekly-report", "/inventory", "/transactions", "/pos", "/invoices", "/reports", "/gudang", "/reporting", "/purchase"];
+const PRIORITY = ["/weekly-report", "/inventory", "/transactions", "/pos", "/invoices", "/reports", "/gudang", "/reporting", "/purchase"];
 
 const SHORT: Record<string, string> = {
   "/dashboard": "Dasbor",
   "/gudang": "Gudang",
   "/reporting": "Laporan",
-  "/lele": "Lele",
   "/weekly-report": "Laporan",
   "/inventory": "Stok",
   "/transactions": "Keluar",

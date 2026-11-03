@@ -188,6 +188,52 @@ export type AppSettings = {
   currency: string;
 };
 
+export type InvoiceColors = {
+  brand: string;
+  tagline: string;
+  heading: string;
+  headingText: string;
+  text: string;
+  detail: string;
+  muted: string;
+  border: string;
+  tableHeader: string;
+  tableHeaderText: string;
+  alternateRow: string;
+  total: string;
+  totalText: string;
+  footer: string;
+};
+
+export type InvoiceVisibility = {
+  logo: boolean;
+  tagline: boolean;
+  storeAddress: boolean;
+  storePhone: boolean;
+  storeEmail: boolean;
+  buyerAddress: boolean;
+  buyerPhone: boolean;
+  dueDate: boolean;
+  rowNumber: boolean;
+  unit: boolean;
+  price: boolean;
+  subtotal: boolean;
+  shipping: boolean;
+  discount: boolean;
+  payment: boolean;
+  terbilang: boolean;
+  signature: boolean;
+  note: boolean;
+  footer: boolean;
+};
+
+export type InvoiceDesign = {
+  layout: "classic" | "modern";
+  logoWidth: number;
+  colors: InvoiceColors;
+  visible: InvoiceVisibility;
+};
+
 export type Store = {
   id: string;
   name: string;
@@ -199,7 +245,11 @@ export type Store = {
   invoicePrefix: string; // e.g. "INVAL"
   signatureName?: string; // name shown above seller signature line
   note?: string; // default catatan / perhatian
-  accent?: string; // hex accent color for the invoice header
+  accent?: string; // fallback untuk toko lama
+  tagline?: string;
+  paymentMethod?: string;
+  footerText?: string;
+  invoiceDesign?: InvoiceDesign;
   /** Aktifkan tanda tangan elektronik sebagai default saat membuat invoice toko ini. */
   eSignEnabled?: boolean;
   /** Nama penanda tangan elektronik (fallback: signatureName lalu name). */
@@ -237,6 +287,25 @@ export type InvoiceSignature = {
   algo: string; // "SHA-256"
 };
 
+/** Identitas dan desain saat invoice disimpan; katalog tidak disalin. */
+export type InvoiceSeller = Omit<Store, "id" | "createdAt" | "catalog">;
+
+export type InvoiceInput = {
+  storeId: string;
+  buyer: string;
+  buyerPhone?: string;
+  buyerAddress?: string;
+  date: string;
+  dueDate?: string;
+  number?: string;
+  lines: InvoiceLine[];
+  shipping: number;
+  discount?: number;
+  note?: string;
+  signature?: InvoiceSignature;
+  seller?: InvoiceSeller;
+};
+
 export type Invoice = {
   id: string;
   number: string;
@@ -244,6 +313,10 @@ export type Invoice = {
   storeName: string;
   buyer: string;
   buyerPhone?: string;
+  buyerAddress?: string;
+  dueDate?: string;
+  discount?: number;
+  seller?: InvoiceSeller;
   date: string; // yyyy-mm-dd
   lines: InvoiceLine[];
   subtotal: number;
@@ -462,239 +535,4 @@ export type WeeklyReport = {
   actor: string;
   createdAt: string;
   updatedAt: string;
-};
-
-/* ── Budidaya Lele (peternakan / monitoring kolam) ─────────────────────── */
-
-export type PondType = "Terpal" | "Tanah" | "Beton" | "Bioflok";
-export type PondStatus = "Kosong" | "Aktif" | "Perlu Panen" | "Nonaktif";
-export type CycleStatus = "Aktif" | "Selesai" | "Gagal";
-
-/** Peran kolam: produksi (pembesaran) atau tampungan/stok siap jual (T1–T4). */
-export type PondKind = "produksi" | "tampungan";
-
-/** Satu kolam fisik dengan kode unik (mis. "A12"). Bisa dipakai berulang
- *  lewat beberapa siklus tebar–panen sepanjang waktu. */
-export type Pond = {
-  id: string;
-  code: string; // kode unik kolam, mis. "A12"
-  name?: string;
-  type: PondType;
-  kind?: PondKind; // default "produksi"; "tampungan" = kolam siap jual (T1–T4)
-  areaM2?: number; // luas kolam
-  note?: string;
-  active: boolean; // kolam dipakai / dinonaktifkan
-  createdAt: string;
-};
-
-/** Satu siklus budidaya pada sebuah kolam: dari tebar benih sampai panen. */
-export type FishCycle = {
-  id: string;
-  pondId: string;
-  pondCode: string; // snapshot kode kolam untuk tampilan
-  species: string; // mis. "Lele Sangkuriang"
-  stockDate: string; // tanggal tebar benih (yyyy-mm-dd)
-  source: string; // asal benih (hatchery/pemasok)
-  initialCount: number; // jumlah benih ditebar (ekor)
-  sizeAtStock?: string; // ukuran benih, mis. "5-7 cm"
-  seedCostRp: number; // total biaya benih
-  otherCostRp: number; // biaya awal lain (kapur, probiotik, dll)
-  targetDate?: string; // target tanggal panen
-  targetWeightG?: number; // target bobot rata-rata per ekor (gram)
-  status: CycleStatus;
-  closedAt?: string;
-  note?: string;
-  actor: string;
-  createdAt: string;
-};
-
-/** Catatan harian per siklus: pakan, kematian, dan sampling bobot. */
-export type PondDailyLog = {
-  id: string;
-  cycleId: string;
-  pondId: string;
-  date: string; // yyyy-mm-dd
-  session?: "Pagi" | "Sore" | "Tambahan"; // sesi pemberian pakan
-  feedKg: number; // pakan hari itu (kg)
-  feedBrand?: string; // merk pakan, mis. "Hi-Pro-Vite"
-  feedType?: string; // jenis/kode pakan, mis. "781-2"
-  feedCostRp: number; // biaya pakan hari itu (Rp)
-  deaths: number; // kematian (ekor)
-  avgWeightG?: number; // hasil sampling bobot rata-rata (gram/ekor)
-  waterChanged?: boolean; // ganti/kuras air
-  note?: string;
-  actor: string;
-  createdAt: string;
-};
-
-/** Hasil sortir/grading panen: bagian panen yang masuk kategori tertentu dan
- *  bisa dialihkan ke kolam lain (mis. Konsumsi → T3, Brojolan → D2). */
-export type HarvestOutput = {
-  id: string;
-  kategori: "Konsumsi" | "Brojolan";
-  weightKg: number;
-  count?: number; // ekor (opsional)
-  targetPondId?: string; // kolam tujuan (tampungan/pembesaran)
-  targetPondCode?: string;
-};
-
-/** Panen (bisa sebagian/sortir atau total menutup siklus). */
-export type PondHarvest = {
-  id: string;
-  cycleId: string;
-  pondId: string;
-  date: string; // yyyy-mm-dd
-  count: number; // jumlah ekor dipanen (total)
-  weightKg: number; // total bobot panen (kg)
-  pricePerKg: number; // harga jual per kg (0 bila hanya grading, jual menyusul)
-  revenueRp: number; // weightKg * pricePerKg
-  buyer?: string;
-  isFinal: boolean; // true = panen total, menutup siklus
-  outputs?: HarvestOutput[]; // rincian grading + tujuan kolam
-  note?: string;
-  actor: string;
-  createdAt: string;
-};
-
-export type JournalCategory =
-  | "Kualitas Air"
-  | "Kesehatan & Penyakit"
-  | "Perlakuan"
-  | "Cuaca"
-  | "Pemeliharaan"
-  | "Catatan Umum";
-
-/** Jurnal/diary kolam: catatan kejadian, perlakuan, kondisi air, cuaca, dll. */
-export type PondJournal = {
-  id: string;
-  pondId?: string; // kolam terkait (opsional; kosong = catatan umum)
-  pondCode?: string;
-  cycleId?: string;
-  date: string; // yyyy-mm-dd
-  category: JournalCategory;
-  title: string;
-  note: string;
-  // ukuran air (opsional) untuk jurnal kualitas air
-  waterTemp?: number; // suhu (°C)
-  waterPh?: number; // pH
-  photo?: string; // data URL
-  actor: string;
-  createdAt: string;
-};
-
-/* ── Keuangan Lele (penjualan, piutang, utang usaha, kas) ──────────────── */
-
-export type PayMethod = "Tunai" | "Transfer" | "QRIS" | "Tempo";
-
-/** Satu kali pembayaran/cicilan pada piutang atau utang. */
-export type PaymentEntry = {
-  id: string;
-  date: string; // yyyy-mm-dd
-  amount: number;
-  method: PayMethod;
-  note?: string;
-};
-
-/**
- * Penjualan lele (konsumsi/sortir/tampungan). PENTING: tidak ada validasi
- * bobot terhadap tebar — biomassa tumbuh, jumlah panen bisa jauh > tebar.
- */
-export type LeleSale = {
-  id: string;
-  number: string;
-  date: string; // yyyy-mm-dd
-  buyer: string;
-  item: string; // mis. "Lele Konsumsi", "Brojolan", "Sortir"
-  pondCode?: string; // asal kolam (opsional)
-  weightKg: number;
-  pricePerKg: number;
-  total: number; // total nilai penjualan (bisa diedit manual utk borongan)
-  paid: number; // dibayar saat transaksi (sisa → piutang)
-  method: PayMethod;
-  note?: string;
-  actor: string;
-  createdAt: string;
-};
-
-/** Piutang: tagihan ke pembeli (penjualan tempo / kurang bayar). */
-export type Receivable = {
-  id: string;
-  saleId?: string; // penjualan terkait (opsional)
-  party: string; // nama pembeli
-  description: string;
-  amount: number; // total tagihan
-  payments: PaymentEntry[]; // cicilan (bisa beberapa kali)
-  dueDate?: string;
-  actor: string;
-  createdAt: string;
-};
-
-/** Utang usaha: kewajiban ke pemasok/pihak lain (pakan, benih, dll). */
-export type Payable = {
-  id: string;
-  party: string; // pemasok / pihak
-  description: string;
-  amount: number;
-  payments: PaymentEntry[];
-  dueDate?: string;
-  actor: string;
-  createdAt: string;
-};
-
-export type FinanceKind = "masuk" | "keluar";
-
-/** Kategori keuangan yang bisa diedit admin (mis. Bon, Ops Ardhi, Inves). */
-export type FinanceCategory = {
-  id: string;
-  name: string;
-  kind: FinanceKind | "both";
-  createdAt: string;
-};
-
-/* ── Mutasi stok lele (ledger pergerakan biomassa antar-kolam) ─────────── */
-
-export type LeleMoveType =
-  | "MASUK" // tebar/masuk luar
-  | "KELUAR" // keluar umum
-  | "TRANSFER_KELUAR" // pindah ke kolam lain (sisi asal)
-  | "TRANSFER_MASUK" // pindah dari kolam lain (sisi tujuan)
-  | "SORTIR" // sortir grading
-  | "PANEN" // panen
-  | "PENJUALAN" // terjual
-  | "KEMATIAN" // mati
-  | "PENYUSUTAN" // susut (bukan omzet)
-  | "PENYESUAIAN"; // koreksi stok
-
-export type SortirKategori = "Konsumsi" | "Brojolan" | "Pemindahan";
-
-/** Satu baris pergerakan fisik lele pada sebuah kolam. Informatif untuk laporan
- *  & jejak; transfer antar-kolam selalu tercatat berpasangan (keluar + masuk). */
-export type LeleMovement = {
-  id: string;
-  date: string; // yyyy-mm-dd
-  type: LeleMoveType;
-  pondId: string;
-  pondCode: string;
-  toPondId?: string; // tujuan (transfer)
-  toPondCode?: string;
-  kategori?: SortirKategori;
-  qtyKg?: number; // bobot (kg)
-  qtyEkor?: number; // jumlah ekor
-  ref?: string; // pasangan transfer / nomor rujukan
-  note?: string;
-  actor: string;
-  createdAt: string;
-};
-
-/** Transaksi kas/keuangan umum di luar penjualan lele. */
-export type FinanceTx = {
-  id: string;
-  date: string; // yyyy-mm-dd
-  kind: FinanceKind;
-  category: string; // nama kategori
-  amount: number;
-  party?: string;
-  note?: string;
-  actor: string;
-  createdAt: string;
 };

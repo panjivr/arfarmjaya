@@ -3,13 +3,12 @@
 // API (verifikasi izin), dan klien (filter menu + redirect). Jangan hardcode
 // izin berdasarkan email/nama user — selalu lewat peran/izin di sini.
 
-export type AppRole = "ADMIN_UTAMA" | "STAFF_LELE" | "STAFF_GUDANG" | "STAFF_REPORTING";
+export type AppRole = "ADMIN_UTAMA" | "STAFF_GUDANG" | "STAFF_REPORTING";
 
-export const APP_ROLES: AppRole[] = ["ADMIN_UTAMA", "STAFF_LELE", "STAFF_GUDANG", "STAFF_REPORTING"];
+export const APP_ROLES: AppRole[] = ["ADMIN_UTAMA", "STAFF_GUDANG", "STAFF_REPORTING"];
 
 export const ROLE_META: Record<AppRole, { label: string; workspace: string; home: string }> = {
   ADMIN_UTAMA: { label: "Admin Utama", workspace: "Akses penuh", home: "/dashboard" },
-  STAFF_LELE: { label: "Staff Lele", workspace: "Budidaya Lele", home: "/lele" },
   STAFF_GUDANG: { label: "Staff Gudang", workspace: "Inventori & Gudang", home: "/gudang" },
   STAFF_REPORTING: { label: "Staff Reporting", workspace: "Laporan & Rekap", home: "/reporting" },
 };
@@ -21,28 +20,23 @@ export function roleLabel(role: AppRole): string {
   return ROLE_META[role]?.label ?? role;
 }
 export function roleHome(role: AppRole): string {
-  return ROLE_META[role]?.home ?? "/lele";
+  return ROLE_META[role]?.home ?? "/reporting";
 }
 
 // ── Izin granular ──────────────────────────────────────────────────────────
 export type Permission =
-  | "pond.read" | "pond.write"
-  | "feed.write" | "harvest.write"
-  | "lele.finance.read" | "lele.finance.write"
   | "inventory.read" | "inventory.write"
   | "report.read" | "report.export"
   | "user.manage" | "backup.manage" | "settings.manage" | "audit.read";
 
-const LELE_PERMS: Permission[] = ["pond.read", "pond.write", "feed.write", "harvest.write", "lele.finance.read", "lele.finance.write"];
 const GUDANG_PERMS: Permission[] = ["inventory.read", "inventory.write"];
-const REPORT_PERMS: Permission[] = ["report.read", "report.export", "pond.read", "inventory.read", "lele.finance.read"];
+const REPORT_PERMS: Permission[] = ["report.read", "report.export", "inventory.read"];
 
 export const ROLE_PERMISSIONS: Record<AppRole, Permission[]> = {
   ADMIN_UTAMA: [
-    ...LELE_PERMS, ...GUDANG_PERMS, "report.read", "report.export",
+    ...GUDANG_PERMS, "report.read", "report.export",
     "user.manage", "backup.manage", "settings.manage", "audit.read",
   ],
-  STAFF_LELE: [...LELE_PERMS],
   STAFF_GUDANG: [...GUDANG_PERMS],
   STAFF_REPORTING: [...REPORT_PERMS],
 };
@@ -59,7 +53,6 @@ export function can(role: AppRole, perm: Permission, overrides: Permission[] = [
 // Admin: semua. Lainnya: hanya prefix miliknya + rute umum.
 const ROLE_ROUTES: Record<AppRole, string[]> = {
   ADMIN_UTAMA: ["/"],
-  STAFF_LELE: ["/lele"],
   STAFF_GUDANG: ["/gudang", "/inventory", "/categories", "/suppliers", "/warehouses", "/racks", "/purchase", "/receiving", "/transactions", "/distribution", "/requests", "/stock-opname"],
   STAFF_REPORTING: ["/reporting", "/weekly-report", "/reports", "/analytics"],
 };

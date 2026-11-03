@@ -58,9 +58,16 @@ test("staff cannot rewrite collection letters", () => {
   assert.doesNotThrow(() => authorizeWorkspaceWrite("ADMIN_UTAMA", before, { ...before, letters: [] }));
 });
 test("staff cannot replace another department's data or initialize a database", () => {
-  const before = { products: [], ponds: [], settings: { companyName: "AR" } };
-  assert.throws(() => authorizeWorkspaceWrite("STAFF_LELE", before, { ...before, products: ["changed"] }), /forbidden_workspace_change/);
+  const before = { products: [], weeklyReports: [], settings: { companyName: "AR" } };
+  assert.throws(() => authorizeWorkspaceWrite("STAFF_REPORTING", before, { ...before, products: ["changed"] }), /forbidden_workspace_change/);
   assert.throws(() => authorizeWorkspaceWrite("STAFF_GUDANG", before, { ...before, settings: { companyName: "changed" } }));
   assert.throws(() => authorizeWorkspaceWrite("STAFF_GUDANG", null, before));
-  assert.doesNotThrow(() => authorizeWorkspaceWrite("STAFF_LELE", before, { ...before, ponds: ["changed"] }));
+  assert.doesNotThrow(() => authorizeWorkspaceWrite("STAFF_REPORTING", before, { ...before, weeklyReports: ["changed"] }));
+});
+
+test("retired collections may only be dropped, without allowing staff to rewrite unrelated data", () => {
+  const before = { products: [], ponds: [{ id: "historical" }], settings: { companyName: "AR" } };
+  assert.doesNotThrow(() => authorizeWorkspaceWrite("STAFF_GUDANG", before, { products: [], settings: before.settings }));
+  assert.throws(() => authorizeWorkspaceWrite("STAFF_GUDANG", before, { ...before, ponds: [{ id: "changed" }] }), /forbidden_workspace_change/);
+  assert.throws(() => authorizeWorkspaceWrite("STAFF_GUDANG", before, { products: [], settings: { companyName: "changed" } }), /forbidden_workspace_change/);
 });

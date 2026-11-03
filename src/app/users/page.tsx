@@ -15,7 +15,7 @@ import { formatDateTime } from "@/lib/utils";
 
 type ApiUser = { id: string; name: string; username: string; role: AppRole; active: boolean; lastLogin: string | null; createdAt: string };
 
-const emptyForm = { name: "", username: "", password: "", role: "STAFF_LELE" as AppRole, active: true };
+const emptyForm = { name: "", username: "", password: "", role: "STAFF_GUDANG" as AppRole, active: true };
 
 export default function UsersPage() {
   const [users, setUsers] = useState<ApiUser[]>([]);

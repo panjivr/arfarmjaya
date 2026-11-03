@@ -503,7 +503,7 @@ function Sidebar({
           </div>
           <div className="min-w-0">
             <p className="truncate font-bold tracking-tight">AR FARM JAYA</p>
-            <p className="truncate text-xs font-medium text-muted">Pertanian · Budidaya · Supply</p>
+            <p className="truncate text-xs font-medium text-muted">Toko · Gudang · Penjualan</p>
           </div>
         </Link>
       </div>

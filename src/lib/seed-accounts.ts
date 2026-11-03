@@ -3,7 +3,6 @@ import type { AppRole } from "./rbac";
 type SeedAccount = { username: string; name: string; role: AppRole; password: string };
 const DEFINITIONS = [
   { username: "admin", name: "Admin Utama", role: "ADMIN_UTAMA", variable: "ADMIN_PASSWORD", demo: "admin123" },
-  { username: "lele", name: "Staff Lele", role: "STAFF_LELE", variable: "LELE_PASSWORD", demo: "lele123" },
   { username: "gudang", name: "Staff Gudang", role: "STAFF_GUDANG", variable: "GUDANG_PASSWORD", demo: "gudang123" },
   { username: "laporan", name: "Staff Reporting", role: "STAFF_REPORTING", variable: "LAPORAN_PASSWORD", demo: "laporan123" },
 ] as const;

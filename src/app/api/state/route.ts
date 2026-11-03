@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { currentSession } from "@/lib/session-server";
 import { uploadParameters, assembleUpload, decodeWorkspace, MAX_WORKSPACE_BYTES, MAX_CHUNK_BYTES } from "@/lib/workspace-upload";
+import { parseWorkspace } from "@/lib/workspace-data";
 import { WorkspaceError, workspaceRevision } from "@/lib/workspace-write";
 
 import { savePrismaWorkspace } from "@/lib/workspace-repository";
@@ -16,7 +17,7 @@ export async function GET() {
   if (!prisma) return json({ error: "no_database", db: false }, 503);
   try {
     const row = await prisma.workspace.findUnique({ where: { id: "main" } });
-    return json({ data: row?.data ?? null, db: true, updatedAt: row?.updatedAt ?? null, revision: workspaceRevision(row) });
+    return json({ data: row ? parseWorkspace(row.data) : null, db: true, updatedAt: row?.updatedAt ?? null, revision: workspaceRevision(row) });
   } catch (error) {
     console.error("GET /api/state failed", error);
     return json({ error: "read_failed" }, 503);

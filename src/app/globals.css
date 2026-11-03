@@ -55,7 +55,7 @@
   --color-leaf: var(--leaf);
   --color-harvest: var(--harvest);
   --color-corn: var(--corn);
-  --font-sans: var(--font-inter);
+  --font-sans: var(--font-inter, Arial), Helvetica, sans-serif;
 }
 
 /* Utilitas kedalaman & interaksi — dipakai konsisten agar tampil satu kesatuan */
@@ -101,6 +101,7 @@ html {
 }
 
 body {
+  font-family: var(--font-inter, Arial), Helvetica, sans-serif;
   min-height: 100%;
   background: var(--background);
   color: var(--foreground);
@@ -219,4 +220,15 @@ textarea {
   .report-doc thead {
     display: table-header-group;
   }
+}
+
+@media print {
+  html, body { background: #ffffff !important; }
+  body.printing-invoice > *:not(#print-area) { display: none !important; }
+  body.printing-invoice #print-area { position: static; width: 100%; }
+  .invoice-doc { max-width: none !important; }
+  .invoice-doc .invoice-body { padding: 0 !important; }
+  .invoice-items thead { display: table-header-group; }
+  .invoice-items tr { break-inside: avoid; }
+  .invoice-doc header, .invoice-metadata, .invoice-totals { break-inside: avoid; }
 }

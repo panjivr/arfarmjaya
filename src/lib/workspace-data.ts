@@ -3,9 +3,7 @@
 export const WORKSPACE_KEYS = [
   "products", "movements", "categories", "suppliers", "warehouses", "racks", "users",
   "purchaseOrders", "receipts", "distributions", "requests", "opnameSessions", "posSales",
-  "stores", "invoices", "letters", "reportProfiles", "weeklyReports", "ponds", "fishCycles",
-  "pondLogs", "pondHarvests", "pondJournals", "leleSales", "receivables", "payables",
-  "financeTx", "financeCategories", "leleMovements", "auditLog", "readNotifications", "settings",
+  "stores", "invoices", "letters", "reportProfiles", "weeklyReports", "auditLog", "readNotifications", "settings",
 ] as const;
 
 export type WorkspaceData = Record<string, unknown>;

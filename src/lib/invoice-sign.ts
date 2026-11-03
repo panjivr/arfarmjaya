@@ -6,7 +6,8 @@
 // `code` diturunkan dari hash agar mudah dirujuk, dan QR memuat fakta + hash
 // untuk verifikasi manual saat dipindai.
 
-import type { InvoiceSignature } from "@/lib/types";
+import { canonicalJson } from "./workspace-data";
+import type { InvoiceSignature, InvoiceSeller } from "@/lib/types";
 
 export type SignableInvoice = {
   number: string;
@@ -17,6 +18,12 @@ export type SignableInvoice = {
   subtotal: number;
   shipping: number;
   total: number;
+  buyerPhone?: string;
+  buyerAddress?: string;
+  dueDate?: string;
+  discount?: number;
+  note?: string;
+  seller?: InvoiceSeller;
 };
 
 /** String kanonik yang di-hash — urutan & format tetap agar hasil konsisten. */
@@ -24,7 +31,7 @@ function canonical(inv: SignableInvoice): string {
   const lines = inv.lines
     .map((l) => `${l.name.trim()}|${l.unit.trim()}|${l.quantity}|${l.price}`)
     .join(";");
-  return [
+  const legacy = [
     `no=${inv.number.trim()}`,
     `toko=${inv.storeName.trim()}`,
     `pembeli=${inv.buyer.trim()}`,
@@ -34,6 +41,16 @@ function canonical(inv: SignableInvoice): string {
     `ongkir=${inv.shipping}`,
     `total=${inv.total}`,
   ].join("\n");
+  // Dokumen lama tetap memakai hash versi pertama. Dokumen baru juga mengikat
+  // alamat, jatuh tempo, diskon, catatan, identitas dan desain penjual.
+  if ([inv.buyerPhone, inv.buyerAddress, inv.dueDate, inv.discount, inv.note, inv.seller].every((v) => v === undefined)) return legacy;
+  return `v2=${canonicalJson({
+    number: inv.number.trim(), storeName: inv.storeName.trim(), buyer: inv.buyer.trim(), date: inv.date,
+    lines: inv.lines.map((line) => ({ ...line, name: line.name.trim(), unit: line.unit.trim() })),
+    subtotal: inv.subtotal, shipping: inv.shipping, total: inv.total,
+    buyerPhone: inv.buyerPhone, buyerAddress: inv.buyerAddress, dueDate: inv.dueDate,
+    discount: inv.discount, note: inv.note, seller: inv.seller,
+  })}`;
 }
 
 async function sha256Hex(text: string): Promise<string> {

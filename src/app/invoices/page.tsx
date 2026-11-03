@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { createPortal } from "react-dom";
 import { useEffect, useMemo, useState } from "react";
 import { FileText, Pencil, Plus, Printer, Save, ShieldCheck, Trash2, X } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
@@ -7,16 +9,18 @@ import { useMobileActions } from "@/components/shell/mobile-actions";
 import { PageHeader, StatCard, EmptyState } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Field, Input, Select } from "@/components/ui/field";
+import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { toast } from "@/components/ui/toast";
 import { ScaledPreview } from "@/components/ui/scaled-preview";
 import { InvoiceDocument, type InvoiceData } from "@/components/invoice/invoice-document";
 import { useUiStore } from "@/lib/store";
 import { currency, documentFileName, formatDate, printNamed } from "@/lib/utils";
+import { resolveInvoiceDesign, snapshotInvoiceSeller } from "@/lib/invoice-design";
+import { invoiceInputError, invoiceLineTotal, invoiceTotals, suggestInvoiceNumber } from "@/lib/invoices";
 import { buildInvoiceSignature } from "@/lib/invoice-sign";
-import type { Invoice, InvoiceLine, InvoiceSignature, Store } from "@/lib/types";
+import type { Invoice, InvoiceLine, InvoiceSignature, InvoiceSeller } from "@/lib/types";
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
 
 /** Waktu lokal untuk <input type="datetime-local"> (YYYY-MM-DDTHH:mm). */
 function nowLocalInput(): string {
@@ -47,6 +51,12 @@ export default function InvoicesPage() {
   const [storeId, setStoreId] = useState(stores[0]?.id ?? "");
   const [buyer, setBuyer] = useState("");
   const [buyerPhone, setBuyerPhone] = useState("");
+  const [buyerAddress, setBuyerAddress] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [discount, setDiscount] = useState(0);
+  const [noteOverride, setNoteOverride] = useState<string | null>(null);
+  const [savedSeller, setSavedSeller] = useState<InvoiceSeller | undefined>(undefined);
+  const [saving, setSaving] = useState(false);
   const [date, setDate] = useState(today());
   const [numberOverride, setNumberOverride] = useState("");
   const [lines, setLines] = useState<InvoiceLine[]>([]);
@@ -67,15 +77,17 @@ export default function InvoicesPage() {
     }
   }, [stores, storeId]);
 
-  const [printTarget, setPrintTarget] = useState<{ store?: Store; data: InvoiceData } | null>(null);
+  const [printTarget, setPrintTarget] = useState<{ store?: InvoiceSeller; data: InvoiceData } | null>(null);
 
   const store = stores.find((s) => s.id === storeId);
+  const seller = savedSeller ?? store;
+  const note = noteOverride ?? seller?.note ?? "";
+  const design = resolveInvoiceDesign(seller);
   const storeInvoices = useMemo(() => invoices.filter((inv) => inv.storeId === storeId), [invoices, storeId]);
-  const subtotal = useMemo(() => lines.reduce((t, l) => t + l.price * l.quantity, 0), [lines]);
-  const total = subtotal + (shipping || 0);
-  const suggestedNumber = store ? `${store.invoicePrefix}${String(invoices.length + 1).padStart(4, "0")}` : "";
+  const { subtotal, total } = invoiceTotals(lines, shipping, discount);
+  const suggestedNumber = store ? suggestInvoiceNumber(store.invoicePrefix, invoices) : "";
   const invoiceNumber = numberOverride.trim() || suggestedNumber;
-  const signerName = store?.eSignerName?.trim() || store?.signatureName?.trim() || store?.name?.trim() || "Penjual";
+  const signerName = seller?.eSignerName?.trim() || seller?.signatureName?.trim() || seller?.name?.trim() || "Penjual";
 
   // Default tanda tangan mengikuti pengaturan toko — hanya saat ganti toko &
   // tidak sedang mengedit invoice tersimpan.
@@ -83,6 +95,8 @@ export default function InvoicesPage() {
     if (!editingId) setESign(Boolean(store?.eSignEnabled));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
+
+  const signable = useMemo(() => ({ number: invoiceNumber, storeName: seller?.name ?? "", buyer, buyerPhone: buyerPhone || undefined, buyerAddress: buyerAddress || undefined, date, dueDate: dueDate || undefined, lines, subtotal, shipping, discount, total, note, seller: seller ? snapshotInvoiceSeller(seller) : undefined }), [invoiceNumber, seller, buyer, buyerPhone, buyerAddress, date, dueDate, lines, subtotal, shipping, discount, total, note]);
 
   // Hitung tanda tangan pratinjau (SHA-256) saat e-sign aktif & ada barang.
   useEffect(() => {
@@ -92,23 +106,24 @@ export default function InvoicesPage() {
       return;
     }
     buildInvoiceSignature(
-      { number: invoiceNumber, storeName: store?.name ?? "", buyer, date, lines, subtotal, shipping: shipping || 0, total },
+      signable,
       signerName,
       localInputToIso(signAt),
     ).then((s) => {
       if (alive) setPreviewSig(s);
-    });
+    }).catch(() => { if (alive) setPreviewSig(undefined); });
     return () => {
       alive = false;
     };
-  }, [eSign, lines, invoiceNumber, buyer, date, subtotal, shipping, total, store?.name, signerName, signAt]);
+  }, [eSign, lines.length, signable, signerName, signAt]);
 
-  const previewData: InvoiceData = { number: invoiceNumber, buyer, buyerPhone, date, lines, subtotal, shipping: shipping || 0, total, note: store?.note, signature: eSign ? previewSig : undefined };
+  const previewData: InvoiceData = { ...signable, signature: eSign ? previewSig : undefined };
 
   function addLine() {
     const quantity = Number(draft.quantity);
     const price = Number(draft.price);
-    if (!draft.name.trim() || !(quantity > 0)) return toast.error("Isi nama barang dan jumlah.");
+    if (!draft.name.trim() || !Number.isFinite(quantity) || !(quantity > 0)) return toast.error("Isi nama barang dan jumlah.");
+    if (!Number.isFinite(price) || price < 0) return toast.error("Harga barang harus nol atau lebih.");
     setLines((prev) => [...prev, { name: draft.name.trim(), unit: draft.unit.trim() || "Pcs", quantity, price: price || 0 }]);
     setDraft({ name: "", unit: draft.unit, quantity: "", price: "" });
   }
@@ -126,7 +141,7 @@ export default function InvoicesPage() {
     });
   }
   function updateLineQty(i: number, qty: number) {
-    setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, quantity: qty > 0 ? qty : 0 } : l)));
+    setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, quantity: Number.isFinite(qty) && qty > 0 ? qty : 0 } : l)));
   }
 
   const catalogMatches = useMemo(() => {
@@ -142,6 +157,12 @@ export default function InvoicesPage() {
     setBuyerPhone("");
     setNumberOverride("");
     setShipping(0);
+    setDiscount(0);
+    setBuyerAddress("");
+    setDueDate("");
+    setNoteOverride(null);
+    setSavedSeller(undefined);
+    setDate(today());
     setESign(Boolean(store?.eSignEnabled));
     setSignAt(nowLocalInput());
     setPreviewSig(undefined);
@@ -149,25 +170,24 @@ export default function InvoicesPage() {
   }
 
   async function save() {
-    if (lines.length === 0) return toast.error("Tambahkan minimal satu barang.");
-    // Tanda tangan dihitung ulang atas isi terbaru agar selalu cocok.
-    let signature: InvoiceSignature | undefined;
-    if (eSign) {
-      try {
-        signature = await buildInvoiceSignature(
-          { number: invoiceNumber, storeName: store?.name ?? "", buyer, date, lines, subtotal, shipping: shipping || 0, total },
-          signerName,
-          localInputToIso(signAt),
-        );
-      } catch {
-        return toast.error("Gagal membuat tanda tangan elektronik.");
-      }
+    if (saving) return;
+    const input = { ...signable, storeId, number: invoiceNumber };
+    const error = invoiceInputError(input);
+    if (error) return toast.error(error);
+    if (invoices.some((inv) => inv.id !== editingId && inv.number === invoiceNumber)) return toast.error("Nomor invoice sudah digunakan.");
+    setSaving(true);
+    try {
+      const signature = eSign ? await buildInvoiceSignature(signable, signerName, localInputToIso(signAt)) : undefined;
+      const payload = { ...input, signature };
+      const result = editingId ? updateInvoice(editingId, payload) : createInvoice(payload);
+      if (!result.ok) return toast.error(result.message ?? "Gagal menyimpan.");
+      toast.success(editingId ? `Invoice ${result.invoice?.number} diperbarui.` : `Invoice ${result.invoice?.number} tersimpan.`);
+      resetForm();
+    } catch {
+      toast.error("Gagal menyiapkan invoice. Periksa isian dan coba lagi.");
+    } finally {
+      setSaving(false);
     }
-    const payload = { storeId, buyer, buyerPhone: buyerPhone || undefined, date, number: invoiceNumber, lines, shipping: shipping || 0, note: store?.note, signature };
-    const result = editingId ? updateInvoice(editingId, payload) : createInvoice(payload);
-    if (!result.ok) return toast.error(result.message ?? "Gagal menyimpan.");
-    toast.success(editingId ? `Invoice ${result.invoice?.number} diperbarui.` : `Invoice ${result.invoice?.number} tersimpan.`);
-    resetForm();
   }
 
   function startEdit(inv: Invoice) {
@@ -175,6 +195,11 @@ export default function InvoicesPage() {
     setStoreId(inv.storeId);
     setBuyer(inv.buyer);
     setBuyerPhone(inv.buyerPhone ?? "");
+    setBuyerAddress(inv.buyerAddress ?? "");
+    setDueDate(inv.dueDate ?? "");
+    setDiscount(inv.discount ?? 0);
+    setNoteOverride(inv.note ?? "");
+    setSavedSeller(inv.seller);
     setDate(inv.date);
     setNumberOverride(inv.number);
     setLines(inv.lines.map((l) => ({ ...l })));
@@ -186,17 +211,48 @@ export default function InvoicesPage() {
     toast.info(`Mengedit invoice ${inv.number}.`);
   }
 
-  function printData(data: InvoiceData, s?: Store) {
+  async function printDraft() {
+    const error = invoiceInputError({ ...signable, storeId });
+    if (error) return toast.error(error);
+    try {
+      // Hitung dari isi terbaru saat cetak, bukan hasil pratinjau asinkron
+      // yang mungkin masih menghitung setelah pengguna mengubah isian.
+      const signature = eSign ? await buildInvoiceSignature(signable, signerName, localInputToIso(signAt)) : undefined;
+      printData({ ...previewData, signature }, seller);
+    } catch {
+      toast.error("Gagal menyiapkan tanda tangan untuk cetak. Coba lagi.");
+    }
+  }
+
+  function printData(data: InvoiceData, s?: InvoiceSeller) {
+    const error = invoiceInputError({ ...data, storeId: storeId || "print" });
+    if (error) return toast.error(error);
     setPrintTarget({ store: s, data });
     const fileName = documentFileName([s?.name, data.number, data.buyer], "Invoice");
-    setTimeout(() => printNamed(fileName), 250);
+    setTimeout(async () => {
+      try {
+        await document.fonts.ready;
+        await Promise.all(Array.from(document.querySelectorAll<HTMLImageElement>("#print-area img")).map((img) => img.decode()));
+        const style = document.createElement("style");
+        style.media = "print";
+        style.textContent = "@page { size: A4 portrait; margin: 12mm; }";
+        document.head.appendChild(style);
+        document.body.classList.add("printing-invoice");
+        const cleanup = () => { document.body.classList.remove("printing-invoice"); style.remove(); };
+        window.addEventListener("afterprint", cleanup, { once: true });
+        printNamed(fileName);
+        window.setTimeout(cleanup, 60_000);
+      } catch {
+        toast.error("Gambar invoice belum berhasil dimuat. Periksa logo dan coba cetak lagi.");
+      }
+    }, 100);
   }
 
   // Tombol aksi khusus halaman untuk bilah bawah di HP.
   useMobileActions([
     ...(editingId ? [{ key: "cancel", label: "Batal", icon: X, variant: "secondary" as const, onClick: resetForm }] : []),
-    { key: "print", label: "Cetak", icon: Printer, variant: "secondary" as const, onClick: () => printData(previewData, store), disabled: lines.length === 0 },
-    { key: "save", label: editingId ? "Perbarui" : "Simpan", icon: Save, variant: "primary" as const, onClick: save, disabled: lines.length === 0 },
+    { key: "print", label: "Cetak", icon: Printer, variant: "secondary" as const, onClick: () => printDraft(), disabled: lines.length === 0 || saving },
+    { key: "save", label: editingId ? "Perbarui" : "Simpan", icon: Save, variant: "primary" as const, onClick: save, disabled: lines.length === 0 || saving },
   ]);
 
   if (stores.length === 0) {
@@ -213,7 +269,8 @@ export default function InvoicesPage() {
       <PageHeader
         eyebrow="Penjualan"
         title="Invoice"
-        description="Pilih toko, isi pembeli dan daftar barang, lalu simpan atau cetak invoice siap kirim."
+        description="Pilih toko, lengkapi rincian penagihan, lalu simpan dan cetak. Desain mengikuti pengaturan toko."
+        action={<Link href="/stores" className="inline-flex items-center rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold">Atur toko & desain</Link>}
       />
 
       <section className="no-print mb-4 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3">
@@ -239,7 +296,7 @@ export default function InvoicesPage() {
             <CardHeader><h2 className="font-semibold">Data Invoice</h2></CardHeader>
             <CardContent className="space-y-3">
               <Field label="Toko">
-                <Select value={storeId} onChange={(e) => setStoreId(e.target.value)}>
+                <Select aria-label="Toko" value={storeId} disabled={saving} onChange={(e) => { setStoreId(e.target.value); setSavedSeller(undefined); setNoteOverride(null); setCatalogQuery(""); }}>
                   {stores.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
                 </Select>
               </Field>
@@ -248,7 +305,12 @@ export default function InvoicesPage() {
                 <Field label="Tanggal"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
               </div>
               <Field label="Pembeli"><Input value={buyer} onChange={(e) => setBuyer(e.target.value)} placeholder="SPPG NGRAKET BALONG" /></Field>
+              <Field label="Alamat Pembeli"><Textarea aria-label="Alamat Pembeli" value={buyerAddress} onChange={(e) => setBuyerAddress(e.target.value)} placeholder="Alamat lengkap tujuan penagihan" /></Field>
+              <Field label="Jatuh Tempo" hint="Opsional. Kosongkan jika tidak ada batas pembayaran."><Input type="date" min={date} value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></Field>
               <Field label="Telepon Pembeli"><Input value={buyerPhone} onChange={(e) => setBuyerPhone(e.target.value)} placeholder="081216101267" /></Field>
+
+              {savedSeller && <div className="rounded-lg border border-border bg-background p-3 text-xs text-muted">Invoice ini memakai identitas dan desain saat disimpan.<button type="button" className="mt-2 block font-semibold text-primary" onClick={() => setSavedSeller(undefined)}>Gunakan desain toko terbaru</button></div>}
+              {(!design.visible.buyerAddress || !design.visible.buyerPhone || !design.visible.dueDate) && <p className="text-xs text-muted">Sebagian detail disembunyikan pada cetakan sesuai pengaturan toko. Isian tetap disimpan.</p>}
 
               {/* Tanda tangan elektronik — opsional, dikontrol admin */}
               <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-sm">
@@ -352,21 +414,25 @@ export default function InvoicesPage() {
                         className="h-8 w-16 rounded-md border border-border bg-card px-2 text-right text-sm outline-none focus:border-primary"
                         aria-label={`Jumlah ${l.name}`}
                       />
-                      <span className="w-24 shrink-0 text-right font-medium">{currency.format(l.price * l.quantity)}</span>
+                      <span className="w-24 shrink-0 text-right font-medium">{currency.format(invoiceLineTotal(l))}</span>
                       <button type="button" onClick={() => setLines((prev) => prev.filter((_, idx) => idx !== i))} className="text-danger" aria-label="Hapus barang"><Trash2 className="h-4 w-4" /></button>
                     </div>
                   ))}
                 </div>
               )}
 
-              <Field label="Ongkos Kirim (Rp)"><Input type="number" min={0} value={shipping || ""} onChange={(e) => setShipping(Number(e.target.value) || 0)} placeholder="0" /></Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Ongkos Kirim (Rp)"><Input type="number" min={0} step={1} value={shipping || ""} onChange={(e) => setShipping(Number(e.target.value) || 0)} placeholder="0" /></Field>
+                <Field label="Diskon (Rp)"><Input type="number" min={0} step={1} max={subtotal + shipping} value={discount || ""} onChange={(e) => setDiscount(Number(e.target.value) || 0)} placeholder="0" /></Field>
+              </div>
+              <Field label="Catatan Invoice" hint="Isi khusus untuk invoice ini; tidak mengubah catatan default toko."><Textarea aria-label="Catatan Invoice" value={note} onChange={(e) => setNoteOverride(e.target.value)} placeholder="Catatan untuk pembeli" /></Field>
               <div className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2 text-sm">
                 <span className="text-muted">Total</span>
                 <span className="text-lg font-bold">{currency.format(total)}</span>
               </div>
               <div className="flex gap-2">
-                <Button className="flex-1" onClick={save} disabled={lines.length === 0}><Save className="h-4 w-4" /> {editingId ? "Perbarui" : "Simpan"}</Button>
-                <Button variant="secondary" onClick={() => printData(previewData, store)} disabled={lines.length === 0}><Printer className="h-4 w-4" /> Cetak</Button>
+                <Button className="flex-1" onClick={save} disabled={lines.length === 0 || saving}><Save className="h-4 w-4" /> {saving ? "Menyimpan…" : editingId ? "Perbarui" : "Simpan"}</Button>
+                <Button variant="secondary" onClick={() => printDraft()} disabled={lines.length === 0 || saving}><Printer className="h-4 w-4" /> Cetak</Button>
                 {editingId && <Button variant="ghost" onClick={resetForm}><X className="h-4 w-4" /> Batal</Button>}
               </div>
             </CardContent>
@@ -378,7 +444,7 @@ export default function InvoicesPage() {
           <Card className="bg-slate-100 p-3 sm:p-4 lg:sticky lg:top-20 dark:bg-slate-900">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted sm:mb-3">Pratinjau invoice</p>
             <ScaledPreview baseWidth={800}>
-              <div className="shadow-lg"><InvoiceDocument store={store} invoice={previewData} /></div>
+              <div className="shadow-lg"><InvoiceDocument store={seller} invoice={previewData} /></div>
             </ScaledPreview>
           </Card>
         </div>
@@ -412,7 +478,7 @@ export default function InvoicesPage() {
                     )}
                     <div className="mt-3 flex justify-end gap-1">
                       <Button variant="secondary" className="h-8" onClick={() => startEdit(inv)}><Pencil className="h-4 w-4" /> Edit</Button>
-                      <Button variant="secondary" className="h-8" onClick={() => printData({ number: inv.number, buyer: inv.buyer, buyerPhone: inv.buyerPhone, date: inv.date, lines: inv.lines, subtotal: inv.subtotal, shipping: inv.shipping, total: inv.total, note: inv.note, signature: inv.signature }, s)}><Printer className="h-4 w-4" /> Cetak</Button>
+                      <Button variant="secondary" className="h-8" onClick={() => printData(inv, inv.seller ?? s)}><Printer className="h-4 w-4" /> Cetak</Button>
                       <Button variant="ghost" className="h-8 w-8 px-0 text-danger" aria-label="Hapus" onClick={() => { if (confirm(`Hapus invoice ${inv.number}?`)) { deleteInvoice(inv.id); toast.success("Invoice dihapus."); if (editingId === inv.id) resetForm(); } }}><Trash2 className="h-4 w-4" /></Button>
                     </div>
                   </CardContent>
@@ -424,10 +490,10 @@ export default function InvoicesPage() {
       </div>
 
       {/* Print area */}
-      {printTarget && (
+      {printTarget && typeof document !== "undefined" && createPortal(
         <div id="print-area">
           <InvoiceDocument store={printTarget.store} invoice={printTarget.data} />
-        </div>
+        </div>, document.body
       )}
     </AppShell>
   );

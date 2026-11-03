@@ -12,7 +12,7 @@ test("complete snapshots round-trip; backup metadata cannot become store actions
   assert.equal("resetData" in parseWorkspace({ ...data, resetData: "malicious", __backup: "arfarmjaya" }), false);
 });
 test("reject partial/corrupt backups, duplicate identities and non-finite amounts", () => {
-  for (const bad of [null, [], {}, { products: [] }, { ...fixture(), settings: null }, { ...fixture(), invoices: "broken" }, { ...fixture(), ponds: [{ id: "1" }, { id: "1" }] }, { ...fixture(), financeTx: [{ id: "1", amount: Infinity }] }, { ...fixture(), products: [{ sku: "x", name: "x", unit: "kg", currentStock: "10", purchasePrice: 1, retailPrice: 2 }] }, JSON.parse('{"__proto__": {"polluted":true}}')]) {
+  for (const bad of [null, [], {}, { products: [] }, { ...fixture(), settings: null }, { ...fixture(), invoices: "broken" }, { ...fixture(), invoices: [{ id: "1" }, { id: "1" }] }, { ...fixture(), financeTx: [{ id: "1", amount: Infinity }] }, { ...fixture(), products: [{ sku: "x", name: "x", unit: "kg", currentStock: "10", purchasePrice: 1, retailPrice: 2 }] }, JSON.parse('{"__proto__": {"polluted":true}}')]) {
     assert.throws(() => parseWorkspace(bad));
   }
 });
@@ -28,4 +28,9 @@ test("canonical serialization preserves JSON rules for optional fields and array
   const data = { note: undefined, amount: 1, nested: [{ reference: undefined, id: "one" }, undefined] };
   assert.deepEqual(JSON.parse(canonicalJson(data)), JSON.parse(JSON.stringify(data)));
   assert.equal(canonicalJson({ note: undefined, amount: 1 }), canonicalJson({ amount: 1 }));
+});
+
+test("older backups retain business data while retired collections cannot return to active state", () => {
+  const data = fixture();
+  assert.deepEqual(parseWorkspace({ ...data, ponds: [{ id: "old" }], leleSales: [{ id: "old-sale" }] }), data);
 });

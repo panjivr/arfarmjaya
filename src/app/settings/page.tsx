@@ -41,7 +41,7 @@ export default function SettingsPage() {
   const [optimizing, setOptimizing] = useState(false);
 
   // Perkecil ulang semua foto tersimpan (kegiatan, bukti, logo, tanda tangan,
-  // jurnal) agar total data turun di bawah batas kiriman server (penyebab
+  // dokumen) agar total data turun di bawah batas kiriman server (penyebab
   // "Gagal menyimpan / HTTP 413"). Lalu langsung sinkron ke server.
   async function optimizeImages() {
     if (optimizing) return;
@@ -50,7 +50,7 @@ export default function SettingsPage() {
     try {
       const s = useUiStore.getState();
       const sizeOf = (st: ReturnType<typeof useUiStore.getState>) =>
-        (JSON.stringify(st.weeklyReports).length + JSON.stringify(st.reportProfiles).length + JSON.stringify(st.stores).length + JSON.stringify(st.pondJournals).length) / 1_048_576;
+        (JSON.stringify(st.weeklyReports).length + JSON.stringify(st.reportProfiles).length + JSON.stringify(st.stores).length) / 1_048_576;
       const before = sizeOf(s);
 
       const weeklyReports = await Promise.all(
@@ -76,15 +76,11 @@ export default function SettingsPage() {
       const stores = await Promise.all(
         s.stores.map(async (st) => ({ ...st, logo: st.logo ? await compressDataUrl(st.logo) : st.logo })),
       );
-      const pondJournals = await Promise.all(
-        s.pondJournals.map(async (j) => ({ ...j, photo: j.photo ? await compressDataUrl(j.photo) : j.photo })),
-      );
-
       const current = useUiStore.getState();
-      if (current.weeklyReports !== s.weeklyReports || current.reportProfiles !== s.reportProfiles || current.stores !== s.stores || current.pondJournals !== s.pondJournals) {
+      if (current.weeklyReports !== s.weeklyReports || current.reportProfiles !== s.reportProfiles || current.stores !== s.stores) {
         throw new Error("Data berubah selama optimasi. Ulangi agar perubahan terbaru tidak tertimpa.");
       }
-      useUiStore.setState({ weeklyReports, reportProfiles, stores, pondJournals } as never);
+      useUiStore.setState({ weeklyReports, reportProfiles, stores } as never);
       const after = sizeOf(useUiStore.getState());
       const sent = await syncNow();
       const delta = `${before.toFixed(1)} MB → ${after.toFixed(1)} MB`;

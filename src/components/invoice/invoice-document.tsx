@@ -4,7 +4,9 @@ import Image from "next/image";
 import { useMemo } from "react";
 import qrcode from "qrcode-generator";
 import { ShieldCheck, Store as StoreIcon } from "lucide-react";
-import type { InvoiceLine, InvoiceSignature, Store } from "@/lib/types";
+import type { InvoiceLine, InvoiceSignature, InvoiceSeller } from "@/lib/types";
+import { resolveInvoiceDesign } from "@/lib/invoice-design";
+import { invoiceLineTotal } from "@/lib/invoices";
 import { invoiceQrPayload } from "@/lib/invoice-sign";
 import { currency, numberFmt, formatDate, formatDateTime } from "@/lib/utils";
 
@@ -12,10 +14,13 @@ export type InvoiceData = {
   number: string;
   buyer: string;
   buyerPhone?: string;
+  buyerAddress?: string;
   date: string;
+  dueDate?: string;
   lines: InvoiceLine[];
   subtotal: number;
   shipping: number;
+  discount?: number;
   total: number;
   note?: string;
   signature?: InvoiceSignature;
@@ -57,181 +62,98 @@ function terbilang(value: number): string {
   return `${text.charAt(0).toUpperCase()}${text.slice(1)} rupiah`;
 }
 
-export function InvoiceDocument({ store, invoice, id }: { store?: Store; invoice: InvoiceData; id?: string }) {
-  const accent = store?.accent ?? "#007a4b";
-  const contact = [store?.phone && `HP/WA: ${store.phone}`, store?.email].filter(Boolean).join("  ·  ");
-
+export function InvoiceDocument({ store, invoice, id }: { store?: InvoiceSeller; invoice: InvoiceData; id?: string }) {
+  const { colors: c, visible: v, logoWidth, layout } = resolveInvoiceDesign(store);
   const sig = invoice.signature;
-  const qrPayload = sig
-    ? invoiceQrPayload(
-        {
-          number: invoice.number,
-          storeName: store?.name ?? "",
-          buyer: invoice.buyer,
-          date: invoice.date,
-          lines: invoice.lines,
-          subtotal: invoice.subtotal,
-          shipping: invoice.shipping,
-          total: invoice.total,
-        },
-        sig,
-      )
-    : null;
-  const qr = useInvoiceQr(qrPayload);
-
-  // Empty-state kontak: sembunyikan bila kosong atau hanya tanda hubung.
-  const phone = invoice.buyerPhone?.trim() ?? "";
-  const hasPhone = phone.length > 0 && phone !== "-";
+  const qr = useInvoiceQr(sig ? invoiceQrPayload({ ...invoice, storeName: store?.name ?? "" }, sig) : null);
+  const phone = invoice.buyerPhone?.trim();
+  const columns = 3 + Number(v.rowNumber) + Number(v.unit) + Number(v.price);
+  const contact = [v.storePhone && store?.phone && `Telp/WA: ${store.phone}`, v.storeEmail && store?.email].filter(Boolean).join(" · ");
+  const cell = { border: `1px solid ${c.border}` };
+  const detail = { color: c.detail };
 
   return (
-    <div
-      id={id}
-      className="invoice-doc mx-auto w-full max-w-[800px] overflow-hidden rounded-md bg-white text-slate-900"
-      style={{ fontFamily: "Arial, Helvetica, sans-serif" }}
-    >
-      {/* Aksen atas */}
-      <div style={{ height: 6, background: accent }} />
-
-      <div className="p-6 sm:p-8">
-        {/* Kop */}
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded bg-white ring-1 ring-slate-200">
-              {store?.logo ? (
-                <Image src={store.logo} alt={store.name} width={64} height={64} className="h-full w-full object-contain" loading="eager" unoptimized />
-              ) : (
-                <StoreIcon className="h-8 w-8" style={{ color: accent }} />
-              )}
+    <div id={id} className="invoice-doc mx-auto w-full max-w-[800px] bg-white" style={{ fontFamily: "Arial, Helvetica, sans-serif", color: c.text, fontSize: 12 }}>
+      <div className="invoice-body p-8">
+        <header className={`flex items-center gap-6 border-b-2 pb-5 ${layout === "classic" ? "justify-between" : "items-start"}`} style={{ borderColor: c.brand }}>
+          {v.logo && (
+            <div className="shrink-0" style={{ width: logoWidth }}>
+              {store?.logo ? <Image src={store.logo} alt={`Logo ${store.name}`} width={logoWidth} height={logoWidth} style={{ width: "100%", height: "auto", maxHeight: 150, objectFit: "contain" }} loading="eager" unoptimized /> : <StoreIcon className="mx-auto h-12 w-12" style={{ color: c.brand }} />}
             </div>
-            <div className="min-w-0">
-              <p className="text-lg font-bold uppercase leading-tight" style={{ color: accent }}>{store?.name ?? "Nama Toko"}</p>
-              {store?.address && <p className="mt-0.5 text-[11px] leading-snug text-slate-600">{store.address}</p>}
-              {contact && <p className="text-[11px] text-slate-600">{contact}</p>}
-            </div>
+          )}
+          <div className={`min-w-0 flex-1 ${layout === "classic" ? "text-right" : "text-left"}`}>
+            <p className="break-words text-[23px] font-bold uppercase leading-tight" style={{ color: c.brand }}>{store?.name || "Nama toko"}</p>
+            {v.tagline && store?.tagline && <p className="mt-1 whitespace-pre-line break-words text-[12px] font-semibold" style={{ color: c.tagline }}>{store.tagline}</p>}
+            {v.storeAddress && store?.address && <p className="mt-1 whitespace-pre-line break-words text-[11px]" style={{ color: c.muted }}>{store.address}</p>}
+            {contact && <p className="mt-1 break-words text-[11px]" style={{ color: c.muted }}>{contact}</p>}
           </div>
-          <div className="shrink-0 text-right">
-            <p className="text-2xl font-extrabold uppercase tracking-wide" style={{ color: accent }}>Invoice</p>
-            <p className="mt-1 font-mono text-sm font-semibold text-slate-800">{invoice.number}</p>
-            <p className="text-[11px] text-slate-500">{formatDate(invoice.date)}</p>
+          {layout === "modern" && <p className="shrink-0 text-[24px] font-extrabold tracking-wide" style={{ color: c.heading }}>INVOICE</p>}
+        </header>
+        {layout === "classic" && <h2 className="mt-1 py-1.5 text-center text-[16px] font-bold tracking-[0.15em]" style={{ background: c.heading, color: c.headingText }}>INVOICE</h2>}
+
+        <section className="invoice-metadata my-5 grid grid-cols-2 gap-x-8 gap-y-2 text-[11px]">
+          <div className="grid grid-cols-[85px_1fr] gap-x-2 gap-y-1.5">
+            <span style={{ color: c.muted }}>No. invoice</span><strong className="break-all" style={detail}>{invoice.number || "—"}</strong>
+            <span style={{ color: c.muted }}>Kepada</span><strong className="break-words" style={detail}>{invoice.buyer || "—"}</strong>
+            {v.buyerAddress && invoice.buyerAddress && <><span style={{ color: c.muted }}>Alamat</span><span className="whitespace-pre-line break-words" style={detail}>{invoice.buyerAddress}</span></>}
           </div>
-        </div>
+          <div className="grid grid-cols-[85px_1fr] content-start gap-x-2 gap-y-1.5">
+            <span style={{ color: c.muted }}>Tanggal</span><span className="text-right" style={detail}>{formatDate(invoice.date)}</span>
+            {v.dueDate && invoice.dueDate && <><span style={{ color: c.muted }}>Jatuh tempo</span><span className="text-right" style={detail}>{formatDate(invoice.dueDate)}</span></>}
+            {v.buyerPhone && phone && phone !== "-" && <><span style={{ color: c.muted }}>No. telp/WA</span><span className="break-words text-right" style={detail}>{phone}</span></>}
+          </div>
+        </section>
 
-        {/* Kepada */}
-        <div className="mt-5 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Ditujukan kepada</p>
-          <p className="text-sm font-bold text-slate-800">{invoice.buyer || "-"}</p>
-          {hasPhone && <p className="text-[11px] text-slate-600">Telp: {invoice.buyerPhone!.trim()}</p>}
-        </div>
-
-        {/* Rincian barang */}
-        <table className="mt-5 w-full border-collapse text-xs">
-          <thead>
-            <tr style={{ background: accent, color: "#fff" }}>
-              <th className="px-2 py-2 text-center font-semibold" style={{ width: "6%" }}>No</th>
-              <th className="px-3 py-2 text-left font-semibold">Nama Barang</th>
-              <th className="px-2 py-2 text-center font-semibold" style={{ width: "10%" }}>Satuan</th>
-              <th className="px-2 py-2 text-right font-semibold" style={{ width: "12%" }}>Jumlah</th>
-              <th className="px-3 py-2 text-right font-semibold" style={{ width: "18%" }}>Harga (Rp)</th>
-              <th className="px-3 py-2 text-right font-semibold" style={{ width: "20%" }}>Total (Rp)</th>
+        <table className="invoice-items w-full table-fixed border-collapse text-[11px]">
+          <thead style={{ background: c.tableHeader, color: c.tableHeaderText }}>
+            <tr>
+              {v.rowNumber && <th className="w-[6%] px-1 py-2 text-center">No</th>}
+              <th className="px-2 py-2 text-left">Nama barang</th>
+              <th className="w-[10%] px-1 py-2 text-right">Qty</th>
+              {v.unit && <th className="w-[10%] px-1 py-2 text-center">Satuan</th>}
+              {v.price && <th className="w-[19%] px-2 py-2 text-right">Harga satuan (Rp)</th>}
+              <th className="w-[21%] px-2 py-2 text-right">Jumlah (Rp)</th>
             </tr>
           </thead>
-          <tbody>
-            {invoice.lines.length === 0 ? (
-              <tr><td colSpan={6} className="border border-slate-200 px-2 py-5 text-center text-slate-400">Belum ada barang</td></tr>
-            ) : (
-              invoice.lines.map((l, i) => (
-                <tr key={i} style={{ background: i % 2 === 1 ? "#f8fafc" : "#ffffff" }}>
-                  <td className="border-x border-slate-200 px-2 py-1.5 text-center text-slate-500">{i + 1}</td>
-                  <td className="border-x border-slate-200 px-3 py-1.5 font-medium">{l.name}</td>
-                  <td className="border-x border-slate-200 px-2 py-1.5 text-center">{l.unit}</td>
-                  <td className="border-x border-slate-200 px-2 py-1.5 text-right">{numberFmt.format(l.quantity)}</td>
-                  <td className="border-x border-slate-200 px-3 py-1.5 text-right">{numberFmt.format(l.price)}</td>
-                  <td className="border-x border-slate-200 px-3 py-1.5 text-right font-semibold">{numberFmt.format(l.price * l.quantity)}</td>
-                </tr>
-              ))
-            )}
+          <tbody style={detail}>
+            {invoice.lines.length === 0 ? <tr><td colSpan={columns} className="px-2 py-6 text-center" style={{ ...cell, color: c.muted }}>Tambahkan barang untuk melihat rincian invoice.</td></tr> : invoice.lines.map((line, i) => (
+              <tr key={i} style={{ background: i % 2 ? c.alternateRow : "#ffffff" }}>
+                {v.rowNumber && <td className="px-1 py-1.5 text-center" style={cell}>{i + 1}</td>}
+                <td className="break-words px-2 py-1.5 font-medium" style={cell}>{line.name}</td>
+                <td className="px-1 py-1.5 text-right" style={cell}>{numberFmt.format(line.quantity)}</td>
+                {v.unit && <td className="break-words px-1 py-1.5 text-center" style={cell}>{line.unit}</td>}
+                {v.price && <td className="px-2 py-1.5 text-right tabular-nums" style={cell}>{numberFmt.format(line.price)}</td>}
+                <td className="px-2 py-1.5 text-right font-medium tabular-nums" style={cell}>{numberFmt.format(invoiceLineTotal(line))}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
-        <div style={{ height: 2, background: accent }} />
 
-        {/* Total + terbilang */}
-        <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="max-w-[52%] rounded-md border border-dashed border-slate-300 px-4 py-3 text-[11px] leading-relaxed">
-            <p className="font-semibold text-slate-700">Terbilang</p>
-            <p className="italic text-slate-600">{terbilang(invoice.total)}</p>
-          </div>
-          <div className="w-full sm:w-[280px]">
-            <div className="flex justify-between px-1 py-1 text-xs text-slate-600">
-              <span>Subtotal</span><span className="font-semibold text-slate-800">{currency.format(invoice.subtotal)}</span>
-            </div>
-            <div className="flex justify-between px-1 py-1 text-xs text-slate-600">
-              <span>Ongkos kirim</span><span>{invoice.shipping ? currency.format(invoice.shipping) : "Rp -"}</span>
-            </div>
-            <div className="mt-1 flex items-center justify-between rounded-md px-3 py-2 text-sm font-bold text-white" style={{ background: accent }}>
-              <span>TOTAL</span><span>{currency.format(invoice.total)}</span>
-            </div>
-          </div>
+        <div className="invoice-totals ml-auto mt-0 w-[55%] text-[11px]" style={{ breakInside: "avoid" }}>
+          {v.subtotal && <div className="flex justify-between gap-3 border-x border-b px-2 py-1.5" style={{ borderColor: c.border }}><span>Subtotal</span><strong style={detail}>{currency.format(invoice.subtotal)}</strong></div>}
+          {(v.shipping || invoice.shipping > 0) && <div className="flex justify-between gap-3 border-x border-b px-2 py-1.5" style={{ borderColor: c.border }}><span>Ongkos kirim</span><span style={detail}>{currency.format(invoice.shipping)}</span></div>}
+          {(v.discount || (invoice.discount ?? 0) > 0) && <div className="flex justify-between gap-3 border-x border-b px-2 py-1.5" style={{ borderColor: c.border }}><span>Diskon</span><span style={detail}>{invoice.discount ? `− ${currency.format(invoice.discount)}` : currency.format(0)}</span></div>}
+          <div className="flex items-center justify-between gap-3 px-2 py-2 text-[12px] font-bold" style={{ background: c.total, color: c.totalText }}><span>TOTAL TAGIHAN</span><span>{currency.format(invoice.total)}</span></div>
         </div>
+        {v.terbilang && <p className="mt-3 text-[11px] italic" style={{ color: c.muted }}><strong className="not-italic">Terbilang: </strong>{terbilang(invoice.total)}</p>}
 
-        {/* Pembayaran + tanda tangan (TTE menyatu di kolom "Hormat kami") */}
-        <div className="mt-6 flex items-end justify-between gap-6 text-xs" style={{ breakInside: "avoid" }}>
-          <div className="max-w-[55%]">
-            <p className="font-semibold text-slate-700">Informasi Pembayaran</p>
-            {store?.bankInfo ? (
-              <p className="mt-0.5 text-slate-600">Transfer: {store.bankInfo}</p>
-            ) : (
-              <p className="mt-0.5 text-slate-400">—</p>
-            )}
-            {invoice.note && <p className="mt-2 text-slate-600">{invoice.note}</p>}
+        <section className="invoice-closing mt-6 flex items-start justify-between gap-8 text-[11px]" style={{ breakInside: "avoid" }}>
+          <div className="min-w-0 flex-1 space-y-3">
+            {v.payment && (store?.paymentMethod || store?.bankInfo) && <div><p className="mb-1 font-bold" style={{ color: c.brand }}>Informasi pembayaran</p>{store.paymentMethod && <p>Metode: {store.paymentMethod}</p>}{store.bankInfo && <p className="whitespace-pre-line break-words" style={detail}>{store.bankInfo}</p>}</div>}
+            {v.note && invoice.note && <div><p className="mb-1 font-bold">Catatan</p><p className="whitespace-pre-line break-words" style={{ color: c.muted }}>{invoice.note}</p></div>}
           </div>
-
-          <div className="min-w-[180px] max-w-[240px] text-center">
-            <p className="text-slate-600">Hormat kami,</p>
-            {sig ? (
-              <>
-                <p className="mt-1 flex items-center justify-center gap-1 text-xs font-medium text-green-700">
-                  <ShieldCheck className="h-3 w-3" /> Ditandatangani secara elektronik
-                </p>
-                {qr && (
-                  // QR sebagai pengganti tanda tangan basah.
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={qr}
-                    alt={`QR verifikasi ${sig.code}`}
-                    width={80}
-                    height={80}
-                    className="mx-auto my-1 rounded bg-white p-1 ring-1 ring-slate-200"
-                    style={{ imageRendering: "pixelated", width: 80, height: 80 }}
-                  />
-                )}
-                <p className="font-bold text-slate-800">{sig.signedBy || store?.signatureName || store?.name || ""}</p>
-                <p className="text-xs text-gray-500">{formatDateTime(sig.signedAt)}</p>
-              </>
-            ) : (
-              <>
-                <div className="h-12" />
-                <p className="border-t border-slate-400 px-6 pt-1 font-semibold text-slate-700">
-                  {store?.signatureName ?? store?.name ?? ""}
-                </p>
-              </>
-            )}
-          </div>
-        </div>
+          {(v.signature || sig) && <div className="w-[200px] shrink-0 text-center">
+            <p style={{ color: c.muted }}>Hormat kami,</p>
+            {sig ? <>
+              <p className="mt-1 flex items-center justify-center gap-1 text-[10px]" style={{ color: c.brand }}><ShieldCheck className="h-3 w-3" /> Ditandatangani secara elektronik</p>
+              {qr && <Image src={qr} alt={`QR verifikasi ${sig.code}`} width={80} height={80} className="mx-auto my-2" style={{ imageRendering: "pixelated" }} unoptimized />}
+              <p className="font-bold">{sig.signedBy || store?.signatureName || store?.name}</p><p className="mt-0.5 text-[10px]" style={{ color: c.muted }}>{formatDateTime(sig.signedAt)}</p>
+            </> : <><div className="h-16" /><p className="border-t px-2 pt-1 font-semibold" style={{ borderColor: c.border }}>{store?.signatureName || store?.name}</p></>}
+          </div>}
+        </section>
+        {v.footer && store?.footerText && <p className="mt-8 whitespace-pre-line break-words text-center text-[11px] italic" style={{ color: c.footer }}>{store.footerText}</p>}
+        {sig && <div className="mt-6 border-t pt-2 text-[8px] leading-relaxed" style={{ borderColor: c.border, color: c.muted, breakInside: "avoid" }}><p>Kode dokumen: {sig.code} · {sig.algo}</p><p className="break-all">Hash: {sig.hash}</p><p>QR memuat ringkasan dan kode dokumen untuk pencocokan. Hash bukan tanda tangan tersertifikasi.</p></div>}
       </div>
-
-      {/* Footer detail teknis TTE — kecil & muted, ringkas maksimal 2 baris */}
-      {sig && (
-        <div
-          className="border-t border-slate-100 px-6 py-2 text-[9px] leading-relaxed text-gray-400 sm:px-8"
-          style={{ breakInside: "avoid" }}
-        >
-          <p>
-            Verifikasi TTE · Kode: <span className="font-mono">{sig.code}</span> · Algoritma: {sig.algo} · Hash:{" "}
-            <span className="break-all font-mono">{sig.hash}</span>
-          </p>
-          <p>Keaslian &amp; keutuhan dapat diperiksa dengan memindai QR; perubahan isi invoice akan mengubah hash.</p>
-        </div>
-      )}
     </div>
   );
 }

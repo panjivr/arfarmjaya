@@ -16,7 +16,7 @@ PostgreSQL sementara dan data uji; database perusahaan tidak diakses atau diubah
 | Potongan unggahan tidak diperiksa jumlah, urutan, pemilik, atau kesesuaian metadata. | Semua diperiksa sebelum data digabung. Ukuran request dan hasil dekompresi dibatasi; batas dataset 64 MiB, maksimal 20 chunk. |
 | JSON backup bebas dapat mengganti tipe koleksi dan merusak store. | Validasi struktur, identitas unik, angka hingga, pengaturan dan produk dasar; hanya kunci data bisnis yang dimuat. Backup inti versi lama tetap didukung. |
 | Kuota localStorage penuh gagal diam-diam. | Kegagalan terlihat pada indikator simpan. Data lokal rusak tidak ditimpa default kosong. Penggantian/pemulihan/reset dibatalkan jika cadangan pengaman tidak berhasil dibuat. |
-| Riwayat diam-diam dipotong pada 500 audit, 1.000 mutasi gudang dan 5.000 mutasi lele. | Batas pemotongan tersebut dihapus, termasuk agar pasangan transfer lele tidak terpisah akibat pemotongan. |
+| Riwayat diam-diam dipotong pada 500 audit, 1.000 mutasi gudang. | Batas pemotongan tersebut dihapus. |
 | Akun login apa pun dapat mengganti seluruh departemen dan mengunduh backup server. | Perubahan dibatasi pada koleksi departemennya; inisialisasi database dan unduh backup server memerlukan admin. |
 | Database gagal membuat login kembali menerima kata sandi bawaan. | Kegagalan autentikasi database ditolak. Akun bawaan hanya berlaku ketika DATABASE_URL tidak dikonfigurasi. AUTH_SECRET wajib untuk production. |
 

@@ -22,7 +22,7 @@ sebelum cadangan diverifikasi dan rencana pemulihan disiapkan.
 3. Isi environment variables Vercel untuk lingkungan yang sesuai:
    - `DATABASE_URL`: connection string PostgreSQL dengan TLS sesuai penyedia.
    - `AUTH_SECRET`: rahasia acak minimal 32 karakter, tetap antar-redeploy.
-   - `ADMIN_PASSWORD`, `LELE_PASSWORD`, `GUDANG_PASSWORD`, `LAPORAN_PASSWORD`:
+   - `ADMIN_PASSWORD`, `GUDANG_PASSWORD`, `LAPORAN_PASSWORD`:
      kata sandi seed awal minimal 12 karakter bila database benar-benar kosong.
      ADMIN_PASSWORD wajib untuk database production kosong. Akun staf hanya
      di-seed jika kata sandinya dikonfigurasi; tidak ada akun demo otomatis

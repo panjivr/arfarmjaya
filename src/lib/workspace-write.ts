@@ -12,17 +12,20 @@ export function workspaceRevision(row: WorkspaceRow | null): string {
 }
 
 const INVENTORY = ["products", "movements", "categories", "suppliers", "warehouses", "racks", "purchaseOrders", "receipts", "distributions", "requests", "opnameSessions", "posSales", "stores", "invoices"];
-const LELE = ["ponds", "fishCycles", "pondLogs", "pondHarvests", "pondJournals", "leleSales", "receivables", "payables", "financeTx", "financeCategories", "leleMovements"];
+// Only these historical collections may be omitted by an upgraded client.
+// Retained names are a one-way migration allowlist, never exposed as features.
+const RETIRED_COLLECTIONS = new Set(["ponds", "fishCycles", "pondLogs", "pondHarvests", "pondJournals", "leleSales", "receivables", "payables", "financeTx", "financeCategories", "leleMovements"]);
 
 export function authorizeWorkspaceWrite(role: AppRole, previous: unknown, next: WorkspaceData) {
   if (role === "ADMIN_UTAMA") return;
   if (!previous || typeof previous !== "object") throw new WorkspaceError(403, "admin_initialization_required");
   const allowed = new Set([
-    ...(role === "STAFF_GUDANG" ? INVENTORY : role === "STAFF_LELE" ? LELE : ["weeklyReports", "reportProfiles"]),
+    ...(role === "STAFF_GUDANG" ? INVENTORY : ["weeklyReports", "reportProfiles"]),
     "auditLog", "readNotifications",
   ]);
   const before = previous as WorkspaceData;
   for (const key of new Set([...Object.keys(before), ...Object.keys(next)])) {
+    if (RETIRED_COLLECTIONS.has(key) && !(key in next)) continue;
     if (!allowed.has(key) && canonicalJson(before[key]) !== canonicalJson(next[key])) throw new WorkspaceError(403, "forbidden_workspace_change");
   }
 }

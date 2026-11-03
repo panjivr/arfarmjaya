@@ -62,14 +62,14 @@ export function LoginScreen() {
           </div>
           <motion.div initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.5 }}>
             <h1 className="max-w-2xl text-5xl font-bold leading-tight">
-              Satu sistem, banyak ruang kerja sesuai peran.
+              Buka ruang kerja Anda.
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-white/75">
-              Admin Utama mengelola seluruh perusahaan dan akun. Staff Lele, Gudang, dan Reporting masing-masing fokus pada ruang kerjanya. Akses dilindungi di sisi server.
+              Kelola stok dan distribusi, buat invoice sesuai identitas toko, atau siapkan laporan. Menu yang tersedia mengikuti peran akun perusahaan Anda.
             </p>
           </motion.div>
-          <div className="grid grid-cols-4 gap-3 text-sm">
-            {["Admin", "Lele", "Gudang", "Reporting"].map((item) => (
+          <div className="grid grid-cols-3 gap-3 text-sm">
+            {["Admin", "Gudang", "Reporting"].map((item) => (
               <div key={item} className="rounded-lg border border-white/20 bg-white/10 px-3 py-3 text-center backdrop-blur">
                 {item}
               </div>

@@ -4,10 +4,10 @@ import type { MetadataRoute } from "next";
 // Membuat aplikasi bisa dipasang di layar utama (Android/desktop) seperti APK.
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "AR FARM JAYA — Manajemen Budidaya & Gudang",
+    name: "AR FARM JAYA — Manajemen Toko & Gudang",
     short_name: "AR FARM JAYA",
     description:
-      "Sistem manajemen budidaya lele, gudang, penjualan, dan keuangan AR FARM JAYA. Data tersinkron ke server dan bisa dipasang di layar utama.",
+      "Sistem manajemen gudang, toko, invoice, dan laporan AR FARM JAYA. Data tersinkron ke server dan bisa dipasang di layar utama.",
     id: "/",
     start_url: "/",
     scope: "/",

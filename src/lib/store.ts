@@ -5,7 +5,9 @@ import { persist, createJSONStorage } from "zustand/middleware";
 
 import { safeStorage, preserveLocalSnapshot } from "@/lib/local-persistence";
 import { cleanLetterLines, letterTotal, resolveLetterChrome, suggestLetterNumber } from "@/lib/letters";
-import { parseWorkspace } from "@/lib/workspace-data";
+import { invoiceInputError, invoiceTotals, suggestInvoiceNumber } from "@/lib/invoices";
+import { snapshotInvoiceSeller } from "@/lib/invoice-design";
+import { WORKSPACE_KEYS, parseWorkspace } from "@/lib/workspace-data";
 import type { Product } from "@/lib/data";
 import { realStockProducts } from "@/lib/stock-products";
 import type {
@@ -14,8 +16,7 @@ import type {
   Category,
   Distribution,
   Invoice,
-  InvoiceLine,
-  InvoiceSignature,
+  InvoiceInput,
   OfficialLetter,
   LetterInput,
   ItemRequest,
@@ -26,24 +27,6 @@ import type {
   PaymentMethod,
   PosSale,
   PurchaseOrder,
-  Pond,
-  PondType,
-  PondKind,
-  FishCycle,
-  PondDailyLog,
-  PondHarvest,
-  PondJournal,
-  CycleStatus,
-  LeleSale,
-  Receivable,
-  Payable,
-  PaymentEntry,
-  PayMethod,
-  FinanceTx,
-  FinanceCategory,
-  LeleMovement,
-  LeleMoveType,
-  SortirKategori,
   Rack,
   Receipt,
   ReportProfile,
@@ -115,18 +98,9 @@ function buildLetterRecord(
   };
   return { ok: true, letter };
 }
-const rupiah = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 });
-const currencyStr = (n: number) => rupiah.format(Math.round(n) || 0);
 
 // Kunci data bisnis yang ikut dicadangkan/dipulihkan (sama dengan data ter-sync).
-const BACKUP_KEYS = [
-  "products", "movements", "categories", "suppliers", "warehouses", "racks", "users",
-  "purchaseOrders", "receipts", "distributions", "requests", "opnameSessions", "posSales",
-  "stores", "invoices", "letters", "reportProfiles", "weeklyReports",
-  "ponds", "fishCycles", "pondLogs", "pondHarvests", "pondJournals",
-  "leleSales", "receivables", "payables", "financeTx", "financeCategories", "leleMovements",
-  "auditLog", "settings",
-] as const;
+const BACKUP_KEYS = WORKSPACE_KEYS;
 
 function unique(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b, "id"));
@@ -254,17 +228,6 @@ type State = {
   letters: OfficialLetter[];
   reportProfiles: ReportProfile[];
   weeklyReports: WeeklyReport[];
-  ponds: Pond[];
-  fishCycles: FishCycle[];
-  pondLogs: PondDailyLog[];
-  pondHarvests: PondHarvest[];
-  pondJournals: PondJournal[];
-  leleSales: LeleSale[];
-  receivables: Receivable[];
-  payables: Payable[];
-  financeTx: FinanceTx[];
-  financeCategories: FinanceCategory[];
-  leleMovements: LeleMovement[];
   auditLog: AuditEntry[];
   readNotifications: string[];
   loginNoticeSeen: boolean;
@@ -329,31 +292,8 @@ type Actions = {
   addStore: (data: Omit<Store, "id" | "createdAt">) => void;
   updateStore: (id: string, patch: Partial<Store>) => void;
   removeStore: (id: string) => void;
-  createInvoice: (data: {
-    storeId: string;
-    buyer: string;
-    buyerPhone?: string;
-    date: string;
-    number?: string;
-    lines: InvoiceLine[];
-    shipping: number;
-    note?: string;
-    signature?: InvoiceSignature;
-  }) => { ok: boolean; message?: string; invoice?: Invoice };
-  updateInvoice: (
-    id: string,
-    data: {
-      storeId: string;
-      buyer: string;
-      buyerPhone?: string;
-      date: string;
-      number?: string;
-      lines: InvoiceLine[];
-      shipping: number;
-      note?: string;
-      signature?: InvoiceSignature;
-    },
-  ) => { ok: boolean; message?: string; invoice?: Invoice };
+  createInvoice: (data: InvoiceInput) => { ok: boolean; message?: string; invoice?: Invoice };
+  updateInvoice: (id: string, data: InvoiceInput) => { ok: boolean; message?: string; invoice?: Invoice };
   deleteInvoice: (id: string) => void;
   createLetter: (data: LetterInput) => { ok: boolean; message?: string; letter?: OfficialLetter };
   updateLetter: (id: string, data: LetterInput) => { ok: boolean; message?: string; letter?: OfficialLetter };
@@ -381,63 +321,6 @@ type Actions = {
   duplicateWeeklyReport: (id: string) => { ok: boolean; report?: WeeklyReport };
   deleteWeeklyReport: (id: string) => void;
 
-  // budidaya lele
-  addPond: (data: Omit<Pond, "id" | "createdAt" | "active">) => { ok: boolean; message?: string; pond?: Pond };
-  updatePond: (id: string, patch: Partial<Pond>) => void;
-  removePond: (id: string) => { ok: boolean; message?: string };
-  startCycle: (data: {
-    pondId: string;
-    species: string;
-    stockDate: string;
-    source: string;
-    initialCount: number;
-    sizeAtStock?: string;
-    seedCostRp: number;
-    otherCostRp?: number;
-    targetDate?: string;
-    targetWeightG?: number;
-    note?: string;
-  }) => { ok: boolean; message?: string; cycle?: FishCycle };
-  closeCycle: (id: string, status?: CycleStatus) => void;
-  addPondLog: (data: Omit<PondDailyLog, "id" | "createdAt" | "actor">) => { ok: boolean; message?: string };
-  removePondLog: (id: string) => void;
-  addPondHarvest: (data: Omit<PondHarvest, "id" | "createdAt" | "actor" | "revenueRp">) => { ok: boolean; message?: string };
-  removePondHarvest: (id: string) => void;
-  addPondJournal: (data: Omit<PondJournal, "id" | "createdAt" | "actor">) => { ok: boolean; message?: string };
-  removePondJournal: (id: string) => void;
-  addStandardPonds: () => { ok: boolean; added: number };
-
-  // keuangan lele: penjualan, piutang, utang, kas
-  recordSale: (data: {
-    date: string;
-    buyer: string;
-    item: string;
-    pondCode?: string;
-    weightKg: number;
-    pricePerKg: number;
-    total?: number;
-    paid: number;
-    method: PayMethod;
-    dueDate?: string;
-    note?: string;
-  }) => { ok: boolean; message?: string; sale?: LeleSale };
-  removeSale: (id: string) => void;
-  addReceivable: (data: Omit<Receivable, "id" | "createdAt" | "actor" | "payments"> & { payments?: PaymentEntry[] }) => { ok: boolean };
-  payReceivable: (id: string, entry: Omit<PaymentEntry, "id">) => { ok: boolean; message?: string };
-  removeReceivable: (id: string) => void;
-  addPayable: (data: Omit<Payable, "id" | "createdAt" | "actor" | "payments"> & { payments?: PaymentEntry[] }) => { ok: boolean };
-  payPayable: (id: string, entry: Omit<PaymentEntry, "id">) => { ok: boolean; message?: string };
-  removePayable: (id: string) => void;
-  addFinanceTx: (data: Omit<FinanceTx, "id" | "createdAt" | "actor">) => { ok: boolean; message?: string };
-  removeFinanceTx: (id: string) => void;
-  addFinanceCategory: (name: string, kind: FinanceCategory["kind"]) => { ok: boolean; message?: string };
-  removeFinanceCategory: (id: string) => void;
-
-  // mutasi stok lele: sortir, transfer antar-kolam (atomik), penyusutan
-  recordLeleMovement: (data: { date: string; type: LeleMoveType; pondId: string; kategori?: SortirKategori; qtyKg?: number; qtyEkor?: number; note?: string }) => { ok: boolean; message?: string };
-  transferLele: (data: { date: string; fromPondId: string; toPondId: string; qtyKg?: number; qtyEkor?: number; kategori?: SortirKategori; note?: string }) => { ok: boolean; message?: string };
-  removeLeleMovement: (id: string) => void;
-
   // cadangan data (backup) & pemulihan (restore)
   exportBackup: () => string;
   importBackup: (json: string) => { ok: boolean; message?: string };
@@ -459,78 +342,6 @@ const roleLabel: Record<Role, string> = {
   viewer: "Hanya lihat",
   karyawan: "Barang keluar",
 };
-
-function seedLele(): { ponds: Pond[]; fishCycles: FishCycle[]; pondLogs: PondDailyLog[]; pondHarvests: PondHarvest[]; pondJournals: PondJournal[] } {
-  const t = now();
-  const iso = (daysAgo: number) => new Date(Date.now() - daysAgo * 86400000).toISOString().slice(0, 10);
-  const pondA = { id: uid(), code: "A12", name: "Kolam Terpal A12", type: "Terpal" as const, areaM2: 12, active: true, createdAt: t };
-  const pondB = { id: uid(), code: "B03", name: "Kolam Bioflok B03", type: "Bioflok" as const, areaM2: 10, active: true, createdAt: t };
-  const pondC = { id: uid(), code: "C07", name: "Kolam Tanah C07", type: "Tanah" as const, areaM2: 25, active: true, createdAt: t };
-
-  const cycleA: FishCycle = {
-    id: uid(), pondId: pondA.id, pondCode: pondA.code, species: "Lele Sangkuriang",
-    stockDate: iso(42), source: "Hatchery Mina Jaya", initialCount: 2000, sizeAtStock: "5-7 cm",
-    seedCostRp: 400000, otherCostRp: 120000, targetDate: iso(-45), targetWeightG: 110,
-    status: "Aktif", actor: "Sistem", createdAt: t,
-  };
-  const cycleB: FishCycle = {
-    id: uid(), pondId: pondB.id, pondCode: pondB.code, species: "Lele Mutiara",
-    stockDate: iso(18), source: "Hatchery Mina Jaya", initialCount: 3000, sizeAtStock: "4-6 cm",
-    seedCostRp: 540000, otherCostRp: 150000, targetDate: iso(-60), targetWeightG: 120,
-    status: "Aktif", actor: "Sistem", createdAt: t,
-  };
-  const mkLog = (c: FishCycle, daysAgo: number, feedKg: number, feedCostRp: number, deaths: number, avg?: number): PondDailyLog => ({
-    id: uid(), cycleId: c.id, pondId: c.pondId, date: iso(daysAgo), feedKg, feedBrand: "Hi-Pro-Vite", feedType: "781-2", feedCostRp, deaths, avgWeightG: avg, actor: "Sistem", createdAt: t,
-  });
-  const logs: PondDailyLog[] = [
-    mkLog(cycleA, 5, 22, 308000, 4, 78),
-    mkLog(cycleA, 3, 24, 336000, 3),
-    mkLog(cycleA, 1, 26, 364000, 2, 92),
-    mkLog(cycleB, 4, 9, 126000, 12, 22),
-    mkLog(cycleB, 2, 11, 154000, 8),
-    mkLog(cycleB, 0, 12, 168000, 6, 28),
-  ];
-  const journals: PondJournal[] = [
-    { id: uid(), pondId: pondA.id, pondCode: pondA.code, cycleId: cycleA.id, date: iso(3), category: "Kualitas Air", title: "Ganti air 30%", note: "Air mulai keruh, dilakukan penggantian sebagian dan penambahan probiotik.", waterTemp: 28, waterPh: 7.2, actor: "Sistem", createdAt: t },
-    { id: uid(), pondId: pondB.id, pondCode: pondB.code, cycleId: cycleB.id, date: iso(1), category: "Kesehatan & Penyakit", title: "Gejala jamur ringan", note: "Beberapa benih terlihat berjamur, diberi garam ikan 0,3%.", actor: "Sistem", createdAt: t },
-  ];
-  return { ponds: [pondA, pondB, pondC], fishCycles: [cycleA, cycleB], pondLogs: logs, pondHarvests: [], pondJournals: journals };
-}
-
-// Kategori keuangan bawaan (bisa ditambah/hapus admin). Mencakup Bon, Ops
-// Ardhi, dan Inves sesuai kebutuhan operasional AR FARM JAYA.
-function seedFinanceCategories(): FinanceCategory[] {
-  const t = now();
-  const rows: Array<[string, FinanceCategory["kind"]]> = [
-    ["Penjualan Lele", "masuk"],
-    ["Pemasukan Lain", "masuk"],
-    ["Pakan", "keluar"],
-    ["Benih", "keluar"],
-    ["Obat & Probiotik", "keluar"],
-    ["Listrik & Air", "keluar"],
-    ["Gaji & Tenaga Kerja", "keluar"],
-    ["Perawatan Kolam", "keluar"],
-    ["Bon", "keluar"],
-    ["Ops Ardhi", "keluar"],
-    ["Inves", "keluar"],
-    ["Lain-lain", "both"],
-  ];
-  return rows.map(([name, kind]) => ({ id: uid(), name, kind, createdAt: t }));
-}
-
-// Daftar kolam standar AR FARM JAYA: blok produksi A/B/D/E + tampungan T1–T4.
-type RosterEntry = { code: string; type: PondType; kind: PondKind };
-function standardRoster(): RosterEntry[] {
-  const block = (prefix: string, n: number, type: PondType, kind: PondKind): RosterEntry[] =>
-    Array.from({ length: n }, (_, i) => ({ code: `${prefix}${i + 1}`, type, kind }));
-  return [
-    ...block("A", 7, "Terpal", "produksi"),
-    ...block("B", 4, "Terpal", "produksi"),
-    ...block("D", 6, "Terpal", "produksi"),
-    ...block("E", 6, "Terpal", "produksi"),
-    ...block("T", 4, "Terpal", "tampungan"),
-  ];
-}
 
 function buildInitial(): State {
   const products = realStockProducts.map((p) => ({ ...p }));
@@ -558,13 +369,6 @@ function buildInitial(): State {
     letters: [],
     reportProfiles: seedReportProfiles,
     weeklyReports: [],
-    ...seedLele(),
-    leleSales: [],
-    receivables: [],
-    payables: [],
-    financeTx: [],
-    financeCategories: seedFinanceCategories(),
-    leleMovements: [],
     auditLog: [],
     readNotifications: [],
     loginNoticeSeen: false,
@@ -825,64 +629,42 @@ export const useUiStore = create<State & Actions>()(
         set((s) => ({ stores: s.stores.filter((x) => x.id !== id) }));
         get().audit("Hapus", "Toko", name);
       },
-      createInvoice: ({ storeId, buyer, buyerPhone, date, number, lines, shipping, note, signature }) => {
-        const store = get().stores.find((x) => x.id === storeId);
+      createInvoice: (data) => {
+        const store = get().stores.find((x) => x.id === data.storeId);
         if (!store) return { ok: false, message: "Toko tidak ditemukan." };
-        if (!buyer.trim()) return { ok: false, message: "Nama pembeli wajib diisi." };
-        if (lines.length === 0) return { ok: false, message: "Tambahkan minimal satu barang." };
-        const subtotal = lines.reduce((t, l) => t + l.price * l.quantity, 0);
-        const total = subtotal + (shipping || 0);
-        const invNumber = number?.trim() || `${store.invoicePrefix}${seq(get().invoices.length)}`;
+        const error = invoiceInputError(data);
+        if (error) return { ok: false, message: error };
+        const number = data.number?.trim() || suggestInvoiceNumber(store.invoicePrefix, get().invoices);
+        if (get().invoices.some((inv) => inv.number === number)) return { ok: false, message: "Nomor invoice sudah digunakan." };
         const invoice: Invoice = {
-          id: uid(),
-          number: invNumber,
-          storeId,
-          storeName: store.name,
-          buyer: buyer.trim(),
-          buyerPhone,
-          date,
-          lines,
-          subtotal,
-          shipping: shipping || 0,
-          total,
-          note: note ?? store.note,
-          signature,
-          createdAt: now(),
+          ...data, ...invoiceTotals(data.lines, data.shipping, data.discount ?? 0),
+          id: uid(), number, storeName: data.seller?.name ?? store.name, buyer: data.buyer.trim(),
+          lines: data.lines.map((line) => ({ ...line, name: line.name.trim(), unit: line.unit.trim() })),
+          note: data.note ?? store.note, seller: snapshotInvoiceSeller(data.seller ?? store), createdAt: now(),
         };
         set((s) => ({ invoices: [invoice, ...s.invoices] }));
-        get().audit("Buat", "Invoice", `${invNumber} · ${buyer}`);
+        get().audit("Buat", "Invoice", `${number} · ${invoice.buyer}`);
         return { ok: true, invoice };
       },
-      updateInvoice: (id, { storeId, buyer, buyerPhone, date, number, lines, shipping, note, signature }) => {
+      updateInvoice: (id, data) => {
         const existing = get().invoices.find((x) => x.id === id);
         if (!existing) return { ok: false, message: "Invoice tidak ditemukan." };
-        const store = get().stores.find((x) => x.id === storeId);
+        const store = get().stores.find((x) => x.id === data.storeId);
         if (!store) return { ok: false, message: "Toko tidak ditemukan." };
-        if (!buyer.trim()) return { ok: false, message: "Nama pembeli wajib diisi." };
-        if (lines.length === 0) return { ok: false, message: "Tambahkan minimal satu barang." };
-        const subtotal = lines.reduce((t, l) => t + l.price * l.quantity, 0);
-        const total = subtotal + (shipping || 0);
-        const invNumber = number?.trim() || existing.number;
+        const error = invoiceInputError(data);
+        if (error) return { ok: false, message: error };
+        const number = data.number?.trim() || existing.number;
+        if (get().invoices.some((inv) => inv.id !== id && inv.number === number)) return { ok: false, message: "Nomor invoice sudah digunakan." };
         const invoice: Invoice = {
-          ...existing,
-          number: invNumber,
-          storeId,
-          storeName: store.name,
-          buyer: buyer.trim(),
-          buyerPhone,
-          date,
-          lines,
-          subtotal,
-          shipping: shipping || 0,
-          total,
-          note,
-          // Tanda tangan selalu mengikuti isi terbaru: bila diedit, tanda tangan
-          // lama (atas isi lama) tidak boleh dipertahankan — pakai yang baru,
-          // atau kosong bila e-sign dimatikan. Menjaga integritas tetap jujur.
-          signature,
+          ...existing, ...data, ...invoiceTotals(data.lines, data.shipping, data.discount ?? 0), number,
+          storeName: data.seller?.name ?? store.name, buyer: data.buyer.trim(),
+          lines: data.lines.map((line) => ({ ...line, name: line.name.trim(), unit: line.unit.trim() })),
+          seller: snapshotInvoiceSeller(data.seller ?? (existing.storeId === data.storeId ? existing.seller ?? store : store)),
+          // Jangan mempertahankan hash isi lama ketika dokumen diperbarui.
+          signature: data.signature,
         };
-        set((s) => ({ invoices: s.invoices.map((x) => (x.id === id ? invoice : x)) }));
-        get().audit("Ubah", "Invoice", `${invNumber} · ${buyer.trim()}`);
+        set((s) => ({ invoices: s.invoices.map((x) => x.id === id ? invoice : x) }));
+        get().audit("Ubah", "Invoice", `${number} · ${invoice.buyer}`);
         return { ok: true, invoice };
       },
       deleteInvoice: (id) => {
@@ -993,310 +775,6 @@ export const useUiStore = create<State & Actions>()(
         get().audit("Hapus", "Laporan Mingguan", report?.number ?? id);
       },
 
-      // ── budidaya lele ───────────────────────────────────────────────────
-      addPond: (data) => {
-        const code = data.code.trim();
-        if (!code) return { ok: false, message: "Kode kolam wajib diisi." };
-        if (get().ponds.some((p) => p.code.toLowerCase() === code.toLowerCase())) {
-          return { ok: false, message: `Kode kolam "${code}" sudah dipakai.` };
-        }
-        const pond: Pond = { ...data, code, id: uid(), active: true, createdAt: now() };
-        set((s) => ({ ponds: [...s.ponds, pond] }));
-        get().audit("Tambah", "Kolam Lele", `${pond.code}${pond.name ? ` · ${pond.name}` : ""}`);
-        return { ok: true, pond };
-      },
-      updatePond: (id, patch) => {
-        set((s) => ({ ponds: s.ponds.map((p) => (p.id === id ? { ...p, ...patch } : p)) }));
-        get().audit("Ubah", "Kolam Lele", get().ponds.find((p) => p.id === id)?.code ?? id);
-      },
-      removePond: (id) => {
-        const pond = get().ponds.find((p) => p.id === id);
-        if (!pond) return { ok: false, message: "Kolam tidak ditemukan." };
-        if (get().fishCycles.some((c) => c.pondId === id && c.status === "Aktif")) {
-          return { ok: false, message: "Kolam masih punya siklus aktif. Tutup/panen dulu." };
-        }
-        set((s) => ({ ponds: s.ponds.filter((p) => p.id !== id) }));
-        get().audit("Hapus", "Kolam Lele", pond.code);
-        return { ok: true };
-      },
-      startCycle: (data) => {
-        const pond = get().ponds.find((p) => p.id === data.pondId);
-        if (!pond) return { ok: false, message: "Kolam tidak ditemukan." };
-        if (pond.kind === "tampungan") {
-          return { ok: false, message: `Kolam ${pond.code} adalah tampungan (siap jual), bukan untuk tebar benih.` };
-        }
-        if (get().fishCycles.some((c) => c.pondId === data.pondId && c.status === "Aktif")) {
-          return { ok: false, message: "Kolam ini sedang ada siklus aktif." };
-        }
-        if (!(data.initialCount > 0)) return { ok: false, message: "Jumlah benih harus lebih dari 0." };
-        const cycle: FishCycle = {
-          id: uid(),
-          pondId: pond.id,
-          pondCode: pond.code,
-          species: data.species.trim() || "Lele",
-          stockDate: data.stockDate,
-          source: data.source.trim(),
-          initialCount: data.initialCount,
-          sizeAtStock: data.sizeAtStock,
-          seedCostRp: data.seedCostRp || 0,
-          otherCostRp: data.otherCostRp || 0,
-          targetDate: data.targetDate,
-          targetWeightG: data.targetWeightG,
-          status: "Aktif",
-          note: data.note,
-          actor: get().user?.name ?? "Pengguna",
-          createdAt: now(),
-        };
-        set((s) => ({ fishCycles: [cycle, ...s.fishCycles] }));
-        get().audit("Tebar Benih", "Kolam Lele", `${pond.code} · ${cycle.initialCount} ekor ${cycle.species}`);
-        return { ok: true, cycle };
-      },
-      closeCycle: (id, status = "Selesai") => {
-        const cycle = get().fishCycles.find((c) => c.id === id);
-        set((s) => ({ fishCycles: s.fishCycles.map((c) => (c.id === id ? { ...c, status, closedAt: now() } : c)) }));
-        if (cycle) get().audit("Tutup Siklus", "Kolam Lele", `${cycle.pondCode} → ${status}`);
-      },
-      addPondLog: (data) => {
-        const cycle = get().fishCycles.find((c) => c.id === data.cycleId);
-        if (!cycle) return { ok: false, message: "Siklus tidak ditemukan." };
-        const log: PondDailyLog = { ...data, id: uid(), actor: get().user?.name ?? "Pengguna", createdAt: now() };
-        set((s) => ({ pondLogs: [log, ...s.pondLogs] }));
-        get().audit("Catatan Harian", "Kolam Lele", `${cycle.pondCode} · pakan ${log.feedKg}kg, mati ${log.deaths}`);
-        return { ok: true };
-      },
-      removePondLog: (id) => set((s) => ({ pondLogs: s.pondLogs.filter((l) => l.id !== id) })),
-      addPondHarvest: (data) => {
-        const cycle = get().fishCycles.find((c) => c.id === data.cycleId);
-        if (!cycle) return { ok: false, message: "Siklus tidak ditemukan." };
-        const revenueRp = Math.round((Number(data.weightKg) || 0) * (Number(data.pricePerKg) || 0));
-        const actor = get().user?.name ?? "Pengguna";
-        // Lengkapi kode kolam tujuan pada tiap output grading.
-        const outputs = data.outputs?.map((o) => {
-          const target = o.targetPondId ? get().ponds.find((p) => p.id === o.targetPondId) : undefined;
-          return { ...o, targetPondCode: target?.code ?? o.targetPondCode };
-        });
-        const harvest: PondHarvest = { ...data, outputs, revenueRp, id: uid(), actor, createdAt: now() };
-        set((s) => ({ pondHarvests: [harvest, ...s.pondHarvests] }));
-        // Setiap output yang dialihkan ke kolam → catat sebagai PANEN MASUK di
-        // kolam tujuan (jadi stok siap jual / pembesaran per kolam).
-        const t = now();
-        const inbound: LeleMovement[] = (outputs ?? [])
-          .filter((o) => o.targetPondId && (Number(o.weightKg) > 0 || Number(o.count) > 0))
-          .map((o) => ({
-            id: uid(), date: harvest.date, type: "PANEN" as LeleMoveType,
-            pondId: o.targetPondId!, pondCode: o.targetPondCode ?? "",
-            toPondId: cycle.pondId, toPondCode: cycle.pondCode,
-            kategori: o.kategori, qtyKg: Number(o.weightKg) || undefined, qtyEkor: Number(o.count) || undefined,
-            ref: harvest.id, note: `Hasil panen ${cycle.pondCode}`, actor, createdAt: t,
-          }));
-        if (inbound.length) set((s) => ({ leleMovements: [...inbound, ...s.leleMovements] }));
-        get().audit("Panen", "Kolam Lele", `${cycle.pondCode} · ${harvest.count} ekor / ${harvest.weightKg}kg${outputs?.length ? ` · ${outputs.length} grading` : ""}`);
-        if (harvest.isFinal) get().closeCycle(cycle.id, "Selesai");
-        return { ok: true };
-      },
-      removePondHarvest: (id) => set((s) => ({ pondHarvests: s.pondHarvests.filter((h) => h.id !== id), leleMovements: s.leleMovements.filter((m) => m.ref !== id) })),
-      addPondJournal: (data) => {
-        if (!data.title.trim() && !data.note.trim()) return { ok: false, message: "Isi judul atau catatan jurnal." };
-        const entry: PondJournal = { ...data, id: uid(), actor: get().user?.name ?? "Pengguna", createdAt: now() };
-        set((s) => ({ pondJournals: [entry, ...s.pondJournals] }));
-        get().audit("Jurnal", "Kolam Lele", `${entry.pondCode ?? "Umum"} · ${entry.category}: ${entry.title || entry.note.slice(0, 30)}`);
-        return { ok: true };
-      },
-      removePondJournal: (id) => set((s) => ({ pondJournals: s.pondJournals.filter((j) => j.id !== id) })),
-
-      addStandardPonds: () => {
-        const existing = new Set(get().ponds.map((p) => p.code.toLowerCase()));
-        const t = now();
-        const toAdd: Pond[] = standardRoster()
-          .filter((r) => !existing.has(r.code.toLowerCase()))
-          .map((r) => ({
-            id: uid(),
-            code: r.code,
-            name: r.kind === "tampungan" ? `Tampungan ${r.code}` : `Kolam ${r.code}`,
-            type: r.type,
-            kind: r.kind,
-            active: true,
-            createdAt: t,
-          }));
-        if (toAdd.length === 0) return { ok: true, added: 0 };
-        set((s) => ({ ponds: [...s.ponds, ...toAdd] }));
-        get().audit("Tambah", "Kolam Lele", `${toAdd.length} kolam standar (A/B/D/E + T1–T4)`);
-        return { ok: true, added: toAdd.length };
-      },
-
-      // ── keuangan lele ───────────────────────────────────────────────────
-      recordSale: (data) => {
-        if (!data.buyer.trim()) return { ok: false, message: "Nama pembeli wajib diisi." };
-        const weightKg = Number(data.weightKg) || 0;
-        const pricePerKg = Number(data.pricePerKg) || 0;
-        // Tidak ada validasi bobot terhadap tebar — biomassa memang tumbuh.
-        const total = data.total != null && data.total > 0 ? Math.round(data.total) : Math.round(weightKg * pricePerKg);
-        if (total <= 0) return { ok: false, message: "Nilai penjualan harus lebih dari 0." };
-        const paid = Math.min(Math.max(Number(data.paid) || 0, 0), total);
-        const number = `JL-${stamp()}-${seq(get().leleSales.length)}`;
-        const sale: LeleSale = {
-          id: uid(),
-          number,
-          date: data.date,
-          buyer: data.buyer.trim(),
-          item: data.item.trim() || "Lele Konsumsi",
-          pondCode: data.pondCode,
-          weightKg,
-          pricePerKg,
-          total,
-          paid,
-          method: data.method,
-          note: data.note,
-          actor: get().user?.name ?? "Pengguna",
-          createdAt: now(),
-        };
-        set((s) => ({ leleSales: [sale, ...s.leleSales] }));
-        // Uang yang benar-benar diterima → kas masuk.
-        if (paid > 0) {
-          set((s) => ({
-            financeTx: [
-              { id: uid(), date: sale.date, kind: "masuk", category: "Penjualan Lele", amount: paid, party: sale.buyer, note: `${sale.number} · ${sale.item}`, actor: sale.actor, createdAt: now() },
-              ...s.financeTx,
-            ],
-          }));
-        }
-        // Sisa yang belum dibayar → piutang.
-        const remainder = total - paid;
-        if (remainder > 0) {
-          set((s) => ({
-            receivables: [
-              { id: uid(), saleId: sale.id, party: sale.buyer, description: `${sale.number} · ${sale.item}`, amount: remainder, payments: [], dueDate: data.dueDate, actor: sale.actor, createdAt: now() },
-              ...s.receivables,
-            ],
-          }));
-        }
-        get().audit("Penjualan", "Keuangan Lele", `${sale.number} · ${sale.buyer} · ${currencyStr(total)}${remainder > 0 ? ` (piutang ${currencyStr(remainder)})` : ""}`);
-        return { ok: true, sale };
-      },
-      removeSale: (id) => {
-        const sale = get().leleSales.find((x) => x.id === id);
-        set((s) => ({
-          leleSales: s.leleSales.filter((x) => x.id !== id),
-          receivables: s.receivables.filter((r) => r.saleId !== id),
-        }));
-        if (sale) get().audit("Hapus", "Keuangan Lele", sale.number);
-      },
-      addReceivable: (data) => {
-        set((s) => ({
-          receivables: [
-            { ...data, payments: data.payments ?? [], id: uid(), actor: get().user?.name ?? "Pengguna", createdAt: now() },
-            ...s.receivables,
-          ],
-        }));
-        get().audit("Tambah", "Piutang", `${data.party} · ${currencyStr(data.amount)}`);
-        return { ok: true };
-      },
-      payReceivable: (id, entry) => {
-        const r = get().receivables.find((x) => x.id === id);
-        if (!r) return { ok: false, message: "Piutang tidak ditemukan." };
-        const amount = Number(entry.amount) || 0;
-        if (amount <= 0) return { ok: false, message: "Nominal bayar harus lebih dari 0." };
-        const payment: PaymentEntry = { ...entry, amount, id: uid() };
-        set((s) => ({
-          receivables: s.receivables.map((x) => (x.id === id ? { ...x, payments: [...x.payments, payment] } : x)),
-          financeTx: [
-            { id: uid(), date: payment.date, kind: "masuk", category: "Penjualan Lele", amount, party: r.party, note: `Pelunasan piutang · ${r.description}`, actor: get().user?.name ?? "Pengguna", createdAt: now() },
-            ...s.financeTx,
-          ],
-        }));
-        get().audit("Bayar", "Piutang", `${r.party} · ${currencyStr(amount)}`);
-        return { ok: true };
-      },
-      removeReceivable: (id) => set((s) => ({ receivables: s.receivables.filter((x) => x.id !== id) })),
-      addPayable: (data) => {
-        set((s) => ({
-          payables: [
-            { ...data, payments: data.payments ?? [], id: uid(), actor: get().user?.name ?? "Pengguna", createdAt: now() },
-            ...s.payables,
-          ],
-        }));
-        get().audit("Tambah", "Utang", `${data.party} · ${currencyStr(data.amount)}`);
-        return { ok: true };
-      },
-      payPayable: (id, entry) => {
-        const p = get().payables.find((x) => x.id === id);
-        if (!p) return { ok: false, message: "Utang tidak ditemukan." };
-        const amount = Number(entry.amount) || 0;
-        if (amount <= 0) return { ok: false, message: "Nominal bayar harus lebih dari 0." };
-        const payment: PaymentEntry = { ...entry, amount, id: uid() };
-        set((s) => ({
-          payables: s.payables.map((x) => (x.id === id ? { ...x, payments: [...x.payments, payment] } : x)),
-          financeTx: [
-            { id: uid(), date: payment.date, kind: "keluar", category: "Lain-lain", amount, party: p.party, note: `Bayar utang · ${p.description}`, actor: get().user?.name ?? "Pengguna", createdAt: now() },
-            ...s.financeTx,
-          ],
-        }));
-        get().audit("Bayar", "Utang", `${p.party} · ${currencyStr(amount)}`);
-        return { ok: true };
-      },
-      removePayable: (id) => set((s) => ({ payables: s.payables.filter((x) => x.id !== id) })),
-      addFinanceTx: (data) => {
-        const amount = Number(data.amount) || 0;
-        if (amount <= 0) return { ok: false, message: "Nominal harus lebih dari 0." };
-        set((s) => ({
-          financeTx: [{ ...data, amount, id: uid(), actor: get().user?.name ?? "Pengguna", createdAt: now() }, ...s.financeTx],
-        }));
-        get().audit(data.kind === "masuk" ? "Kas Masuk" : "Kas Keluar", "Keuangan", `${data.category} · ${currencyStr(amount)}`);
-        return { ok: true };
-      },
-      removeFinanceTx: (id) => set((s) => ({ financeTx: s.financeTx.filter((x) => x.id !== id) })),
-      addFinanceCategory: (name, kind) => {
-        const trimmed = name.trim();
-        if (!trimmed) return { ok: false, message: "Nama kategori wajib diisi." };
-        if (get().financeCategories.some((c) => c.name.toLowerCase() === trimmed.toLowerCase())) {
-          return { ok: false, message: "Kategori sudah ada." };
-        }
-        set((s) => ({ financeCategories: [...s.financeCategories, { id: uid(), name: trimmed, kind, createdAt: now() }] }));
-        get().audit("Tambah", "Kategori Keuangan", trimmed);
-        return { ok: true };
-      },
-      removeFinanceCategory: (id) => set((s) => ({ financeCategories: s.financeCategories.filter((c) => c.id !== id) })),
-
-      // ── mutasi stok lele ────────────────────────────────────────────────
-      recordLeleMovement: (data) => {
-        const pond = get().ponds.find((p) => p.id === data.pondId);
-        if (!pond) return { ok: false, message: "Kolam tidak ditemukan." };
-        const qtyKg = data.qtyKg != null ? Number(data.qtyKg) : undefined;
-        const qtyEkor = data.qtyEkor != null ? Number(data.qtyEkor) : undefined;
-        if (!(qtyKg && qtyKg > 0) && !(qtyEkor && qtyEkor > 0)) return { ok: false, message: "Isi jumlah kg atau ekor." };
-        const mv: LeleMovement = {
-          id: uid(), date: data.date, type: data.type, pondId: pond.id, pondCode: pond.code,
-          kategori: data.kategori, qtyKg, qtyEkor, note: data.note, actor: get().user?.name ?? "Pengguna", createdAt: now(),
-        };
-        set((s) => ({ leleMovements: [mv, ...s.leleMovements] }));
-        get().audit("Mutasi", "Stok Lele", `${pond.code} · ${data.type}${data.kategori ? ` (${data.kategori})` : ""}${qtyKg ? ` · ${qtyKg}kg` : ""}`);
-        return { ok: true };
-      },
-      // Transfer antar-kolam: SELALU dua sisi (keluar di asal, masuk di tujuan)
-      // dengan ref yang sama supaya bisa ditelusuri dan tidak pernah timpang.
-      transferLele: (data) => {
-        const from = get().ponds.find((p) => p.id === data.fromPondId);
-        const to = get().ponds.find((p) => p.id === data.toPondId);
-        if (!from || !to) return { ok: false, message: "Kolam asal/tujuan tidak ditemukan." };
-        if (from.id === to.id) return { ok: false, message: "Kolam asal dan tujuan tidak boleh sama." };
-        const qtyKg = data.qtyKg != null ? Number(data.qtyKg) : undefined;
-        const qtyEkor = data.qtyEkor != null ? Number(data.qtyEkor) : undefined;
-        if (!(qtyKg && qtyKg > 0) && !(qtyEkor && qtyEkor > 0)) return { ok: false, message: "Isi jumlah kg atau ekor." };
-        const ref = `TF-${stamp()}-${seq(get().leleMovements.length)}`;
-        const actor = get().user?.name ?? "Pengguna";
-        const t = now();
-        const out: LeleMovement = { id: uid(), date: data.date, type: "TRANSFER_KELUAR", pondId: from.id, pondCode: from.code, toPondId: to.id, toPondCode: to.code, kategori: data.kategori, qtyKg, qtyEkor, ref, note: data.note, actor, createdAt: t };
-        const inn: LeleMovement = { id: uid(), date: data.date, type: "TRANSFER_MASUK", pondId: to.id, pondCode: to.code, toPondId: from.id, toPondCode: from.code, kategori: data.kategori, qtyKg, qtyEkor, ref, note: data.note, actor, createdAt: t };
-        set((s) => ({ leleMovements: [inn, out, ...s.leleMovements] }));
-        get().audit("Transfer", "Stok Lele", `${from.code} → ${to.code}${qtyKg ? ` · ${qtyKg}kg` : ""}${qtyEkor ? ` · ${qtyEkor} ekor` : ""} (${ref})`);
-        return { ok: true };
-      },
-      // Hapus satu mutasi; jika bagian dari transfer (punya ref), hapus pasangannya juga.
-      removeLeleMovement: (id) => {
-        const mv = get().leleMovements.find((m) => m.id === id);
-        set((s) => ({ leleMovements: s.leleMovements.filter((m) => (mv?.ref ? m.ref !== mv.ref : m.id !== id)) }));
-      },
-
       // ── backup & restore ────────────────────────────────────────────────
       exportBackup: () => {
         const s = get();
@@ -1338,6 +816,12 @@ export const useUiStore = create<State & Actions>()(
       storage: createJSONStorage(() => safeStorage),
       // Backfill field baru pada profil laporan yang tersimpan dari versi lama
       // agar kolom "Bukti Pembayaran" langsung aktif tanpa menghapus data.
+      merge: (persisted, current) => {
+        if (!persisted || typeof persisted !== "object") return current;
+        const cache = persisted as Record<string, unknown>;
+        const business = parseWorkspace(cache);
+        return { ...current, ...business, theme: cache.theme === "dark" ? "dark" : "light", user: cache.user as State["user"], loginNoticeSeen: cache.loginNoticeSeen === true };
+      },
       migrate: (persisted) => {
         const state = persisted as Partial<State> | undefined;
         if (state?.reportProfiles) {
@@ -1369,17 +853,6 @@ export const useUiStore = create<State & Actions>()(
         letters: s.letters,
         reportProfiles: s.reportProfiles,
         weeklyReports: s.weeklyReports,
-        ponds: s.ponds,
-        fishCycles: s.fishCycles,
-        pondLogs: s.pondLogs,
-        pondHarvests: s.pondHarvests,
-        pondJournals: s.pondJournals,
-        leleSales: s.leleSales,
-        receivables: s.receivables,
-        payables: s.payables,
-        financeTx: s.financeTx,
-        financeCategories: s.financeCategories,
-        leleMovements: s.leleMovements,
         auditLog: s.auditLog,
         readNotifications: s.readNotifications,
         loginNoticeSeen: s.loginNoticeSeen,

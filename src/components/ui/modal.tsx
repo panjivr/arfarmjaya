@@ -18,13 +18,18 @@ export function Modal({
   title: string;
   description?: string;
   children: React.ReactNode;
-  size?: "md" | "lg";
+  size?: "md" | "lg" | "xl";
 }) {
   useEffect(() => {
     if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     const handler = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handler);
+    };
   }, [open, onClose]);
 
   return (
@@ -38,7 +43,10 @@ export function Modal({
           onClick={onClose}
         >
           <motion.div
-            className={`w-full rounded-2xl border border-border bg-card shadow-soft-lg ${size === "lg" ? "max-w-3xl" : "max-w-lg"}`}
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
+            className={`w-full rounded-2xl border border-border bg-card shadow-soft-lg ${size === "xl" ? "max-w-7xl" : size === "lg" ? "max-w-3xl" : "max-w-lg"}`}
             style={{ marginBottom: "1rem" }}
             initial={{ y: -16, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}

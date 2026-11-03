@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { parseWorkspace } from "@/lib/workspace-data";
 import { currentSession } from "@/lib/session-server";
 
 export const dynamic = "force-dynamic";
@@ -8,8 +9,8 @@ export const runtime = "nodejs";
 const WORKSPACE_ID = "main";
 
 // GET /api/backup -> unduh seluruh data server sebagai berkas JSON (butuh login).
-// Ini "download semua database": isi dokumen Workspace apa adanya, agar bisa
-// disimpan/di-import kembali kapan saja.
+// Ekspor hanya koleksi aktif agar modul yang dihentikan tidak masuk lagi
+// melalui pemulihan cadangan. Snapshot historis di database tetap terpisah.
 export async function GET(request: Request) {
   const session = await currentSession();
   if (!session) {
@@ -29,7 +30,7 @@ export async function GET(request: Request) {
     if (version && !/^backup:[a-f0-9-]{36}$/.test(version)) return NextResponse.json({ error: "invalid_version" }, { status: 400 });
     const row = await prisma.workspace.findUnique({ where: { id: version || WORKSPACE_ID } });
     if (!row) return NextResponse.json({ error: "no_backup_data" }, { status: 404 });
-    const data = row.data;
+    const data = parseWorkspace(row.data);
     const stamp = new Date().toISOString().slice(0, 10);
     const filename = `arfarmjaya-server-backup-${stamp}.json`;
     return new NextResponse(JSON.stringify(data, null, 2), {

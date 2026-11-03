@@ -14,8 +14,8 @@ export async function runPostgresChecks(client: PrismaClient) {
   console.log("PASS database initialization");
   const revision = workspaceRevision(row);
   const results = await Promise.allSettled([
-    savePrismaWorkspace(client, { ...data, ponds: [{ id: "a" }] }, revision, "ADMIN_UTAMA"),
-    savePrismaWorkspace(client, { ...data, ponds: [{ id: "b" }] }, revision, "ADMIN_UTAMA"),
+    savePrismaWorkspace(client, { ...data, invoices: [{ id: "a" }] }, revision, "ADMIN_UTAMA"),
+    savePrismaWorkspace(client, { ...data, invoices: [{ id: "b" }] }, revision, "ADMIN_UTAMA"),
   ]);
   assert.equal(results.filter((r) => r.status === "fulfilled").length, 1);
   assert.equal((results.find((r) => r.status === "rejected") as PromiseRejectedResult).reason.status, 409);
@@ -35,7 +35,7 @@ export async function runPostgresChecks(client: PrismaClient) {
   assert.equal(workspaceRevision(await client.workspace.findUnique({ where: { id: "main" } })), workspaceRevision(row));
   await client.$executeRawUnsafe(`ALTER TABLE "Workspace" DROP CONSTRAINT "audit_failure"`);
   console.log("PASS backup and main write roll back together on SQL failure");
-  for (let n = 0; n < 23; n++) row = await savePrismaWorkspace(client, { ...data, ponds: [{ id: `pond-${n}` }] }, workspaceRevision(row), "ADMIN_UTAMA");
+  for (let n = 0; n < 23; n++) row = await savePrismaWorkspace(client, { ...data, invoices: [{ id: `invoice-${n}` }] }, workspaceRevision(row), "ADMIN_UTAMA");
   assert.equal(await client.workspace.count({ where: { id: { startsWith: "backup:" } } }), 20);
   console.log("PASS rolling retention of 20 previous versions");
 }

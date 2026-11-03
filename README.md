@@ -10,7 +10,6 @@ Sistem Manajemen Gudang untuk ARFARM BHINNEKA NUSA JAYA — aplikasi Next.js den
 - **Data Master** — Kategori, Pemasok, Gudang, dan Rak dengan CRUD penuh dan statistik turunan.
 - **Operasional** — Pembelian (PO + persetujuan), Penerimaan Barang (menambah stok), Barang Keluar, Distribusi, Permintaan Barang, Stok Opname (adjustment), dan POS Retail (mengurangi stok).
 - **Laporan Mingguan Lapangan** — generator *Laporan Pelaksanaan Mingguan* (mis. program penanaman kedelai): kop lembaga + logo, tabel kegiatan (tanggal, jenis kegiatan, tujuan, umur HST, nominal, output, foto), total otomatis, ringkasan, blok tanda tangan, dan keterangan pengisian. Hasilnya bisa disimpan, dicetak, atau diekspor ke PDF (A4 landscape, otomatis muat satu halaman) dan CSV. Semua elemen kop, judul, kolom, tanda tangan, dan catatan dapat diatur lewat **Pengaturan Format**.
-- **Budidaya Lele** — area terpisah untuk peternakan lele: monitoring tiap kolam berdasarkan kode (mis. A12) — umur lele, jumlah ikan hidup, sintasan (SR), pakan harian + biaya, kematian, sampling bobot, biomassa, dan panen; ringkasan laba-rugi & FCR per siklus; pilihan **pakan dari katalog merk** (Hi-Pro-Vite, CP, Matahari Sakti, Cargill, dll. — ukuran, protein, harga) dengan biaya otomatis; **Jurnal Lele** (kualitas air, kesehatan, perlakuan, cuaca, pemeliharaan) dengan ekspor CSV; serta simulator proyeksi bisnis (panen, kebutuhan pakan, HPP, BEP, ROI). Semua tersinkron antar-perangkat dan mendukung mode gelap.
 - **Surat** — generator surat resmi dari data toko. Jenis pertama adalah *Surat Penagihan Hutang*: kop seperti invoice, teks penagihan yang bisa disesuaikan, tabel barang (nama, jumlah, keterangan, nilai rupiah) yang bisa ditambah, lalu simpan dan cetak PDF. Isi dapat disalin dari invoice tanpa mengubah invoice tersebut.
 - **Analitik & Laporan** — laporan valuasi, stok rendah, kedaluwarsa, pergerakan stok, dan ekspor CSV.
 - **Sistem** — Notifikasi otomatis (stok rendah/kedaluwarsa), Log Audit setiap aksi, Pengguna & Role, dan Pengaturan.
@@ -31,7 +30,6 @@ Pada dialog cetak, pilih tujuan **Simpan sebagai PDF** untuk menghasilkan berkas
 
 - Admin Utama: `admin` / `admin123`
 - Staff Gudang: `gudang` / `gudang123`
-- Staff Lele: `lele` / `lele123`
 - Staff Reporting: `laporan` / `laporan123`
 
 Akun bawaan digunakan untuk mode demo lokal atau seed database kosong. Konfigurasikan kata sandi akun saat menyiapkan production; gangguan database tidak mengaktifkan kembali akun demo.

@@ -40,8 +40,8 @@ type Row = { id: string; name: string; username: string; passwordHash: string; r
 function toUser(r: Row): AuthUser {
   return {
     id: r.id, name: r.name, username: r.username,
-    role: isAppRole(r.role) ? r.role : "STAFF_LELE",
-    active: r.active, permissions: r.permissions ?? [],
+    role: isAppRole(r.role) ? r.role : "STAFF_REPORTING",
+    active: r.active && isAppRole(r.role), permissions: r.permissions ?? [],
     lastLogin: r.lastLogin ? r.lastLogin.toISOString() : null,
     createdAt: r.createdAt.toISOString(),
   };
@@ -68,7 +68,7 @@ export async function authenticate(username: string, password: string): Promise<
       await ensureSeeded();
       const row = (await (prisma as any).appUser.findUnique({ where: { username: uname } })) as Row | null;
       if (!row) return { ok: false, message: "Username atau password salah." };
-      if (!row.active) return { ok: false, message: "Akun dinonaktifkan. Hubungi admin." };
+      if (!row.active || !isAppRole(row.role)) return { ok: false, message: "Akun dinonaktifkan. Hubungi admin." };
       if (!(await verifyPassword(password, row.passwordHash))) return { ok: false, message: "Username atau password salah." };
       await (prisma as any).appUser.update({ where: { id: row.id }, data: { lastLogin: new Date() } });
       return { ok: true, user: toUser({ ...row, lastLogin: new Date() }) };

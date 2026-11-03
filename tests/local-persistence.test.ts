@@ -66,12 +66,7 @@ test("business history is not silently truncated at the previous retention limit
   assert.equal(useUiStore.getState().movements.length, 1001);
   assert.equal(useUiStore.getState().movements.at(-1)?.id, "old-999");
   assert.equal(useUiStore.getState().auditLog.length, 501);
-  const [from, to] = store.ponds;
-  const base = { id: "old", date: "2026-10-18", type: "TRANSFER_MASUK" as const, pondId: from.id, pondCode: from.code, qtyKg: 1, actor: "test", createdAt: "2026-10-18" };
-  useUiStore.setState({ leleMovements: Array.from({ length: 5000 }, (_, i) => ({ ...base, id: `old-${i}` })) });
-  assert.equal(store.transferLele({ date: "2026-10-18", fromPondId: from.id, toPondId: to.id, qtyKg: 1 }).ok, true);
-  assert.equal(useUiStore.getState().leleMovements.length, 5002);
-  assert.equal(useUiStore.getState().leleMovements.at(-1)?.id, "old-4999");
+
 });
 test("corrupt persisted JSON cannot be overwritten with empty defaults", () => {
   storage.setItem("corrupt", "{broken");
