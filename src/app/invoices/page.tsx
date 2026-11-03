@@ -47,6 +47,7 @@ export default function InvoicesPage() {
   const createInvoice = useUiStore((s) => s.createInvoice);
   const updateInvoice = useUiStore((s) => s.updateInvoice);
   const deleteInvoice = useUiStore((s) => s.deleteInvoice);
+  const updateStore = useUiStore((s) => s.updateStore);
 
   const [storeId, setStoreId] = useState(stores[0]?.id ?? "");
   const [buyer, setBuyer] = useState("");
@@ -149,6 +150,24 @@ export default function InvoicesPage() {
     const q = catalogQuery.trim().toLowerCase();
     return q ? items.filter((it) => it.name.toLowerCase().includes(q) || it.unit.toLowerCase().includes(q)) : items;
   }, [store?.catalog, catalogQuery]);
+
+  // Isi data pembeli dari pelanggan tersimpan toko.
+  function applyBuyer(b: { name: string; phone?: string; address?: string }) {
+    setBuyer(b.name);
+    setBuyerPhone(b.phone ?? "");
+    setBuyerAddress(b.address ?? "");
+  }
+  // Simpan pembeli saat ini ke daftar pelanggan toko (bila belum ada).
+  function saveBuyerToStore() {
+    if (!store) return;
+    const name = buyer.trim();
+    if (!name) return toast.error("Isi nama pembeli dulu.");
+    const exists = (store.buyers ?? []).some((b) => b.name.trim().toLowerCase() === name.toLowerCase());
+    if (exists) return toast.info("Pembeli ini sudah ada di daftar toko.");
+    const entry = { id: (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)), name, phone: buyerPhone.trim() || undefined, address: buyerAddress.trim() || undefined };
+    updateStore(store.id, { buyers: [...(store.buyers ?? []), entry] });
+    toast.success(`Pembeli "${name}" disimpan ke ${store.name}.`);
+  }
 
   function resetForm() {
     setEditingId(null);
@@ -304,10 +323,27 @@ export default function InvoicesPage() {
                 <Field label="No Invoice"><Input value={numberOverride} onChange={(e) => setNumberOverride(e.target.value)} placeholder={suggestedNumber} /></Field>
                 <Field label="Tanggal"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
               </div>
+              {store?.buyers && store.buyers.length > 0 && (
+                <Field label="Pilih Pembeli Tersimpan" hint="Nama, telepon, dan alamat akan terisi otomatis.">
+                  <Select
+                    aria-label="Pilih pembeli tersimpan"
+                    value=""
+                    onChange={(e) => { const b = store.buyers?.find((x) => x.id === e.target.value); if (b) applyBuyer(b); e.target.value = ""; }}
+                  >
+                    <option value="">— pilih pembeli —</option>
+                    {store.buyers.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
+                  </Select>
+                </Field>
+              )}
               <Field label="Pembeli"><Input value={buyer} onChange={(e) => setBuyer(e.target.value)} placeholder="SPPG NGRAKET BALONG" /></Field>
               <Field label="Alamat Pembeli"><Textarea aria-label="Alamat Pembeli" value={buyerAddress} onChange={(e) => setBuyerAddress(e.target.value)} placeholder="Alamat lengkap tujuan penagihan" /></Field>
               <Field label="Jatuh Tempo" hint="Opsional. Kosongkan jika tidak ada batas pembayaran."><Input type="date" min={date} value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></Field>
               <Field label="Telepon Pembeli"><Input value={buyerPhone} onChange={(e) => setBuyerPhone(e.target.value)} placeholder="081216101267" /></Field>
+              {buyer.trim() && store && (
+                <Button type="button" variant="ghost" className="h-8 w-full justify-center text-xs" onClick={saveBuyerToStore}>
+                  <Plus className="h-3.5 w-3.5" /> Simpan pembeli ini ke {store.name}
+                </Button>
+              )}
 
               {savedSeller && <div className="rounded-lg border border-border bg-background p-3 text-xs text-muted">Invoice ini memakai identitas dan desain saat disimpan.<button type="button" className="mt-2 block font-semibold text-primary" onClick={() => setSavedSeller(undefined)}>Gunakan desain toko terbaru</button></div>}
               {(!design.visible.buyerAddress || !design.visible.buyerPhone || !design.visible.dueDate) && <p className="text-xs text-muted">Sebagian detail disembunyikan pada cetakan sesuai pengaturan toko. Isian tetap disimpan.</p>}

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Image from "next/image";
-import { Building2, ImagePlus, Package, Pencil, Plus, ShieldCheck, Store as StoreIcon, Trash2 } from "lucide-react";
+import { Building2, ImagePlus, Package, Pencil, Plus, ShieldCheck, Store as StoreIcon, Trash2, Users } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import { PageHeader, StatCard, EmptyState } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import { InvoiceDesignEditor } from "@/components/invoice/invoice-design-editor"
 import { InvoiceDocument } from "@/components/invoice/invoice-document";
 import { ScaledPreview } from "@/components/ui/scaled-preview";
 import { resolveInvoiceDesign } from "@/lib/invoice-design";
-import type { Store, StoreItem } from "@/lib/types";
+import type { Store, StoreItem, StoreBuyer } from "@/lib/types";
 
 const uid = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
 
@@ -50,8 +50,10 @@ export default function StoresPage() {
   const [form, setForm] = useState(empty);
   const [catalog, setCatalog] = useState<StoreItem[]>([]);
   const [itemDraft, setItemDraft] = useState({ name: "", unit: "Pcs", price: "" });
+  const [buyers, setBuyers] = useState<StoreBuyer[]>([]);
+  const [buyerDraft, setBuyerDraft] = useState({ name: "", phone: "", address: "" });
   const [showPreview, setShowPreview] = useState(false);
-  const [tab, setTab] = useState<"identity" | "design" | "catalog">("identity");
+  const [tab, setTab] = useState<"identity" | "design" | "catalog" | "buyers">("identity");
   const fileRef = useRef<HTMLInputElement>(null);
 
   function set<K extends keyof typeof form>(key: K, value: string) {
@@ -73,6 +75,19 @@ export default function StoresPage() {
     setCatalog((c) => c.filter((it) => it.id !== id));
   }
 
+  function addBuyer() {
+    const name = buyerDraft.name.trim();
+    if (!name) return toast.error("Isi nama pembeli.");
+    setBuyers((b) => [...b, { id: uid(), name, phone: buyerDraft.phone.trim() || undefined, address: buyerDraft.address.trim() || undefined }]);
+    setBuyerDraft({ name: "", phone: "", address: "" });
+  }
+  function updateBuyer(id: string, patch: Partial<StoreBuyer>) {
+    setBuyers((b) => b.map((it) => (it.id === id ? { ...it, ...patch } : it)));
+  }
+  function removeBuyer(id: string) {
+    setBuyers((b) => b.filter((it) => it.id !== id));
+  }
+
   function openCreate() {
     setEditing(null);
     setShowPreview(false);
@@ -80,6 +95,8 @@ export default function StoresPage() {
     setTab("identity");
     setCatalog([]);
     setItemDraft({ name: "", unit: "Pcs", price: "" });
+    setBuyers([]);
+    setBuyerDraft({ name: "", phone: "", address: "" });
     setOpen(true);
   }
   function openEdit(store: Store) {
@@ -106,6 +123,8 @@ export default function StoresPage() {
     });
     setCatalog((store.catalog ?? []).map((it) => ({ ...it })));
     setItemDraft({ name: "", unit: "Pcs", price: "" });
+    setBuyers((store.buyers ?? []).map((it) => ({ ...it })));
+    setBuyerDraft({ name: "", phone: "", address: "" });
     setOpen(true);
   }
 
@@ -146,6 +165,9 @@ export default function StoresPage() {
       eSignerName: form.eSignerName.trim() || undefined,
       catalog: catalog
         .map((it) => ({ ...it, name: it.name.trim(), unit: it.unit.trim() || "Pcs", price: Number.isFinite(it.price) ? it.price : 0 }))
+        .filter((it) => it.name),
+      buyers: buyers
+        .map((it) => ({ ...it, name: it.name.trim(), phone: it.phone?.trim() || undefined, address: it.address?.trim() || undefined }))
         .filter((it) => it.name),
     };
     if (editing) {
@@ -201,9 +223,9 @@ export default function StoresPage() {
                     <span className="text-muted">Prefix: <span className="font-mono font-semibold text-foreground">{store.invoicePrefix}</span></span>
                     <span className="text-muted">{count} invoice</span>
                   </div>
-                  <div className="mt-2 flex items-center gap-1.5 text-xs text-muted">
-                    <Package className="h-3.5 w-3.5" />
-                    <span>{store.catalog?.length ?? 0} barang di katalog</span>
+                  <div className="mt-2 flex items-center gap-3 text-xs text-muted">
+                    <span className="flex items-center gap-1"><Package className="h-3.5 w-3.5" />{store.catalog?.length ?? 0} barang</span>
+                    <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{store.buyers?.length ?? 0} pembeli</span>
                   </div>
                   {store.tagline && <p className="mt-2 text-xs text-muted">{store.tagline}</p>}
                   {store.bankInfo && <p className="mt-2 truncate text-xs text-muted">{store.bankInfo}</p>}
@@ -234,7 +256,7 @@ export default function StoresPage() {
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? "Pengaturan Toko" : "Toko Baru"} description="Identitas, katalog, dan desain invoice dalam satu tempat." size="xl">
         <form onSubmit={submit}>
           <div className="mb-5 flex gap-1 rounded-xl border border-border bg-background p-1" aria-label="Bagian pengaturan toko">
-            {([['identity', 'Identitas'], ['design', 'Desain invoice'], ['catalog', 'Katalog barang']] as const).map(([key, label]) => <button key={key} type="button" aria-pressed={tab === key} onClick={() => setTab(key)} className={`flex-1 rounded-lg px-2 py-2.5 text-sm font-semibold ${tab === key ? 'bg-card text-primary shadow-sm' : 'text-muted'}`}>{label}</button>)}
+            {([['identity', 'Identitas'], ['design', 'Desain invoice'], ['catalog', 'Katalog barang'], ['buyers', 'Pelanggan']] as const).map(([key, label]) => <button key={key} type="button" aria-pressed={tab === key} onClick={() => setTab(key)} className={`flex-1 rounded-lg px-2 py-2.5 text-sm font-semibold ${tab === key ? 'bg-card text-primary shadow-sm' : 'text-muted'}`}>{label}</button>)}
           </div>
           <Button type="button" variant="secondary" className="mb-4 w-full lg:hidden" onClick={() => setShowPreview((current) => !current)}>{showPreview ? "Kembali ke pengaturan" : "Lihat pratinjau invoice"}</Button>
           <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
@@ -329,6 +351,41 @@ export default function StoresPage() {
               )}
             </div>
           </div>
+          </div>
+          <div hidden={tab !== "buyers"}>
+            <div className="rounded-lg border border-border bg-background p-3">
+              <div className="mb-2 flex items-center gap-2">
+                <Users className="h-4 w-4 text-primary" />
+                <p className="text-sm font-semibold">Pelanggan / Pembeli Tersimpan</p>
+                <span className="ml-auto text-xs text-muted">{buyers.length} pembeli</span>
+              </div>
+              <p className="mb-3 text-xs text-muted">
+                Simpan pelanggan langganan toko ini (nama, telepon, alamat). Saat membuat invoice, tinggal pilih pembeli — data langsung terisi. Khusus toko ini, tidak dicampur dengan toko lain.
+              </p>
+
+              <div className="grid grid-cols-2 gap-2">
+                <Input value={buyerDraft.name} onChange={(e) => setBuyerDraft((d) => ({ ...d, name: e.target.value }))} placeholder="Nama pembeli (mis. SPPG Ngraket)" />
+                <Input value={buyerDraft.phone} onChange={(e) => setBuyerDraft((d) => ({ ...d, phone: e.target.value }))} placeholder="Telepon (opsional)" />
+                <Input className="col-span-2" value={buyerDraft.address} onChange={(e) => setBuyerDraft((d) => ({ ...d, address: e.target.value }))} placeholder="Alamat (opsional)"
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addBuyer(); } }} />
+              </div>
+              <Button type="button" variant="secondary" className="mt-2 w-full" onClick={addBuyer}><Plus className="h-4 w-4" /> Tambah Pembeli</Button>
+
+              {buyers.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {buyers.map((b) => (
+                    <div key={b.id} className="rounded-lg border border-border p-2">
+                      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
+                        <Input value={b.name} onChange={(e) => updateBuyer(b.id, { name: e.target.value })} placeholder="Nama" />
+                        <Input value={b.phone ?? ""} onChange={(e) => updateBuyer(b.id, { phone: e.target.value })} placeholder="Telepon" />
+                        <button type="button" onClick={() => removeBuyer(b.id)} className="self-center px-1 text-danger" aria-label="Hapus pembeli"><Trash2 className="h-4 w-4" /></button>
+                      </div>
+                      <Input className="mt-2" value={b.address ?? ""} onChange={(e) => updateBuyer(b.id, { address: e.target.value })} placeholder="Alamat" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           </div>
           <aside className={`min-w-0 rounded-2xl border border-border bg-slate-100 p-3 lg:sticky lg:top-4 dark:bg-slate-900 ${showPreview ? "" : "hidden lg:block"}`}>

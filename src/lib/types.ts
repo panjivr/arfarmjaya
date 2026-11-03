@@ -256,6 +256,8 @@ export type Store = {
   eSignerName?: string;
   /** Katalog barang/daftar harga toko — dipakai untuk mengisi invoice cepat. */
   catalog?: StoreItem[];
+  /** Pelanggan/pembeli tersimpan toko — mengisi data pembeli invoice cepat. Per toko. */
+  buyers?: StoreBuyer[];
   createdAt: string;
 };
 
@@ -265,6 +267,14 @@ export type StoreItem = {
   name: string;
   unit: string;
   price: number;
+};
+
+/** Pelanggan tersimpan milik sebuah toko (tidak dicampur antar toko). */
+export type StoreBuyer = {
+  id: string;
+  name: string;
+  phone?: string;
+  address?: string;
 };
 
 export type InvoiceLine = {
@@ -287,8 +297,8 @@ export type InvoiceSignature = {
   algo: string; // "SHA-256"
 };
 
-/** Identitas dan desain saat invoice disimpan; katalog tidak disalin. */
-export type InvoiceSeller = Omit<Store, "id" | "createdAt" | "catalog">;
+/** Identitas dan desain saat invoice disimpan; katalog & pelanggan tidak disalin. */
+export type InvoiceSeller = Omit<Store, "id" | "createdAt" | "catalog" | "buyers">;
 
 export type InvoiceInput = {
   storeId: string;
