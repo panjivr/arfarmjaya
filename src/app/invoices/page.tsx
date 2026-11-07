@@ -15,6 +15,7 @@ import { ScaledPreview } from "@/components/ui/scaled-preview";
 import { InvoiceDocument, type InvoiceData } from "@/components/invoice/invoice-document";
 import { useUiStore } from "@/lib/store";
 import { currency, documentFileName, formatDate, printNamed } from "@/lib/utils";
+import { applyInvoiceTemplate, getInvoiceTemplate, INVOICE_TEMPLATES } from "@/lib/invoice-templates";
 import { resolveInvoiceDesign, snapshotInvoiceSeller } from "@/lib/invoice-design";
 import { invoiceInputError, invoiceLineTotal, invoiceTotals, suggestInvoiceNumber } from "@/lib/invoices";
 import { buildInvoiceSignature } from "@/lib/invoice-sign";
@@ -319,6 +320,17 @@ export default function InvoicesPage() {
                   {stores.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
                 </Select>
               </Field>
+              <Field label="Template invoice" hint="Default mengikuti toko. Pilihan di sini hanya mengubah invoice ini.">
+                <Select aria-label="Template invoice" disabled={saving} value={design.templateId ?? design.layout} onChange={(e) => {
+                  if (!seller) return;
+                  const selected = e.target.value;
+                  const invoiceDesign = selected === "classic" || selected === "modern" ? { ...design, templateId: undefined, layout: selected as "classic" | "modern" } : applyInvoiceTemplate(design, selected);
+                  setSavedSeller(snapshotInvoiceSeller({ ...seller, invoiceDesign }));
+                }}>
+                  <option value="classic">Klasik · desain lama</option><option value="modern">Modern · desain lama</option>
+                  <optgroup label="32 template profesional">{INVOICE_TEMPLATES.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.category}</option>)}</optgroup>
+                </Select>
+              </Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="No Invoice"><Input value={numberOverride} onChange={(e) => setNumberOverride(e.target.value)} placeholder={suggestedNumber} /></Field>
                 <Field label="Tanggal"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
@@ -345,7 +357,7 @@ export default function InvoicesPage() {
                 </Button>
               )}
 
-              {savedSeller && <div className="rounded-lg border border-border bg-background p-3 text-xs text-muted">Invoice ini memakai identitas dan desain saat disimpan.<button type="button" className="mt-2 block font-semibold text-primary" onClick={() => setSavedSeller(undefined)}>Gunakan desain toko terbaru</button></div>}
+              {savedSeller && <div className="rounded-lg border border-border bg-background p-3 text-xs text-muted">{editingId ? "Invoice ini memakai salinan identitas dan desain tersimpan." : "Pilihan desain ini hanya berlaku untuk invoice ini."}<button type="button" className="mt-2 block font-semibold text-primary" onClick={() => setSavedSeller(undefined)}>Gunakan desain toko terbaru</button></div>}
               {(!design.visible.buyerAddress || !design.visible.buyerPhone || !design.visible.dueDate) && <p className="text-xs text-muted">Sebagian detail disembunyikan pada cetakan sesuai pengaturan toko. Isian tetap disimpan.</p>}
 
               {/* Tanda tangan elektronik — opsional, dikontrol admin */}
@@ -478,10 +490,11 @@ export default function InvoicesPage() {
         {/* Live preview */}
         <div className="no-print min-w-0">
           <Card className="bg-slate-100 p-3 sm:p-4 lg:sticky lg:top-20 dark:bg-slate-900">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted sm:mb-3">Pratinjau invoice</p>
+            <div className="mb-3 flex items-center justify-between gap-2"><p className="text-xs font-semibold uppercase tracking-wide text-muted">Pratinjau invoice</p><span className="rounded-full border border-border bg-card px-2 py-1 text-[10px] text-muted">{getInvoiceTemplate(design.templateId)?.name ?? (design.layout === "modern" ? "Modern" : "Klasik")}</span></div>
             <ScaledPreview baseWidth={800}>
               <div className="shadow-lg"><InvoiceDocument store={seller} invoice={previewData} /></div>
             </ScaledPreview>
+            <p className="mt-3 text-xs text-muted">Tips cetak: gunakan A4 dan nonaktifkan header/footer browser agar PDF hanya berisi invoice.</p>
           </Card>
         </div>
       </div>

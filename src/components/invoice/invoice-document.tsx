@@ -1,12 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo } from "react";
+import React, { useMemo } from "react";
 import qrcode from "qrcode-generator";
 import { ShieldCheck, Store as StoreIcon } from "lucide-react";
 import type { InvoiceLine, InvoiceSignature, InvoiceSeller } from "@/lib/types";
 import { resolveInvoiceDesign } from "@/lib/invoice-design";
-import { invoiceLineTotal } from "@/lib/invoices";
+import { InvoiceTemplateDocument } from "./invoice-template-document";
+import { getInvoiceTemplate } from "@/lib/invoice-templates";
+import { invoiceInWords as terbilang, invoiceLineTotal } from "@/lib/invoices";
 import { invoiceQrPayload } from "@/lib/invoice-sign";
 import { currency, numberFmt, formatDate, formatDateTime } from "@/lib/utils";
 
@@ -42,28 +44,10 @@ function useInvoiceQr(payload: string | null): string | null {
   }, [payload]);
 }
 
-/** Ubah angka menjadi kalimat "terbilang" bahasa Indonesia. */
-function terbilang(value: number): string {
-  const n = Math.floor(Math.abs(value));
-  const satuan = ["", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan", "sepuluh", "sebelas"];
-  const words = (x: number): string => {
-    if (x < 12) return satuan[x];
-    if (x < 20) return `${words(x - 10)} belas`;
-    if (x < 100) return `${words(Math.floor(x / 10))} puluh${x % 10 ? ` ${words(x % 10)}` : ""}`;
-    if (x < 200) return `seratus${x - 100 ? ` ${words(x - 100)}` : ""}`;
-    if (x < 1000) return `${words(Math.floor(x / 100))} ratus${x % 100 ? ` ${words(x % 100)}` : ""}`;
-    if (x < 2000) return `seribu${x - 1000 ? ` ${words(x - 1000)}` : ""}`;
-    if (x < 1_000_000) return `${words(Math.floor(x / 1000))} ribu${x % 1000 ? ` ${words(x % 1000)}` : ""}`;
-    if (x < 1_000_000_000) return `${words(Math.floor(x / 1_000_000))} juta${x % 1_000_000 ? ` ${words(x % 1_000_000)}` : ""}`;
-    if (x < 1_000_000_000_000) return `${words(Math.floor(x / 1_000_000_000))} miliar${x % 1_000_000_000 ? ` ${words(x % 1_000_000_000)}` : ""}`;
-    return `${words(Math.floor(x / 1_000_000_000_000))} triliun${x % 1_000_000_000_000 ? ` ${words(x % 1_000_000_000_000)}` : ""}`;
-  };
-  const text = (n === 0 ? "nol" : words(n)).replace(/\s+/g, " ").trim();
-  return `${text.charAt(0).toUpperCase()}${text.slice(1)} rupiah`;
-}
-
 export function InvoiceDocument({ store, invoice, id }: { store?: InvoiceSeller; invoice: InvoiceData; id?: string }) {
-  const { colors: c, visible: v, logoWidth, layout } = resolveInvoiceDesign(store);
+  const design = resolveInvoiceDesign(store);
+  const { colors: c, visible: v, logoWidth, layout } = design;
+  const template = getInvoiceTemplate(design.templateId);
   const sig = invoice.signature;
   const qr = useInvoiceQr(sig ? invoiceQrPayload({ ...invoice, storeName: store?.name ?? "" }, sig) : null);
   const phone = invoice.buyerPhone?.trim();
@@ -71,6 +55,8 @@ export function InvoiceDocument({ store, invoice, id }: { store?: InvoiceSeller;
   const contact = [v.storePhone && store?.phone && `Telp/WA: ${store.phone}`, v.storeEmail && store?.email].filter(Boolean).join(" · ");
   const cell = { border: `1px solid ${c.border}` };
   const detail = { color: c.detail };
+
+  if (template) return <InvoiceTemplateDocument store={store} invoice={invoice} design={design} template={template} qr={qr} id={id} />;
 
   return (
     <div id={id} className="invoice-doc mx-auto w-full max-w-[800px] bg-white" style={{ fontFamily: "Arial, Helvetica, sans-serif", color: c.text, fontSize: 12 }}>

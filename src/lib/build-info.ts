@@ -1,3 +1,3 @@
 // Penanda versi build. Dinaikkan tiap rilis supaya mudah memastikan versi mana
 // yang benar-benar termuat di browser (membedakan "belum ter-deploy" vs "cache lama").
-export const APP_BUILD = "2026-11-03 · invoice-custom-1";
+export const APP_BUILD = "2026-11-07 · invoice-templates-32";

@@ -228,7 +228,7 @@ textarea {
   body.printing-invoice #print-area { position: static; width: 100%; }
   .invoice-doc { max-width: none !important; }
   .invoice-doc .invoice-body { padding: 0 !important; }
-  .invoice-items thead { display: table-header-group; }
+  .invoice-items thead { display: table-header-group; break-inside: avoid; }
   .invoice-items tr { break-inside: avoid; }
   .invoice-doc header, .invoice-metadata, .invoice-totals { break-inside: avoid; }
 }

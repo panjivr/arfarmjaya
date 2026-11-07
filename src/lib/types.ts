@@ -228,6 +228,8 @@ export type InvoiceVisibility = {
 };
 
 export type InvoiceDesign = {
+  /** Versioned preset; omitted for existing classic/modern invoices. */
+  templateId?: string;
   layout: "classic" | "modern";
   logoWidth: number;
   colors: InvoiceColors;

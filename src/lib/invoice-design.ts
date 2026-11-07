@@ -1,3 +1,4 @@
+import { getInvoiceTemplate } from "./invoice-templates";
 import type { InvoiceColors, InvoiceDesign, InvoiceSeller, InvoiceVisibility } from "./types";
 
 export const INVOICE_COLOR_LABELS: Record<keyof InvoiceColors, string> = {
@@ -25,13 +26,16 @@ export function resolveInvoiceDesign(store?: Pick<InvoiceSeller, "accent" | "inv
     border: "#cbd5e1", tableHeader: accent, tableHeaderText: "#ffffff", alternateRow: "#f0f7f0",
     total: accent, totalText: "#ffffff", footer: accent,
   };
-  const visible = Object.fromEntries(Object.keys(INVOICE_VISIBILITY_LABELS).map((key) => [key, true])) as InvoiceVisibility;
   const raw = store?.invoiceDesign;
+  const preset = getInvoiceTemplate(raw?.templateId);
+  if (preset) Object.assign(colors, preset.colors);
+  const visible = Object.fromEntries(Object.keys(INVOICE_VISIBILITY_LABELS).map((key) => [key, true])) as InvoiceVisibility;
   for (const key of Object.keys(colors) as (keyof InvoiceColors)[]) colors[key] = hex(raw?.colors?.[key], colors[key]);
   for (const key of Object.keys(visible) as (keyof InvoiceVisibility)[]) {
     if (typeof raw?.visible?.[key] === "boolean") visible[key] = raw.visible[key];
   }
   return {
+    ...(preset ? { templateId: preset.id } : {}),
     layout: raw?.layout === "modern" ? "modern" : "classic",
     logoWidth: typeof raw?.logoWidth === "number" && Number.isFinite(raw.logoWidth) ? Math.max(40, Math.min(180, raw.logoWidth)) : 100,
     colors, visible,

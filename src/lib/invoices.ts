@@ -36,3 +36,23 @@ export function invoiceInputError(data: InvoiceInput): string | null {
   if (![subtotal, total, data.shipping, data.discount ?? 0].every((n) => Number.isSafeInteger(n) && n >= 0)) return "Ongkir dan diskon harus berupa rupiah bulat yang valid. Diskon tidak boleh melebihi subtotal + ongkir.";
   return null;
 }
+
+/** Ubah angka menjadi kalimat "terbilang" bahasa Indonesia. */
+export function invoiceInWords(value: number): string {
+  const n = Math.floor(Math.abs(value));
+  const satuan = ["", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan", "sepuluh", "sebelas"];
+  const words = (x: number): string => {
+    if (x < 12) return satuan[x];
+    if (x < 20) return `${words(x - 10)} belas`;
+    if (x < 100) return `${words(Math.floor(x / 10))} puluh${x % 10 ? ` ${words(x % 10)}` : ""}`;
+    if (x < 200) return `seratus${x - 100 ? ` ${words(x - 100)}` : ""}`;
+    if (x < 1000) return `${words(Math.floor(x / 100))} ratus${x % 100 ? ` ${words(x % 100)}` : ""}`;
+    if (x < 2000) return `seribu${x - 1000 ? ` ${words(x - 1000)}` : ""}`;
+    if (x < 1_000_000) return `${words(Math.floor(x / 1000))} ribu${x % 1000 ? ` ${words(x % 1000)}` : ""}`;
+    if (x < 1_000_000_000) return `${words(Math.floor(x / 1_000_000))} juta${x % 1_000_000 ? ` ${words(x % 1_000_000)}` : ""}`;
+    if (x < 1_000_000_000_000) return `${words(Math.floor(x / 1_000_000_000))} miliar${x % 1_000_000_000 ? ` ${words(x % 1_000_000_000)}` : ""}`;
+    return `${words(Math.floor(x / 1_000_000_000_000))} triliun${x % 1_000_000_000_000 ? ` ${words(x % 1_000_000_000_000)}` : ""}`;
+  };
+  const text = (n === 0 ? "nol" : words(n)).replace(/\s+/g, " ").trim();
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)} rupiah`;
+}

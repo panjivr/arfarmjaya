@@ -14,6 +14,7 @@ import { useUiStore } from "@/lib/store";
 import { InvoiceDesignEditor } from "@/components/invoice/invoice-design-editor";
 import { InvoiceDocument } from "@/components/invoice/invoice-document";
 import { ScaledPreview } from "@/components/ui/scaled-preview";
+import { getInvoiceTemplate } from "@/lib/invoice-templates";
 import { resolveInvoiceDesign } from "@/lib/invoice-design";
 import type { Store, StoreItem, StoreBuyer } from "@/lib/types";
 
@@ -227,6 +228,7 @@ export default function StoresPage() {
                     <span className="flex items-center gap-1"><Package className="h-3.5 w-3.5" />{store.catalog?.length ?? 0} barang</span>
                     <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{store.buyers?.length ?? 0} pembeli</span>
                   </div>
+                  <p className="mt-2 text-xs text-muted">Template invoice: <span className="font-semibold text-foreground">{getInvoiceTemplate(store.invoiceDesign?.templateId)?.name ?? (store.invoiceDesign?.layout === "modern" ? "Modern" : "Klasik")}</span></p>
                   {store.tagline && <p className="mt-2 text-xs text-muted">{store.tagline}</p>}
                   {store.bankInfo && <p className="mt-2 truncate text-xs text-muted">{store.bankInfo}</p>}
                   <div className="mt-3 flex justify-end gap-1">

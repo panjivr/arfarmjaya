@@ -45,7 +45,7 @@ export function ScaledPreview({ children, baseWidth = 1180 }: { children: React.
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="absolute right-2 top-2 z-10 inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card/95 px-2.5 text-xs font-semibold shadow-sm backdrop-blur transition hover:bg-card"
+          className="mb-2 ml-auto flex h-9 w-fit items-center gap-1.5 rounded-lg border border-border bg-card/95 px-2.5 text-xs font-semibold shadow-sm backdrop-blur transition hover:bg-card"
         >
           {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
           {expanded ? "Muat layar" : "Perbesar"}
