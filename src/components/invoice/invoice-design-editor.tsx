@@ -50,7 +50,7 @@ export function InvoiceDesignEditor({ value, accent, onChange }: { value: Invoic
         <div className="grid gap-2 sm:grid-cols-2">
           {Object.entries(INVOICE_VISIBILITY_LABELS).map(([key, label]) => (
             <label key={key} className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
-              <input type="checkbox" className="h-4 w-4 accent-[var(--primary)]" checked={value.visible[key as keyof typeof value.visible]} onChange={(e) => onChange({ ...value, visible: { ...value.visible, [key]: e.target.checked } })} />{label}
+              <input type="checkbox" className="h-4 w-4 accent-[var(--primary)]" checked={Boolean(value.visible[key as keyof typeof value.visible])} onChange={(e) => onChange({ ...value, visible: { ...value.visible, [key]: e.target.checked } })} />{label}
             </label>
           ))}
         </div>

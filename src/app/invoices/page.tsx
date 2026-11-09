@@ -63,7 +63,7 @@ export default function InvoicesPage() {
   const [numberOverride, setNumberOverride] = useState("");
   const [lines, setLines] = useState<InvoiceLine[]>([]);
   const [shipping, setShipping] = useState(0);
-  const [draft, setDraft] = useState({ name: "", unit: "Kg", quantity: "", price: "" });
+  const [draft, setDraft] = useState({ name: "", unit: "Kg", quantity: "", price: "", description: "" });
   const [catalogQuery, setCatalogQuery] = useState("");
   // Mode edit invoice tersimpan + tanda tangan elektronik.
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -126,14 +126,14 @@ export default function InvoicesPage() {
     const price = Number(draft.price);
     if (!draft.name.trim() || !Number.isFinite(quantity) || !(quantity > 0)) return toast.error("Isi nama barang dan jumlah.");
     if (!Number.isFinite(price) || price < 0) return toast.error("Harga barang harus nol atau lebih.");
-    setLines((prev) => [...prev, { name: draft.name.trim(), unit: draft.unit.trim() || "Pcs", quantity, price: price || 0 }]);
-    setDraft({ name: "", unit: draft.unit, quantity: "", price: "" });
+    setLines((prev) => [...prev, { name: draft.name.trim(), unit: draft.unit.trim() || "Pcs", quantity, price: price || 0, ...(draft.description.trim() ? { description: draft.description.trim() } : {}) }]);
+    setDraft({ name: "", unit: draft.unit, quantity: "", price: "", description: "" });
   }
 
   // Tambah barang dari katalog toko: jika sudah ada baris sama, tambah jumlahnya.
   function addFromCatalog(item: { name: string; unit: string; price: number }) {
     setLines((prev) => {
-      const i = prev.findIndex((l) => l.name === item.name && l.unit === item.unit && l.price === item.price);
+      const i = prev.findIndex((l) => l.name === item.name && l.unit === item.unit && l.price === item.price && !l.description?.trim());
       if (i >= 0) {
         const next = [...prev];
         next[i] = { ...next[i], quantity: next[i].quantity + 1 };
@@ -436,19 +436,28 @@ export default function InvoicesPage() {
           <Card>
             <CardHeader><h2 className="font-semibold">Tambah Barang Manual</h2></CardHeader>
             <CardContent className="space-y-3">
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                <input type="checkbox" className="h-4 w-4 accent-[var(--primary)]" checked={Boolean(design.visible.description)} onChange={(e) => {
+                  if (!seller) return;
+                  setSavedSeller(snapshotInvoiceSeller({ ...seller, invoiceDesign: { ...design, visible: { ...design.visible, description: e.target.checked } } }));
+                }} />Tampilkan kolom keterangan
+              </label>
+              {!design.visible.description && <p className="text-xs text-muted">Keterangan yang sudah diisi tetap tersimpan saat kolom disembunyikan.</p>}
               <Field label="Nama Barang"><Input value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} placeholder="Pakcoy" /></Field>
               <div className="grid grid-cols-3 gap-2">
                 <Field label="Satuan"><Input value={draft.unit} onChange={(e) => setDraft((d) => ({ ...d, unit: e.target.value }))} /></Field>
                 <Field label="Jumlah"><Input type="number" min={0} step="any" value={draft.quantity} onChange={(e) => setDraft((d) => ({ ...d, quantity: e.target.value }))} /></Field>
                 <Field label="Harga"><Input type="number" min={0} value={draft.price} onChange={(e) => setDraft((d) => ({ ...d, price: e.target.value }))} /></Field>
               </div>
+              {design.visible.description && <Field label="Keterangan barang"><Textarea aria-label="Keterangan barang" value={draft.description} onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))} placeholder="Contoh: ukuran besar, kemasan khusus" /></Field>}
               <Button type="button" variant="secondary" className="w-full" onClick={addLine}><Plus className="h-4 w-4" /> Tambah ke Invoice</Button>
 
               {lines.length > 0 && (
                 <div className="space-y-1.5 pt-1">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted">Barang di Invoice ({lines.length})</p>
                   {lines.map((l, i) => (
-                    <div key={i} className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 text-sm">
+                    <div key={i} className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                      <div className="flex items-center gap-2">
                       <span className="min-w-0 flex-1 truncate">
                         {l.name}
                         <span className="text-muted"> · {currency.format(l.price)}/{l.unit}</span>
@@ -464,6 +473,8 @@ export default function InvoicesPage() {
                       />
                       <span className="w-24 shrink-0 text-right font-medium">{currency.format(invoiceLineTotal(l))}</span>
                       <button type="button" onClick={() => setLines((prev) => prev.filter((_, idx) => idx !== i))} className="text-danger" aria-label="Hapus barang"><Trash2 className="h-4 w-4" /></button>
+                      </div>
+                      {design.visible.description && <Textarea aria-label={`Keterangan ${l.name}`} className="mt-2 min-h-16" value={l.description ?? ""} onChange={(e) => setLines((prev) => prev.map((line, idx) => idx === i ? { ...line, description: e.target.value } : line))} placeholder="Keterangan barang ini (opsional)" />}
                     </div>
                   ))}
                 </div>

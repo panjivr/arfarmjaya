@@ -7,14 +7,14 @@
 // untuk verifikasi manual saat dipindai.
 
 import { canonicalJson } from "./workspace-data";
-import type { InvoiceSignature, InvoiceSeller } from "@/lib/types";
+import type { InvoiceSignature, InvoiceSeller, InvoiceLine } from "@/lib/types";
 
 export type SignableInvoice = {
   number: string;
   storeName: string;
   buyer: string;
   date: string;
-  lines: { name: string; unit: string; quantity: number; price: number }[];
+  lines: InvoiceLine[];
   subtotal: number;
   shipping: number;
   total: number;
@@ -43,7 +43,7 @@ function canonical(inv: SignableInvoice): string {
   ].join("\n");
   // Dokumen lama tetap memakai hash versi pertama. Dokumen baru juga mengikat
   // alamat, jatuh tempo, diskon, catatan, identitas dan desain penjual.
-  if ([inv.buyerPhone, inv.buyerAddress, inv.dueDate, inv.discount, inv.note, inv.seller].every((v) => v === undefined)) return legacy;
+  if ([inv.buyerPhone, inv.buyerAddress, inv.dueDate, inv.discount, inv.note, inv.seller].every((v) => v === undefined) && inv.lines.every((line) => line.description === undefined)) return legacy;
   return `v2=${canonicalJson({
     number: inv.number.trim(), storeName: inv.storeName.trim(), buyer: inv.buyer.trim(), date: inv.date,
     lines: inv.lines.map((line) => ({ ...line, name: line.name.trim(), unit: line.unit.trim() })),

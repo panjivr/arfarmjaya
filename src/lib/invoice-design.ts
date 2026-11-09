@@ -11,7 +11,7 @@ export const INVOICE_COLOR_LABELS: Record<keyof InvoiceColors, string> = {
 export const INVOICE_VISIBILITY_LABELS: Record<keyof InvoiceVisibility, string> = {
   logo: "Logo toko", tagline: "Tagline", storeAddress: "Alamat toko", storePhone: "Telepon / WA toko",
   storeEmail: "Email toko", buyerAddress: "Alamat pembeli", buyerPhone: "Telepon pembeli", dueDate: "Jatuh tempo",
-  rowNumber: "Nomor urut barang", unit: "Kolom satuan", price: "Kolom harga satuan", subtotal: "Subtotal",
+  rowNumber: "Nomor urut barang", description: "Kolom keterangan", unit: "Kolom satuan", price: "Kolom harga satuan", subtotal: "Subtotal",
   shipping: "Ongkos kirim", discount: "Diskon", payment: "Informasi pembayaran", terbilang: "Terbilang",
   signature: "Blok tanda tangan", note: "Catatan invoice", footer: "Ucapan penutup",
 };
@@ -29,9 +29,9 @@ export function resolveInvoiceDesign(store?: Pick<InvoiceSeller, "accent" | "inv
   const raw = store?.invoiceDesign;
   const preset = getInvoiceTemplate(raw?.templateId);
   if (preset) Object.assign(colors, preset.colors);
-  const visible = Object.fromEntries(Object.keys(INVOICE_VISIBILITY_LABELS).map((key) => [key, true])) as InvoiceVisibility;
+  const visible = Object.fromEntries(Object.keys(INVOICE_VISIBILITY_LABELS).filter((key) => key !== "description").map((key) => [key, true])) as InvoiceVisibility;
   for (const key of Object.keys(colors) as (keyof InvoiceColors)[]) colors[key] = hex(raw?.colors?.[key], colors[key]);
-  for (const key of Object.keys(visible) as (keyof InvoiceVisibility)[]) {
+  for (const key of Object.keys(INVOICE_VISIBILITY_LABELS) as (keyof InvoiceVisibility)[]) {
     if (typeof raw?.visible?.[key] === "boolean") visible[key] = raw.visible[key];
   }
   return {

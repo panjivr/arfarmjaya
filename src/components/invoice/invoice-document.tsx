@@ -51,7 +51,7 @@ export function InvoiceDocument({ store, invoice, id }: { store?: InvoiceSeller;
   const sig = invoice.signature;
   const qr = useInvoiceQr(sig ? invoiceQrPayload({ ...invoice, storeName: store?.name ?? "" }, sig) : null);
   const phone = invoice.buyerPhone?.trim();
-  const columns = 3 + Number(v.rowNumber) + Number(v.unit) + Number(v.price);
+  const columns = 3 + Number(v.rowNumber) + Number(v.unit) + Number(v.price) + Number(Boolean(v.description));
   const contact = [v.storePhone && store?.phone && `Telp/WA: ${store.phone}`, v.storeEmail && store?.email].filter(Boolean).join(" · ");
   const cell = { border: `1px solid ${c.border}` };
   const detail = { color: c.detail };
@@ -93,12 +93,13 @@ export function InvoiceDocument({ store, invoice, id }: { store?: InvoiceSeller;
         <table className="invoice-items w-full table-fixed border-collapse text-[11px]">
           <thead style={{ background: c.tableHeader, color: c.tableHeaderText }}>
             <tr>
-              {v.rowNumber && <th className="w-[6%] px-1 py-2 text-center">No</th>}
+              {v.rowNumber && <th className="px-1 py-2 text-center" style={{ width: v.description ? "5%" : "6%" }}>No</th>}
               <th className="px-2 py-2 text-left">Nama barang</th>
-              <th className="w-[10%] px-1 py-2 text-right">Qty</th>
-              {v.unit && <th className="w-[10%] px-1 py-2 text-center">Satuan</th>}
-              {v.price && <th className="w-[19%] px-2 py-2 text-right">Harga satuan (Rp)</th>}
-              <th className="w-[21%] px-2 py-2 text-right">Jumlah (Rp)</th>
+              {v.description && <th className="w-[23%] px-2 py-2 text-left">Keterangan</th>}
+              <th className="px-1 py-2 text-right" style={{ width: v.description ? "8%" : "10%" }}>Qty</th>
+              {v.unit && <th className="px-1 py-2 text-center" style={{ width: v.description ? "8%" : "10%" }}>Satuan</th>}
+              {v.price && <th className="px-2 py-2 text-right" style={{ width: v.description ? "16%" : "19%" }}>Harga satuan (Rp)</th>}
+              <th className="px-2 py-2 text-right" style={{ width: v.description ? "18%" : "21%" }}>Jumlah (Rp)</th>
             </tr>
           </thead>
           <tbody style={detail}>
@@ -106,6 +107,7 @@ export function InvoiceDocument({ store, invoice, id }: { store?: InvoiceSeller;
               <tr key={i} style={{ background: i % 2 ? c.alternateRow : "#ffffff" }}>
                 {v.rowNumber && <td className="px-1 py-1.5 text-center" style={cell}>{i + 1}</td>}
                 <td className="break-words px-2 py-1.5 font-medium" style={cell}>{line.name}</td>
+                {v.description && <td className="whitespace-pre-line px-2 py-1.5 text-[10px]" style={{ ...cell, overflowWrap: "anywhere" }}>{line.description || "—"}</td>}
                 <td className="px-1 py-1.5 text-right" style={cell}>{numberFmt.format(line.quantity)}</td>
                 {v.unit && <td className="break-words px-1 py-1.5 text-center" style={cell}>{line.unit}</td>}
                 {v.price && <td className="px-2 py-1.5 text-right tabular-nums" style={cell}>{numberFmt.format(line.price)}</td>}

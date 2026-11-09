@@ -215,6 +215,7 @@ export type InvoiceVisibility = {
   buyerPhone: boolean;
   dueDate: boolean;
   rowNumber: boolean;
+  description?: boolean;
   unit: boolean;
   price: boolean;
   subtotal: boolean;
@@ -281,6 +282,7 @@ export type StoreBuyer = {
 
 export type InvoiceLine = {
   name: string;
+  description?: string;
   unit: string;
   quantity: number;
   price: number;

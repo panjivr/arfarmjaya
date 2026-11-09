@@ -14,6 +14,8 @@ Pilihan tampil/sembunyi tersedia untuk identitas tambahan, kontak, alamat pembel
 
 ## Buat dan cetak
 
+Kolom **Keterangan** per barang bersifat opsional dan awalnya tersembunyi. Aktifkan **Toko → Desain invoice → Kolom keterangan** untuk default toko, atau **Tampilkan kolom keterangan** pada halaman Invoice untuk dokumen tertentu. Isi keterangan pada barang manual atau baris barang dari katalog. Mematikan kolom menyembunyikannya dari pratinjau dan cetakan tanpa menghapus isinya. Pengaturan dan isi ikut disimpan, disinkronkan, dan dicadangkan; tersedia pada seluruh 34 template. Invoice lama tetap memakai tampilan sebelumnya.
+
 Di Invoice, pilih toko, isi pembeli, tanggal, alamat, kontak, dan jatuh tempo bila diperlukan. Pilih barang dari katalog atau tambah manual. Atur ongkir, diskon rupiah, dan catatan khusus invoice. Diskon tidak boleh melebihi subtotal + ongkir. Jumlah barang harus positif. Nomor otomatis mengikuti nomor terbesar yang sudah dipakai dan nomor duplikat ditolak.
 
 Nilai tiap baris dibulatkan ke rupiah, lalu dijumlahkan untuk mendapatkan subtotal. Total = subtotal + ongkir − diskon. Cara ini menjaga angka cetak sesuai penjumlahan rincian.
