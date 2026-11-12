@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 export function SaveIndicator() {
   const status = useSyncStatus((s) => s.status);
   const message = useSyncStatus((s) => s.message);
+  const notice = useSyncStatus((s) => s.notice);
   const localError = useStorageHealth((s) => s.error);
   const [open, setOpen] = useState(false);
   const [recoveryError, setRecoveryError] = useState<string>();
@@ -81,8 +82,9 @@ export function SaveIndicator() {
     <Modal open={open} onClose={() => setOpen(false)} title="Status penyimpanan">
       <div className="space-y-4 text-sm">
         <p role="status">{error || (status === "saved" ? "Data sudah dikonfirmasi tersimpan di server." : "Penyimpanan ke server belum dikonfirmasi.")}</p>
+        {notice && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">{notice}</p>}
         {recoveryError && <p role="alert" className="text-danger">{recoveryError}</p>}
-        <p>Jika terjadi konflik, unduh cadangan perangkat ini terlebih dahulu. Muat data server, lalu rekonsiliasi perubahan lokal bersama admin sebelum melanjutkan transaksi.</p>
+        <p>Bila data perangkat berbeda dengan server, sistem otomatis menyimpan salinan data perangkat ke server sebagai salinan pemulihan, lalu memuat data server — tidak ada data yang hilang dan Anda dapat langsung melanjutkan. Tombol di bawah tersedia bila Anda ingin mengelola cadangan secara manual.</p>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={download}><Download className="h-4 w-4" /> Unduh cadangan lokal</Button>
           <Button variant="secondary" onClick={async () => { const result = await syncNow(); setRecoveryError(result.message); }}>Coba simpan lagi</Button>

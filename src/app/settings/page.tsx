@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Save, RotateCcw, Palette, Info, Download, Upload, Images } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import { PageHeader } from "@/components/ui/page-header";
@@ -23,6 +23,15 @@ export default function SettingsPage() {
   const importBackup = useUiStore((s) => s.importBackup);
   const fileRef = useRef<HTMLInputElement>(null);
   const sync = useSyncStatus();
+  const [recoveries, setRecoveries] = useState<{ id: string; updatedAt: string }[]>([]);
+
+  // Salinan pemulihan otomatis tersimpan di server (hanya terbaca oleh admin).
+  useEffect(() => {
+    fetch("/api/backup?recoveries=1")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (Array.isArray(j?.recoveries)) setRecoveries(j.recoveries); })
+      .catch(() => {});
+  }, []);
 
   async function restoreLocalBackup() {
     const backup = readLocalBackup();
@@ -277,6 +286,9 @@ export default function SettingsPage() {
                 {sync.message && (
                   <p className="mt-1 rounded-lg bg-red-50 px-2 py-1.5 text-xs font-medium text-danger dark:bg-red-950/30">{sync.message}</p>
                 )}
+                {sync.notice && (
+                  <p className="mt-1 rounded-lg bg-emerald-50 px-2 py-1.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">{sync.notice}</p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -288,7 +300,7 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted">
-                Unduh seluruh data sebagai berkas cadangan (JSON), atau pulihkan dari berkas cadangan. Berguna sebelum perubahan besar atau pindah server. Jika muncul &quot;Gagal menyimpan (HTTP 413)&quot;, klik <strong>Optimalkan Gambar</strong> untuk memperkecil foto agar data kembali bisa tersimpan.
+                Unduh seluruh data sebagai berkas cadangan (JSON), atau pulihkan dari berkas cadangan. Berguna sebelum perubahan besar atau pindah server. Jika muncul &quot;Gagal menyimpan (HTTP 413)&quot;, klik <strong>Optimalkan Gambar</strong> untuk memperkecil foto agar data kembali bisa tersimpan. Bila data suatu perangkat berbeda dengan server, sistem otomatis menyimpan salinan data perangkat itu ke server sebagai <strong>salinan pemulihan</strong> — tidak perlu unduh atau rekonsiliasi manual.
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button onClick={downloadFromServer}><Download className="h-4 w-4" /> Unduh dari Server</Button>
@@ -298,6 +310,20 @@ export default function SettingsPage() {
                 <Button variant="secondary" onClick={optimizeImages} disabled={optimizing}><Images className="h-4 w-4" /> {optimizing ? "Mengoptimalkan…" : "Optimalkan Gambar"}</Button>
                 <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={onRestoreFile} />
               </div>
+              {recoveries.length > 0 && (
+                <div className="border-t border-border pt-3">
+                  <p className="text-sm font-semibold">Salinan Pemulihan Otomatis (di server)</p>
+                  <p className="mt-0.5 text-xs text-muted">Snapshot perangkat yang berbeda dengan server, disimpan otomatis agar tidak ada data yang hilang. Unduh lalu gunakan &quot;Pulihkan dari Berkas&quot; bila perlu mengembalikannya.</p>
+                  <ul className="mt-2 space-y-1.5">
+                    {recoveries.map((r) => (
+                      <li key={r.id} className="flex items-center justify-between gap-3 text-sm">
+                        <span>{formatDateTime(r.updatedAt)}</span>
+                        <a className="font-medium text-primary underline" href={`/api/backup?version=${encodeURIComponent(r.id)}`}>Unduh</a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </CardContent>
           </Card>
 

@@ -35,13 +35,12 @@ const CHUNK_LIMIT = 3_500_000;
  * batas request, dipecah menjadi beberapa potongan (chunk). Mengembalikan
  * status HTTP terakhir + JSON balasan, agar pemanggil menangani sukses/gagal.
  */
-async function sendStateRequest(serialized: string, revision: string): Promise<{ status: number; json: Record<string, unknown> }> {
+async function sendChunked(url: string, method: string, serialized: string, headers: Record<string, string>): Promise<{ status: number; json: Record<string, unknown> }> {
   const { bytes, gzip } = await toBytes(serialized);
-  const enc: Record<string, string> = gzip ? { "x-encoding": "gzip" } : {};
-  const base: Record<string, string> = { "Content-Type": "application/octet-stream", "x-base-revision": revision, ...enc };
+  const base: Record<string, string> = { "Content-Type": "application/octet-stream", ...headers, ...(gzip ? { "x-encoding": "gzip" } : {}) };
 
   if (bytes.length <= CHUNK_LIMIT) {
-    const res = await fetch("/api/state", { method: "PUT", headers: base, body: bytes as unknown as BodyInit });
+    const res = await fetch(url, { method, headers: base, body: bytes as unknown as BodyInit });
     return { status: res.status, json: (await res.json().catch(() => ({}))) as Record<string, unknown> };
   }
 
@@ -50,8 +49,8 @@ async function sendStateRequest(serialized: string, revision: string): Promise<{
   let last: { status: number; json: Record<string, unknown> } = { status: 0, json: {} };
   for (let i = 0; i < total; i++) {
     const chunk = bytes.subarray(i * CHUNK_LIMIT, Math.min((i + 1) * CHUNK_LIMIT, bytes.length));
-    const res = await fetch("/api/state", {
-      method: "PUT",
+    const res = await fetch(url, {
+      method,
       headers: { ...base, "x-upload-id": uploadId, "x-chunk-index": String(i), "x-chunk-total": String(total) },
       body: chunk as unknown as BodyInit,
     });
@@ -59,6 +58,25 @@ async function sendStateRequest(serialized: string, revision: string): Promise<{
     if (!res.ok || last.json?.ok === false) return last; // batalkan bila ada potongan gagal
   }
   return last;
+}
+
+async function sendStateRequest(serialized: string, revision: string): Promise<{ status: number; json: Record<string, unknown> }> {
+  return sendChunked("/api/state", "PUT", serialized, { "x-base-revision": revision });
+}
+
+/**
+ * Unggah snapshot perangkat sebagai salinan pemulihan di server (baris
+ * "recovery:" — tidak mengubah data utama). Dipakai pemulihan konflik
+ * otomatis agar data perangkat tidak hilang tanpa pengguna mengunduh berkas.
+ */
+async function uploadRecoveryCopy(serialized: string): Promise<{ ok: boolean; id?: string; updatedAt?: string }> {
+  try {
+    const { status, json } = await sendChunked("/api/backup", "POST", serialized, {});
+    if (status >= 200 && status < 300 && json.ok === true && json.partial !== true && typeof json.id === "string") {
+      return { ok: true, id: json.id, updatedAt: typeof json.updatedAt === "string" ? json.updatedAt : undefined };
+    }
+  } catch { /* jaringan gagal — pemulihan otomatis tidak dilakukan */ }
+  return { ok: false };
 }
 
 function snapshot(state: Record<string, unknown>): Snapshot {
@@ -96,6 +114,8 @@ type SyncStatusState = {
   status: SyncStatusValue;
   at?: string;
   message?: string;
+  /** Informasi non-error, mis. pemberitahuan pemulihan konflik otomatis. */
+  notice?: string;
   serverUpdatedAt?: string;
   setStatus: (patch: Partial<Omit<SyncStatusState, "setStatus">>) => void;
 };
@@ -134,7 +154,7 @@ export function SyncProvider() {
     const baseline = canonicalJson(snap());
     const meta = readMeta();
     const setStatus = useSyncStatus.getState().setStatus;
-    setStatus({ status: "idle", message: "Memeriksa data server…", serverUpdatedAt: undefined });
+    setStatus({ status: "idle", message: "Memeriksa data server…", notice: undefined, serverUpdatedAt: undefined });
     const queue = new SyncQueue(sendStateRequest, (serialized, reply) => {
       writeMeta({ syncedAt: reply.updatedAt as string, sig: sig(serialized), cacheFailed: Boolean(useStorageHealth.getState().error) });
       setStatus({ serverUpdatedAt: reply.updatedAt as string });
@@ -194,14 +214,28 @@ export function SyncProvider() {
         const serverData = json.data === null ? null : parseWorkspace(json.data);
         const localData = snap();
         const localStr = canonicalJson(localData);
-        const decision = decideSync({ localStr, baseline, hasServerData: Boolean(serverData), serverStr: serverData ? canonicalJson(serverData) : undefined, serverUpdatedAt: json.updatedAt ?? null,
+        let decision = decideSync({ localStr, baseline, hasServerData: Boolean(serverData), serverStr: serverData ? canonicalJson(serverData) : undefined, serverUpdatedAt: json.updatedAt ?? null,
           metaSyncedAt: meta.syncedAt, metaSig: meta.sig, metaCacheFailed: meta.cacheFailed, localPristine: isPristineSnapshot(localData, factorySnapshot()), localSig: sig(localStr) });
-        if (decision === "conflict") throw new Error("Perubahan lokal berbeda dengan versi server. Data lokal dipertahankan; unduh cadangan sebelum memuat ulang dan rekonsiliasi data.");
+        let recovery: { id: string; updatedAt?: string } | undefined;
+        if (decision === "conflict" && serverData) {
+          // Pemulihan konflik otomatis: salinan data perangkat disimpan ke
+          // server terlebih dahulu (baris "recovery:"); sesudah aman di
+          // server, data server dimuat. Data perangkat tidak hilang dan
+          // pengguna tidak perlu mengunduh atau merekonsiliasi apa pun
+          // secara manual. Bila unggahan gagal (mis. tidak ada koneksi),
+          // perilaku lama berlaku: konflik dipertahankan, data lokal utuh.
+          const uploaded = await uploadRecoveryCopy(localStr);
+          if (uploaded.ok && uploaded.id) {
+            recovery = { id: uploaded.id, updatedAt: uploaded.updatedAt };
+            decision = "adopt-server";
+          }
+        }
+        if (decision === "conflict") throw new Error("Perubahan lokal berbeda dengan versi server dan salinan pemulihan belum dapat disimpan ke server. Data lokal dipertahankan; periksa koneksi Anda lalu coba lagi.");
         if (decision === "adopt-server" && serverData) {
           // Never drop fields unknown to this browser (e.g. an older client).
           const unknown = Object.keys(json.data).filter((key) => !(WORKSPACE_KEYS as readonly string[]).includes(key));
           if (unknown.length) throw new Error("Versi data server berbeda. Perbarui aplikasi sebelum menyimpan.");
-          if (localStr !== canonicalJson(serverData) && !preserveLocalSnapshot(snap())) throw new Error("Cadangan lokal gagal dibuat. Data perangkat dipertahankan; unduh cadangan dan kosongkan ruang penyimpanan sebelum memuat ulang.");
+          if (localStr !== canonicalJson(serverData) && !preserveLocalSnapshot(snap()) && !recovery) throw new Error("Cadangan lokal gagal dibuat. Data perangkat dipertahankan; unduh cadangan dan kosongkan ruang penyimpanan sebelum memuat ulang.");
           applyingServer = true;
           useUiStore.setState(serverData);
           applyingServer = false;
@@ -209,7 +243,13 @@ export function SyncProvider() {
           queue.initialize(json.revision, adopted);
           writeMeta({ syncedAt: json.updatedAt, sig: sig(adopted), cacheFailed: Boolean(useStorageHealth.getState().error) });
           ready = true;
-          setStatus({ status: "saved", at: new Date().toISOString(), message: undefined, serverUpdatedAt: json.updatedAt });
+          if (recovery) {
+            useUiStore.getState().audit("Pemulihan otomatis", "Sinkronisasi", `Data perangkat berbeda dengan server; salinan perangkat disimpan di server (${recovery.id}) dan data server dimuat.`);
+            setStatus({ status: "saved", at: new Date().toISOString(), message: undefined, serverUpdatedAt: json.updatedAt,
+              notice: "Data di perangkat ini berbeda dengan data server, jadi sistem menyimpan salinan data perangkat ke server sebagai salinan pemulihan lalu memuat data server. Tidak ada data yang hilang — admin dapat meninjau salinan pemulihan di Pengaturan → Cadangan & Pemulihan." });
+          } else {
+            setStatus({ status: "saved", at: new Date().toISOString(), message: undefined, serverUpdatedAt: json.updatedAt });
+          }
         } else {
           queue.initialize(json.revision);
           ready = true;
