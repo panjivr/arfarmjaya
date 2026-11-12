@@ -2,10 +2,10 @@
 
 import { useEffect } from "react";
 import { create } from "zustand";
-import { useUiStore } from "@/lib/store";
+import { useUiStore, factorySnapshot } from "@/lib/store";
 import { decideSync } from "@/lib/sync-decide";
 
-import { WORKSPACE_KEYS, parseWorkspace, canonicalJson } from "@/lib/workspace-data";
+import { WORKSPACE_KEYS, parseWorkspace, canonicalJson, isPristineSnapshot } from "@/lib/workspace-data";
 import { preserveLocalSnapshot, useStorageHealth } from "@/lib/local-persistence";
 import { SyncQueue, type SaveResult } from "@/lib/sync-queue";
 export { readLocalBackup } from "@/lib/local-persistence";
@@ -150,7 +150,9 @@ export function SyncProvider() {
       return result;
     }
     const saveOrInitialize = async (): Promise<SaveResult> => {
-      if (!ready) await initialize();
+      // An explicit retry after a conflict must re-read the server first: the
+      // queue alone keeps refusing with the revision that already failed.
+      if (!ready || queue.hasConflict) await initialize();
       return save();
     };
     activeSave = saveOrInitialize;
@@ -186,9 +188,10 @@ export function SyncProvider() {
         }
         if (cancelled) return;
         const serverData = json.data === null ? null : parseWorkspace(json.data);
-        const localStr = canonicalJson(snap());
+        const localData = snap();
+        const localStr = canonicalJson(localData);
         const decision = decideSync({ localStr, baseline, hasServerData: Boolean(serverData), serverStr: serverData ? canonicalJson(serverData) : undefined, serverUpdatedAt: json.updatedAt ?? null,
-          metaSyncedAt: meta.syncedAt, metaSig: meta.sig, metaCacheFailed: meta.cacheFailed, localSig: sig(localStr) });
+          metaSyncedAt: meta.syncedAt, metaSig: meta.sig, metaCacheFailed: meta.cacheFailed, localPristine: isPristineSnapshot(localData, factorySnapshot()), localSig: sig(localStr) });
         if (decision === "conflict") throw new Error("Perubahan lokal berbeda dengan versi server. Data lokal dipertahankan; unduh cadangan sebelum memuat ulang dan rekonsiliasi data.");
         if (decision === "adopt-server" && serverData) {
           // Never drop fields unknown to this browser (e.g. an older client).

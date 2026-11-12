@@ -17,9 +17,14 @@ export class SyncQueue {
   initialize(revision: string, serialized = "") {
     this.revision = revision;
     this.lastAck = serialized;
+    // A fresh server read establishes a new baseline: a conflict latched
+    // against the old revision must not block saves against the new one,
+    // otherwise "Coba simpan lagi" can never recover after a single 409.
+    this.conflict = false;
   }
   stop() { this.stopped = true; }
   get acknowledgedSnapshot() { return this.lastAck; }
+  get hasConflict() { return this.conflict; }
 
   save(serialized: string): Promise<SaveResult> {
     const task = this.tail.then(async (): Promise<SaveResult> => {

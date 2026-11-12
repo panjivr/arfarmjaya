@@ -60,6 +60,34 @@ export function parseWorkspace(value: unknown, complete = false): WorkspaceData 
   return out;
 }
 
+// Fields generated when the factory seed is built (random ids, timestamps).
+// They differ between devices without representing real data differences.
+const VOLATILE_KEYS = new Set(["id", "createdAt", "lastUpdate", "updatedAt"]);
+
+export function stripVolatileFields(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stripVolatileFields);
+  if (record(value)) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([key]) => !VOLATILE_KEYS.has(key))
+        .map(([key, item]) => [key, stripVolatileFields(item)]),
+    );
+  }
+  return value;
+}
+
+/**
+ * True when a local snapshot still holds only the factory seed: every business
+ * collection matches a freshly built initial state once generated ids and
+ * timestamps are ignored. Append-only bookkeeping (audit log, read markers)
+ * is excluded — it is preserved in the pre-adopt backup snapshot.
+ */
+export function isPristineSnapshot(local: WorkspaceData, factory: WorkspaceData): boolean {
+  return WORKSPACE_KEYS
+    .filter((key) => key !== "auditLog" && key !== "readNotifications")
+    .every((key) => canonicalJson(stripVolatileFields(local[key])) === canonicalJson(stripVolatileFields(factory[key])));
+}
+
 // Order object keys for stable comparisons across JSONB storage and browsers.
 export function canonicalJson(value: unknown): string {
   // Use JSON's own omission/null rules for optional undefined fields. Building

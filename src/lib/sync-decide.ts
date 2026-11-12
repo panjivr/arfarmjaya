@@ -9,6 +9,8 @@ export type SyncInputs = {
   metaSig?: string;
   /** The acknowledged server snapshot could not be persisted on this device. */
   metaCacheFailed?: boolean;
+  /** Local data is still exactly the factory seed (no real records entered). */
+  localPristine?: boolean;
   localSig: string;
 };
 
@@ -21,6 +23,11 @@ export function decideSync(i: SyncInputs): SyncDecision {
   // A lost response or another tab may already have saved exactly this data.
   // Matching validated snapshots need no manual conflict reconciliation.
   if (i.serverStr === i.localStr) return "adopt-server";
+  // A device still holding only the factory seed has no real work to protect:
+  // the seed is reproducible from the app itself, so adopting the server can
+  // never lose data. Without this, any incidental mutation before the first
+  // successful sync traps a new device in a permanent conflict.
+  if (i.localPristine) return "adopt-server";
   // An older durable cache is not an offline edit. Never upload it over the
   // newer acknowledged server snapshot after a quota failure and reload.
   if (i.metaCacheFailed && dirty) return "conflict";
