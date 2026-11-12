@@ -12,10 +12,16 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 const json = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { "Cache-Control": "no-store" } });
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!(await currentSession())) return json({ error: "unauthorized" }, 401);
   if (!prisma) return json({ error: "no_database", db: false }, 503);
   try {
+    // Pemeriksaan ringan untuk polling multi-admin ("selalu terbaru"): hanya
+    // stempel waktu baris utama, tanpa membaca/memproses seluruh data.
+    if (new URL(request.url).searchParams.get("check") === "1") {
+      const row = await prisma.workspace.findUnique({ where: { id: "main" }, select: { updatedAt: true } });
+      return json({ db: true, updatedAt: row?.updatedAt ?? null });
+    }
     const row = await prisma.workspace.findUnique({ where: { id: "main" } });
     return json({ data: row ? parseWorkspace(row.data) : null, db: true, updatedAt: row?.updatedAt ?? null, revision: workspaceRevision(row) });
   } catch (error) {

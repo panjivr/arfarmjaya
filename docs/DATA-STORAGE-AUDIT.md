@@ -139,6 +139,20 @@ pemulihan di Pengaturan → Cadangan & Pemulihan (`GET /api/backup?recoveries=1`
 dan `?version=recovery:<uuid>`, khusus ADMIN_UTAMA), lalu memulihkannya lewat
 "Pulihkan dari Berkas" bila diperlukan.
 
+Masih di 2026-11-12 (lanjutan): aplikasi dipakai banyak admin bersamaan,
+jadi klien kini "selalu terbaru". `GET /api/state?check=1` menjawab hanya
+stempel waktu baris utama (tanpa membaca data); klien memeriksanya tiap
+±25 detik dan saat tab kembali aktif. Bila server lebih baru dan perangkat
+ini bersih (tidak ada perubahan belum diakui), data terbaru dimuat otomatis.
+Bila pengguna punya perubahan belum tersimpan, ia hanya diberi tahu —
+datanya tidak ditarik dari layar. Konsekuensinya pemuatan kini bermode:
+"initial" (pemulihan otomatis seperti di atas), "refresh" (adopsi senyap
+saat bersih), dan "retry" (sesudah simpan ditolak 409: edit segar TIDAK
+diadopsi otomatis — dilindungi sebagai salinan pemulihan di latar dan
+pengguna memutuskan sendiri kapan beralih lewat "Cadangkan & muat data
+server"). Penanda kotor pada pemuatan tengah sesi membaca meta sesi yang
+segar dan tanda tangan terakhir yang diakui, bukan baseline awal sesi.
+
 Masih di 2026-11-12: persist lokal Zustand dipindahkan dari localStorage ke
 IndexedDB (`src/lib/persist-storage.ts` + `src/lib/idb-storage.ts`). Dataset
 ±5,4 MB sudah melampaui kuota localStorage untuk satu salinan saja, sehingga
