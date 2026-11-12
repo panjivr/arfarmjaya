@@ -119,3 +119,22 @@ otomatis. Inisialisasi akun menggunakan INSERT ... ON CONFLICT DO NOTHING agar l
 pertama bersamaan tidak gagal karena duplikasi username. Uji khusus tersedia
 melalui `NODE_ENV=production npm run test:auth:postgres` dengan database lokal
 sementara, tabel AppUser kosong, dan ADMIN_PASSWORD uji yang kuat.
+
+## Pembaruan 2026-11-12 — pemulihan konflik otomatis di server
+
+Perilaku konflik pada pemuatan awal berubah: konflik tidak lagi berhenti
+sebagai jalan buntu manual. Saat keputusan sinkronisasi adalah konflik dan
+server memiliki data, klien terlebih dahulu mengunggah snapshot perangkatnya
+ke `POST /api/backup`, yang menyimpannya sebagai baris Workspace
+`recovery:<uuid>` (terpisah dari `main` dan dari versi pengaman `backup:`;
+dijaga maksimal 10 salinan terbaru). Sesudah salinan itu aman di database,
+klien memuat data server, menambahkan entri Log Audit "Pemulihan otomatis",
+dan menampilkan pemberitahuan non-error kepada pengguna. Jaminan audit ini
+tetap berlaku: perubahan lokal tidak pernah hilang tanpa cadangan yang tahan
+lama — cadangannya kini berada di server, bukan berkas unduhan yang harus
+dijaga pengguna. Bila unggahan salinan pemulihan gagal (mis. tidak ada
+koneksi), perilaku lama tetap berlaku: konflik dipertahankan, data lokal
+utuh, dan tidak ada yang ditimpa. Admin dapat melihat dan mengunduh salinan
+pemulihan di Pengaturan → Cadangan & Pemulihan (`GET /api/backup?recoveries=1`
+dan `?version=recovery:<uuid>`, khusus ADMIN_UTAMA), lalu memulihkannya lewat
+"Pulihkan dari Berkas" bila diperlukan.
