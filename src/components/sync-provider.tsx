@@ -152,7 +152,6 @@ export function SyncProvider() {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const snap = () => snapshot(useUiStore.getState() as unknown as Record<string, unknown>);
     const baseline = canonicalJson(snap());
-    const meta = readMeta();
     const setStatus = useSyncStatus.getState().setStatus;
     setStatus({ status: "idle", message: "Memeriksa data server…", notice: undefined, serverUpdatedAt: undefined });
     const queue = new SyncQueue(sendStateRequest, (serialized, reply) => {
@@ -176,7 +175,7 @@ export function SyncProvider() {
     const saveOrInitialize = async (): Promise<SaveResult> => {
       // An explicit retry after a conflict must re-read the server first: the
       // queue alone keeps refusing with the revision that already failed.
-      if (!ready || queue.hasConflict) await initialize();
+      if (!ready || queue.hasConflict) await initialize("retry");
       return save();
     };
     activeSave = saveOrInitialize;
@@ -203,7 +202,8 @@ export function SyncProvider() {
     };
     window.addEventListener("beforeunload", onBeforeUnload);
 
-    async function load() {
+    type LoadMode = "initial" | "refresh" | "retry";
+    async function load(mode: LoadMode = "initial") {
       try {
         const response = await fetch("/api/state", { cache: "no-store" });
         const json = await response.json();
@@ -214,20 +214,36 @@ export function SyncProvider() {
         const serverData = json.data === null ? null : parseWorkspace(json.data);
         const localData = snap();
         const localStr = canonicalJson(localData);
-        let decision = decideSync({ localStr, baseline, hasServerData: Boolean(serverData), serverStr: serverData ? canonicalJson(serverData) : undefined, serverUpdatedAt: json.updatedAt ?? null,
-          metaSyncedAt: meta.syncedAt, metaSig: meta.sig, metaCacheFailed: meta.cacheFailed, localPristine: isPristineSnapshot(localData, factorySnapshot()), localSig: sig(localStr) });
+        // Meta dibaca segar pada setiap pemuatan: di tengah sesi, tanda tangan
+        // terakhir yang diakui server adalah penanda kotor yang sebenarnya.
+        const freshMeta = readMeta();
+        let decision = decideSync({ localStr, baseline: mode === "initial" ? baseline : localStr, hasServerData: Boolean(serverData), serverStr: serverData ? canonicalJson(serverData) : undefined, serverUpdatedAt: json.updatedAt ?? null,
+          metaSyncedAt: freshMeta.syncedAt, metaSig: freshMeta.sig, metaCacheFailed: freshMeta.cacheFailed, localPristine: isPristineSnapshot(localData, factorySnapshot()), localSig: sig(localStr) });
         let recovery: { id: string; updatedAt?: string } | undefined;
         if (decision === "conflict" && serverData) {
-          // Pemulihan konflik otomatis: salinan data perangkat disimpan ke
-          // server terlebih dahulu (baris "recovery:"); sesudah aman di
-          // server, data server dimuat. Data perangkat tidak hilang dan
-          // pengguna tidak perlu mengunduh atau merekonsiliasi apa pun
-          // secara manual. Bila unggahan gagal (mis. tidak ada koneksi),
-          // perilaku lama berlaku: konflik dipertahankan, data lokal utuh.
-          const uploaded = await uploadRecoveryCopy(localStr);
-          if (uploaded.ok && uploaded.id) {
-            recovery = { id: uploaded.id, updatedAt: uploaded.updatedAt };
-            decision = "adopt-server";
+          if (mode === "initial") {
+            // Pemulihan konflik otomatis saat aplikasi dibuka: salinan data
+            // perangkat disimpan ke server terlebih dahulu (baris
+            // "recovery:"); sesudah aman di server, data server dimuat. Data
+            // perangkat tidak hilang dan pengguna tidak perlu mengunduh atau
+            // merekonsiliasi apa pun secara manual. Bila unggahan gagal
+            // (mis. tidak ada koneksi), konflik dipertahankan, data utuh.
+            const uploaded = await uploadRecoveryCopy(localStr);
+            if (uploaded.ok && uploaded.id) {
+              recovery = { id: uploaded.id, updatedAt: uploaded.updatedAt };
+              decision = "adopt-server";
+            }
+          } else if (mode === "retry") {
+            // Edit segar pengguna yang baru saja ditolak server TIDAK boleh
+            // disapu otomatis: lindungi sebagai salinan pemulihan di latar,
+            // tampilkan datanya tetap di layar, dan biarkan pengguna yang
+            // memutuskan kapan beralih ke data terbaru.
+            void uploadRecoveryCopy(localStr);
+            throw new Error("Data server berubah oleh admin lain, jadi perubahan terakhirmu belum dapat disimpan menimpa data terbaru. Perubahanmu tetap aman di perangkat ini dan sedang disalin sebagai salinan pemulihan di server. Untuk beralih ke data terbaru, buka status simpan lalu pilih 'Cadangkan & muat data server'.");
+          } else {
+            // refresh berkala: jangan mengganggu pengguna yang sedang bekerja.
+            setStatus({ notice: "Ada data terbaru dari admin lain di server. Data terbaru akan dimuat setelah perubahanmu tersimpan." });
+            return;
           }
         }
         if (decision === "conflict") throw new Error("Perubahan lokal berbeda dengan versi server dan salinan pemulihan belum dapat disimpan ke server. Data lokal dipertahankan; periksa koneksi Anda lalu coba lagi.");
@@ -247,6 +263,9 @@ export function SyncProvider() {
             useUiStore.getState().audit("Pemulihan otomatis", "Sinkronisasi", `Data perangkat berbeda dengan server; salinan perangkat disimpan di server (${recovery.id}) dan data server dimuat.`);
             setStatus({ status: "saved", at: new Date().toISOString(), message: undefined, serverUpdatedAt: json.updatedAt,
               notice: "Data di perangkat ini berbeda dengan data server, jadi sistem menyimpan salinan data perangkat ke server sebagai salinan pemulihan lalu memuat data server. Tidak ada data yang hilang — admin dapat meninjau salinan pemulihan di Pengaturan → Cadangan & Pemulihan." });
+          } else if (mode === "refresh") {
+            setStatus({ status: "saved", at: new Date().toISOString(), message: undefined, serverUpdatedAt: json.updatedAt,
+              notice: "Data diperbarui otomatis dari server (perubahan admin lain)." });
           } else {
             setStatus({ status: "saved", at: new Date().toISOString(), message: undefined, serverUpdatedAt: json.updatedAt });
           }
@@ -259,12 +278,43 @@ export function SyncProvider() {
         if (!cancelled) setStatus({ status: "error", message: error instanceof Error ? error.message : "Data server gagal dimuat. Perubahan lokal dipertahankan." });
       }
     }
-    function initialize(): Promise<void> {
+    function initialize(mode: LoadMode = "initial"): Promise<void> {
       if (cancelled) return Promise.resolve();
-      if (!initializing) initializing = load().finally(() => { initializing = undefined; });
+      if (!initializing) initializing = load(mode).finally(() => { initializing = undefined; });
       return initializing;
     }
     void initialize();
+
+    // "Selalu terbaru" untuk banyak admin: periksa stempel revisi server
+    // secara berkala (permintaan ringan, tanpa data) dan saat tab kembali
+    // aktif. Bila server lebih baru dan perangkat ini bersih, data terbaru
+    // dimuat otomatis; bila pengguna punya perubahan belum tersimpan, ia
+    // hanya diberi tahu — datanya tidak pernah ditarik dari layar.
+    let checking = false;
+    let lastNotifiedServerAt: string | undefined;
+    async function checkForUpdates() {
+      if (cancelled || !ready || checking || pending > 0) return;
+      if (document.visibilityState !== "visible") return;
+      checking = true;
+      try {
+        const res = await fetch("/api/state?check=1", { cache: "no-store" });
+        const check = await res.json().catch(() => null);
+        if (!res.ok || !check || check.db !== true || typeof check.updatedAt !== "string") return;
+        const known = useSyncStatus.getState().serverUpdatedAt;
+        if (!known || check.updatedAt <= known) return;
+        if (canonicalJson(snap()) === queue.acknowledgedSnapshot) {
+          await initialize("refresh");
+        } else if (lastNotifiedServerAt !== check.updatedAt) {
+          lastNotifiedServerAt = check.updatedAt;
+          setStatus({ notice: "Ada data terbaru dari admin lain di server. Perubahanmu yang belum tersimpan tetap aman di perangkat ini — data terbaru dimuat begitu perubahanmu tersimpan atau kamu memuat ulang." });
+        }
+      } catch { /* pemeriksaan berikutnya akan mencoba lagi */ }
+      finally { checking = false; }
+    }
+    const poll = setInterval(() => { void checkForUpdates(); }, 25_000);
+    const onVisible = () => { if (document.visibilityState === "visible") void checkForUpdates(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
 
     return () => {
       cancelled = true;
@@ -272,8 +322,11 @@ export function SyncProvider() {
       queue.stop();
       if (activeSave === saveOrInitialize) activeSave = undefined;
       clearTimeout(timer);
+      clearInterval(poll);
       unsubscribe();
       document.removeEventListener("visibilitychange", onHide);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
       window.removeEventListener("pagehide", flush);
       window.removeEventListener("online", onOnline);
       window.removeEventListener("beforeunload", onBeforeUnload);

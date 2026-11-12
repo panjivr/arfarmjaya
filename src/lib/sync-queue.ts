@@ -29,7 +29,7 @@ export class SyncQueue {
   save(serialized: string): Promise<SaveResult> {
     const task = this.tail.then(async (): Promise<SaveResult> => {
       if (this.stopped || !this.revision) return { ok: false, message: "Data server belum berhasil dimuat. Muat ulang sebelum menyimpan." };
-      if (this.conflict) return { ok: false, message: "Ada konflik data. Unduh cadangan perangkat ini, lalu muat ulang dan rekonsiliasi perubahan sebelum menyimpan kembali." };
+      if (this.conflict) return { ok: false, message: "Ada konflik data. Perubahan lokal dipertahankan — buka status simpan untuk beralih ke data server terbaru." };
       if (serialized === this.lastAck) return { ok: true };
       try {
         const { status, json } = await this.send(serialized, this.revision);
@@ -42,7 +42,7 @@ export class SyncQueue {
         }
         if (status === 409 || status === 428) {
           this.conflict = true;
-          return { ok: false, message: "Data server berubah di perangkat lain. Perubahan lokal dipertahankan. Unduh cadangan lokal sebelum memuat ulang dan rekonsiliasi data." };
+          return { ok: false, message: "Data server berubah oleh admin lain. Perubahanmu dipertahankan di perangkat ini; buka status simpan untuk menyelesaikan." };
         }
         return { ok: false, message: status === 401 ? "Sesi login berakhir. Masuk ulang untuk menyimpan." : status === 403 ? "Perubahan ditolak karena izin akun tidak sesuai." : json.db === false ? "Database server tidak aktif. Data belum tersimpan ke server." : `Gagal menyimpan ke server (HTTP ${status}).` };
       } catch {
