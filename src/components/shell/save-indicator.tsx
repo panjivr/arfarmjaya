@@ -16,6 +16,7 @@ export function SaveIndicator() {
   const localError = useStorageHealth((s) => s.error);
   const [open, setOpen] = useState(false);
   const [recoveryError, setRecoveryError] = useState<string>();
+  const [fileBackupReady, setFileBackupReady] = useState(false);
   const error = localError || message;
   function download() {
     try {
@@ -27,6 +28,7 @@ export function SaveIndicator() {
       a.href = url;
       a.download = `arfarmjaya-local-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
       a.click();
+      setFileBackupReady(true);
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch {
       setRecoveryError("Cadangan tidak dapat diunduh. Periksa izin penyimpanan browser dan jangan hapus data situs.");
@@ -86,7 +88,7 @@ export function SaveIndicator() {
           <Button variant="secondary" onClick={async () => { const result = await syncNow(); setRecoveryError(result.message); }}>Coba simpan lagi</Button>
           <Button variant="secondary" onClick={() => {
             if (!confirm("Data perangkat akan dicadangkan, lalu diganti dengan data server. Pastikan cadangan unduhan Anda sudah disimpan. Lanjutkan?")) return;
-            const result = reloadFromServer();
+            const result = reloadFromServer(fileBackupReady);
             setRecoveryError(result.message);
           }}>Cadangkan & muat data server</Button>
         </div>

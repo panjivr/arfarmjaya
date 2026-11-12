@@ -4,12 +4,19 @@ import { safeStorage, preserveLocalSnapshot, readLocalBackup, useStorageHealth }
 
 const values = new Map<string, string>();
 let quotaFull = false;
+let byteBudget = Infinity;
 const storage = {
   get length() { return values.size; },
   clear() { values.clear(); },
   key(i: number) { return [...values.keys()][i] ?? null; },
   getItem(key: string) { return values.get(key) ?? null; },
-  setItem(key: string, value: string) { if (quotaFull) throw new Error("QuotaExceededError"); values.set(key, value); },
+  setItem(key: string, value: string) {
+    if (quotaFull) throw new Error("QuotaExceededError");
+    const next = new Map(values); next.set(key, value);
+    const used = [...next.entries()].reduce((n, [k, v]) => n + k.length + v.length, 0);
+    if (used > byteBudget) throw new Error("QuotaExceededError");
+    values.set(key, value);
+  },
   removeItem(key: string) { values.delete(key); },
 };
 Object.defineProperty(globalThis, "localStorage", { value: storage, configurable: true });
@@ -35,6 +42,27 @@ test("local replacements preserve earlier recovery snapshots; full quota blocks 
   assert.equal(preserveLocalSnapshot({ data: "third" }), false);
   assert.equal(readLocalBackup()?.data.data, "second");
   quotaFull = false;
+});
+test("rotated recovery copies are capped so full-size snapshots cannot pile up and exhaust storage", () => {
+  values.clear();
+  assert.equal(preserveLocalSnapshot({ data: "one" }), true);
+  assert.equal(preserveLocalSnapshot({ data: "two" }), true);
+  assert.equal(preserveLocalSnapshot({ data: "three" }), true);
+  const rotated = [...values.keys()].filter((k) => k.startsWith("arfarmjaya-local-backup:"));
+  assert.equal(rotated.length, 1);
+  assert.equal(JSON.parse(values.get(rotated[0])!).data.data, "two");
+  assert.equal(readLocalBackup()?.data.data, "three");
+});
+test("when storage is nearly full, sacrificing rotated copies makes room for the newest backup", () => {
+  values.clear();
+  byteBudget = Infinity;
+  assert.equal(preserveLocalSnapshot({ data: "x".repeat(200) }), true);
+  assert.equal(preserveLocalSnapshot({ data: "y".repeat(200) }), true);
+  const used = [...values.entries()].reduce((n, [k, v]) => n + k.length + v.length, 0);
+  byteBudget = used + 10; // nothing more fits until something is freed
+  assert.equal(preserveLocalSnapshot({ data: "z".repeat(400) }), true);
+  assert.equal(readLocalBackup()?.data.data, "z".repeat(400));
+  byteBudget = Infinity;
 });
 test("real store backup round-trips; malformed imports and failed safety backup cannot replace data", async () => {
   const { useUiStore } = await import("../src/lib/store");

@@ -105,9 +105,13 @@ export async function syncNow(): Promise<SaveResult> {
   return activeSave ? activeSave() : { ok: false, message: "Sinkronisasi belum siap. Masuk dan tunggu data server berhasil dimuat." };
 }
 
-export function reloadFromServer(): SaveResult {
+export function reloadFromServer(fileBackupReady = false): SaveResult {
   const data = snapshot(useUiStore.getState() as unknown as Record<string, unknown>);
-  if (!preserveLocalSnapshot(data)) return { ok: false, message: "Cadangan lokal gagal disimpan. Unduh cadangan dan kosongkan ruang penyimpanan sebelum memuat data server." };
+  // A downloaded backup file is an equally durable safety copy — more durable
+  // than local storage, in fact. When the device storage is too full to hold
+  // another full snapshot, a completed download in this dialog may stand in
+  // for the local snapshot instead of blocking recovery forever.
+  if (!preserveLocalSnapshot(data) && !fileBackupReady) return { ok: false, message: "Cadangan lokal gagal disimpan (penyimpanan perangkat penuh). Unduh cadangan terlebih dahulu lewat tombol Unduh cadangan lokal — setelah berkasnya terunduh, tombol ini bisa melanjutkan." };
   try { sessionStorage.removeItem(META_KEY); }
   catch { return { ok: false, message: "Metadata perangkat tidak dapat diperbarui. Periksa izin penyimpanan browser." }; }
   window.location.reload();
