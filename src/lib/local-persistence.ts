@@ -4,16 +4,20 @@ import { parseWorkspace, canonicalJson } from "./workspace-data";
 
 export const useStorageHealth = create<{ error?: string }>(() => ({}));
 let readBlocked = false;
+
+/** Validate a persisted payload exactly as the store hydration expects it. */
+export function assertValidPersisted(raw: string): void {
+  const parsed = JSON.parse(raw);
+  if (!parsed || typeof parsed !== "object" || !parsed.state || typeof parsed.state !== "object") throw new Error("invalid_state");
+  parseWorkspace(parsed.state);
+}
+
 export const safeStorage = {
   getItem(name: string) {
     if (typeof window === "undefined") return null;
     try {
       const raw = localStorage.getItem(name);
-      if (raw !== null) {
-        const parsed = JSON.parse(raw);
-        if (!parsed || typeof parsed !== "object" || !parsed.state || typeof parsed.state !== "object") throw new Error("invalid_state");
-        parseWorkspace(parsed.state);
-      }
+      if (raw !== null) assertValidPersisted(raw);
       return raw;
     } catch {
       readBlocked = true;
