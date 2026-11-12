@@ -376,6 +376,15 @@ function buildInitial(): State {
   };
 }
 
+/** Factory-seed snapshot of the business data, for recognising a device that
+ *  has never held real records (used by the initial sync decision). */
+export function factorySnapshot(): Record<string, unknown> {
+  const initial = buildInitial() as unknown as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const key of WORKSPACE_KEYS) out[key] = initial[key];
+  return out;
+}
+
 export const useUiStore = create<State & Actions>()(
   persist(
     (set, get) => ({

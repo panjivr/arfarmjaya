@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { decideSync, type SyncInputs } from "../src/lib/sync-decide";
 import { SyncQueue, type SaveReply } from "../src/lib/sync-queue";
+import { isPristineSnapshot } from "../src/lib/workspace-data";
 const input: SyncInputs = { localStr: "local", baseline: "local", hasServerData: true, serverUpdatedAt: "v2", metaSyncedAt: "v1", metaSig: "old", localSig: "new" };
 
 test("offline edits with a newer server are conflicts, even if edited during load", () => {
@@ -20,6 +21,20 @@ test("only a matching server version permits offline edits; database disappearan
 test("an older browser cache after a failed local write cannot replace the acknowledged server on reload", () => {
   assert.equal(decideSync({ ...input, serverUpdatedAt: "v1", metaCacheFailed: true }), "conflict");
   assert.equal(decideSync({ ...input, serverUpdatedAt: "v1", metaCacheFailed: true, localSig: "old" }), "adopt-server");
+});
+test("a device holding only the factory seed adopts the server instead of trapping in conflict", () => {
+  assert.equal(decideSync({ ...input, localPristine: true }), "adopt-server");
+  assert.equal(decideSync({ ...input, localPristine: true, baseline: "before" }), "adopt-server");
+  // Database disappearance stays protected even for a pristine device.
+  assert.equal(decideSync({ ...input, localPristine: true, hasServerData: false }), "conflict");
+  assert.equal(decideSync({ ...input, localPristine: true, hasServerData: false, metaSyncedAt: undefined }), "push-local");
+});
+test("pristine detection ignores generated ids/timestamps and bookkeeping, but catches real records", () => {
+  const factory = { products: [{ sku: "A", id: "1", createdAt: "t0" }], stores: [{ name: "SEED", id: "x" }], auditLog: [] as unknown[] };
+  const fresh = { products: [{ sku: "A", id: "2", createdAt: "t9" }], stores: [{ name: "SEED", id: "y" }], auditLog: [{ id: "a" }] };
+  assert.equal(isPristineSnapshot(fresh, factory), true);
+  assert.equal(isPristineSnapshot({ ...fresh, invoices: [{ id: "inv1", number: "INV/1" }] }, factory), false);
+  assert.equal(isPristineSnapshot({ ...fresh, products: [{ sku: "B", id: "2", createdAt: "t9" }] }, factory), false);
 });
 test("matching server data recovers a lost acknowledgement or another tab's save without a false conflict", () => {
   assert.equal(decideSync({ ...input, serverStr: input.localStr }), "adopt-server");
@@ -60,6 +75,19 @@ test("conflict freezes writes and never acknowledges rejected local data", async
   assert.equal(calls, 1);
   assert.equal(acknowledgements, 0);
   assert.equal(queue.acknowledgedSnapshot, "original");
+});
+test("re-initializing after a conflict clears the latch so an explicit retry can save", async () => {
+  let conflicted = true;
+  const queue = new SyncQueue(async () => (conflicted ? { status: 409, json: { ok: false } } : reply("v1")), () => {});
+  queue.initialize("v0", "original");
+  assert.equal((await queue.save("A")).ok, false);
+  assert.equal(queue.hasConflict, true);
+  assert.equal((await queue.save("A")).ok, false);
+  conflicted = false;
+  queue.initialize("v1", "server");
+  assert.equal(queue.hasConflict, false);
+  assert.equal((await queue.save("A")).ok, true);
+  assert.equal(queue.acknowledgedSnapshot, "A");
 });
 test("partial uploads, false HTTP successes, and network failures never mean saved", async () => {
   for (const response of [{ status: 200, json: { ok: true, partial: true } }, { status: 503, json: { ok: true } }, { status: 200, json: { ok: false, db: false } }]) {
