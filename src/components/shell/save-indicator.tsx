@@ -5,6 +5,7 @@ import { Check, Cloud, CloudOff, Loader2, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSyncStatus, syncNow, reloadFromServer } from "@/components/sync-provider";
 import { useStorageHealth } from "@/lib/local-persistence";
+import { readPersistedMirror } from "@/lib/persist-storage";
 import { useUiStore } from "@/lib/store";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,7 @@ export function SaveIndicator() {
   function download() {
     try {
       const hydrated = useUiStore.getState().hasHydrated;
-      const contents = hydrated ? useUiStore.getState().exportBackup() : localStorage.getItem("arfarmjaya-wms");
+      const contents = hydrated ? useUiStore.getState().exportBackup() : readPersistedMirror();
       if (!contents) return;
       const url = URL.createObjectURL(new Blob([contents], { type: "application/json" }));
       const a = document.createElement("a");

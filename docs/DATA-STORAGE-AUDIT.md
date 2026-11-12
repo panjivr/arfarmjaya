@@ -138,3 +138,14 @@ utuh, dan tidak ada yang ditimpa. Admin dapat melihat dan mengunduh salinan
 pemulihan di Pengaturan → Cadangan & Pemulihan (`GET /api/backup?recoveries=1`
 dan `?version=recovery:<uuid>`, khusus ADMIN_UTAMA), lalu memulihkannya lewat
 "Pulihkan dari Berkas" bila diperlukan.
+
+Masih di 2026-11-12: persist lokal Zustand dipindahkan dari localStorage ke
+IndexedDB (`src/lib/persist-storage.ts` + `src/lib/idb-storage.ts`). Dataset
+±5,4 MB sudah melampaui kuota localStorage untuk satu salinan saja, sehingga
+penulisan cache rutin gagal dan indikator "Gagal simpan lokal" menyala
+permanen. Semantik perlindungan tidak berubah (validasi payload, penulisan
+diblokir bila data terbaca rusak, kegagalan terlihat di indikator). Nilai
+lama di localStorage dimigrasikan satu kali secara otomatis: divalidasi,
+disalin ke IndexedDB, lalu dihapus dari localStorage. Cadangan pengaman lokal
+(preserveLocalSnapshot) tetap di localStorage dan kini memiliki seluruh
+kuotanya untuk dua salinan cadangan.

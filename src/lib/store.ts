@@ -3,7 +3,8 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
-import { safeStorage, preserveLocalSnapshot } from "@/lib/local-persistence";
+import { preserveLocalSnapshot } from "@/lib/local-persistence";
+import { persistStorage } from "@/lib/persist-storage";
 import { cleanLetterLines, letterTotal, resolveLetterChrome, suggestLetterNumber } from "@/lib/letters";
 import { invoiceInputError, invoiceTotals, suggestInvoiceNumber } from "@/lib/invoices";
 import { snapshotInvoiceSeller } from "@/lib/invoice-design";
@@ -822,7 +823,7 @@ export const useUiStore = create<State & Actions>()(
     {
       name: "arfarmjaya-wms",
       version: 3,
-      storage: createJSONStorage(() => safeStorage),
+      storage: createJSONStorage(() => persistStorage),
       // Backfill field baru pada profil laporan yang tersimpan dari versi lama
       // agar kolom "Bukti Pembayaran" langsung aktif tanpa menghapus data.
       merge: (persisted, current) => {
