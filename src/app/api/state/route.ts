@@ -12,6 +12,14 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 const json = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { "Cache-Control": "no-store" } });
 
+// Cache baca di memori instans ini: data utama hanya dibaca penuh dari
+// database bila stempel waktunya berubah. updatedAt baris "main" selalu naik
+// pada setiap penulisan (dijamin writeWorkspace), jadi stempel yang sama
+// pasti berarti data yang sama. Tanpa ini, setiap perangkat yang membuka
+// aplikasi mengunduh seluruh data dari database — itulah yang menghabiskan
+// kuota transfer Neon paket Free (5 GB/bulan) pada Nov 2026.
+let stateCache: { updatedAtISO: string; revision: string; data: unknown } | null = null;
+
 export async function GET(request: Request) {
   if (!(await currentSession())) return json({ error: "unauthorized" }, 401);
   if (!prisma) return json({ error: "no_database", db: false }, 503);
@@ -22,8 +30,21 @@ export async function GET(request: Request) {
       const row = await prisma.workspace.findUnique({ where: { id: "main" }, select: { updatedAt: true } });
       return json({ db: true, updatedAt: row?.updatedAt ?? null });
     }
+    // Pemeriksaan ringan dulu: hanya stempel waktu. Bila sama dengan cache,
+    // sajikan dari memori tanpa membaca seluruh data dari database.
+    const meta = await prisma.workspace.findUnique({ where: { id: "main" }, select: { updatedAt: true } });
+    if (!meta) {
+      stateCache = null;
+      return json({ data: null, db: true, updatedAt: null, revision: "empty" });
+    }
+    if (stateCache && stateCache.updatedAtISO === meta.updatedAt.toISOString()) {
+      return json({ data: stateCache.data, db: true, updatedAt: meta.updatedAt, revision: stateCache.revision });
+    }
     const row = await prisma.workspace.findUnique({ where: { id: "main" } });
-    return json({ data: row ? parseWorkspace(row.data) : null, db: true, updatedAt: row?.updatedAt ?? null, revision: workspaceRevision(row) });
+    const revision = workspaceRevision(row);
+    const parsed = row ? parseWorkspace(row.data) : null;
+    stateCache = row ? { updatedAtISO: row.updatedAt.toISOString(), revision, data: parsed } : null;
+    return json({ data: parsed, db: true, updatedAt: row?.updatedAt ?? null, revision });
   } catch (error) {
     console.error("GET /api/state failed", error);
     return json({ error: "read_failed" }, 503);
@@ -72,6 +93,7 @@ export async function PUT(request: Request) {
     }
     const data = decodeWorkspace(buf, gzip);
     const row = await savePrismaWorkspace(prisma, data, expected, session.role);
+    stateCache = null;
     // Chunk cleanup is best effort AFTER commit; never report an accepted write
     // as failed simply because temporary upload cleanup failed.
     if (chunkPrefix) await prisma.workspace.deleteMany({ where: { id: { startsWith: chunkPrefix } } }).catch(() => {});
